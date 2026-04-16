@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
+import { ToastProvider } from "@/components/toast-provider";
 import { Sidebar } from "@/components/sidebar";
 import "./globals.css";
 
@@ -33,14 +34,16 @@ export default function RootLayout({
     >
       <body className="h-screen overflow-hidden font-sans">
         <ThemeProvider>
-          <div className="flex h-screen">
-            <Sidebar />
-            <main className="flex flex-1 flex-col overflow-hidden min-w-0">
-              <div className="flex-1 overflow-y-auto">
-                {children}
-              </div>
-            </main>
-          </div>
+          <ToastProvider>
+            <div className="flex h-screen">
+              <Sidebar />
+              <main className="flex flex-1 flex-col overflow-hidden min-w-0">
+                <div className="flex-1 overflow-y-auto">
+                  {children}
+                </div>
+              </main>
+            </div>
+          </ToastProvider>
         </ThemeProvider>
       </body>
     </html>

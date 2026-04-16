@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState, useCallback } from "react";
 import {
   LayoutGrid,
   FileText,
@@ -12,26 +13,69 @@ import {
   Settings,
   Sun,
   Moon,
-  ChevronDown,
-  Plus,
 } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { ProjectSwitcher } from "@/components/project-switcher";
 
-const navItems = [
+interface NavItem {
+  label: string;
+  href: string;
+  icon: typeof LayoutGrid;
+  badgeKey?: "sourceCount" | "runningJobs";
+}
+
+const navItems: NavItem[] = [
   { label: "Dashboard", href: "/", icon: LayoutGrid },
   { label: "Wiki", href: "/wiki", icon: FileText },
-  { label: "Sources", href: "/sources", icon: Download },
+  { label: "Sources", href: "/sources", icon: Download, badgeKey: "sourceCount" },
   { label: "Chat", href: "/chat", icon: MessageSquare },
-  { label: "Jobs", href: "/jobs", icon: Clock },
+  { label: "Jobs", href: "/jobs", icon: Clock, badgeKey: "runningJobs" },
   { label: "Graph", href: "/graph", icon: Share2 },
 ];
 
 const settingsItem = { label: "Settings", href: "/settings", icon: Settings };
 
+interface SidebarData {
+  sourceCount: number;
+  runningJobs: number;
+  activeJob: { title: string; progress: string | null } | null;
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const { resolvedTheme, setTheme } = useTheme();
+  const [data, setData] = useState<SidebarData>({
+    sourceCount: 0,
+    runningJobs: 0,
+    activeJob: null,
+  });
+
+  const fetchSidebarData = useCallback(async () => {
+    try {
+      const res = await fetch("/api/claude/job");
+      if (res.ok) {
+        const json = await res.json();
+        const running = json.jobs?.filter(
+          (j: { status: string }) => j.status === "running"
+        );
+        setData({
+          sourceCount: 0, // Will be populated by sources API
+          runningJobs: running?.length ?? 0,
+          activeJob: running?.[0]
+            ? { title: running[0].title, progress: running[0].progress }
+            : null,
+        });
+      }
+    } catch {
+      // silently fail
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSidebarData();
+    const interval = setInterval(fetchSidebarData, 3000);
+    return () => clearInterval(interval);
+  }, [fetchSidebarData]);
 
   function toggleTheme() {
     setTheme(resolvedTheme === "dark" ? "light" : "dark");
@@ -71,6 +115,10 @@ export function Sidebar() {
             item.href === "/"
               ? pathname === "/"
               : pathname.startsWith(item.href);
+
+          const badgeValue = item.badgeKey ? data[item.badgeKey] : 0;
+          const isRunning = item.badgeKey === "runningJobs" && badgeValue > 0;
+
           return (
             <Link
               key={item.href}
@@ -87,6 +135,17 @@ export function Sidebar() {
                 }`}
               />
               {item.label}
+              {item.badgeKey && badgeValue > 0 && (
+                <span
+                  className={`ml-auto text-[10px] font-semibold font-mono px-1.5 py-px rounded-full ${
+                    isRunning
+                      ? "bg-[var(--green-dim)] text-[var(--green)] animate-pulse"
+                      : "bg-[var(--primary-dim)] text-[var(--primary)]"
+                  }`}
+                >
+                  {badgeValue}
+                </span>
+              )}
             </Link>
           );
         })}
@@ -114,6 +173,30 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="p-2 border-t border-[var(--border)]">
+        {/* Active Job Indicator */}
+        {data.activeJob && (
+          <div className="flex items-center gap-2 px-2.5 py-2 bg-[var(--bg-2)] border border-[var(--border)] rounded-md mb-1.5">
+            <div className="w-3 h-3 border-[1.5px] border-[var(--border-strong)] border-t-[var(--primary)] rounded-full animate-spin shrink-0" />
+            <div className="min-w-0 flex-1">
+              <div className="text-[12px] font-medium text-[var(--text-2)] truncate">
+                {data.activeJob.title}
+              </div>
+              {data.activeJob.progress && (
+                <div className="text-[10px] text-[var(--text-3)] font-mono">
+                  {(() => {
+                    try {
+                      const p = JSON.parse(data.activeJob.progress);
+                      return `${p.current} / ${p.total}`;
+                    } catch {
+                      return "";
+                    }
+                  })()}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         <button
           onClick={toggleTheme}
           className="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[13px] font-[450] text-[var(--text-3)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)] w-full text-left transition-all duration-100"
