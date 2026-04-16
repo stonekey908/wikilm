@@ -236,20 +236,67 @@ export async function startJob(options: JobOptions): Promise<number> {
 }
 
 /**
- * Cancel a running job by killing its process.
+ * Check if a process is still alive.
+ */
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0); // signal 0 = test if process exists
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Send SIGTERM, then SIGKILL after 3s if still alive.
+ */
+function killWithEscalation(pid: number): void {
+  try {
+    process.kill(pid, "SIGTERM");
+  } catch {
+    return; // already dead
+  }
+
+  setTimeout(() => {
+    if (isProcessAlive(pid)) {
+      try {
+        process.kill(pid, "SIGKILL");
+      } catch {
+        // already dead
+      }
+    }
+  }, 3000);
+}
+
+/**
+ * Cancel a running job. Tries in-memory process first, falls back to PID from DB.
+ * Sends SIGTERM, then SIGKILL after 3s if the process is still alive.
  */
 export function cancelJob(jobId: number): boolean {
   const proc = runningProcesses.get(jobId);
-  if (!proc) return false;
 
-  proc.kill("SIGTERM");
-  runningProcesses.delete(jobId);
+  if (proc) {
+    killWithEscalation(proc.pid!);
+    runningProcesses.delete(jobId);
+  } else {
+    // Fallback: look up PID from database
+    const job = db.select({ pid: jobs.pid, status: jobs.status }).from(jobs).where(eq(jobs.id, jobId)).get();
+    if (!job || !job.pid || (job.status !== "running" && job.status !== "queued")) return false;
+
+    if (!isProcessAlive(job.pid)) {
+      // Process already dead — just update status
+      db.update(jobs)
+        .set({ status: "failed", error: "Process died unexpectedly", completedAt: new Date().toISOString() })
+        .where(eq(jobs.id, jobId))
+        .run();
+      return true;
+    }
+
+    killWithEscalation(job.pid);
+  }
 
   db.update(jobs)
-    .set({
-      status: "cancelled",
-      completedAt: new Date().toISOString(),
-    })
+    .set({ status: "cancelled", completedAt: new Date().toISOString() })
     .where(eq(jobs.id, jobId))
     .run();
 
