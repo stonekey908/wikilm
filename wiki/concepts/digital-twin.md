@@ -56,6 +56,8 @@ Beyond physical assets, digital twins are emerging in human-modeling contexts:
 
 ## Relationship to Other Concepts
 
+- **[[world-models]]** — neural networks providing the simulation and prediction engine for digital twins, enabling faster-than-real-time scenario analysis and synthetic data generation
+- **[[physical-ai]]** — broader concept where digital twins are key infrastructure for autonomous systems operating in the physical world
 - **[[enterprise-metaverse]]** — when multiple digital twins are interconnected across an organization's domains
 - **[[predictive-maintenance]]** — one of the highest-value applications of digital twins in physical assets
 - **[[synthetic-user-modeling]]** — human-centric digital twins for UX research and behavior prediction

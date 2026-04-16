@@ -98,3 +98,46 @@ Key themes: Digital twins extended from industrial/physical assets to *personal 
 Critical distinction: Unlike [[nngroup-digital-twins-generative-ai]] (predicting *user behavior*) or [[mckinsey-what-is-digital-twin-technology]] (monitoring *physical assets*), Personal.ai frames digital twins for *knowledge representation and growth*. Positions [[personal-language-models]] as alternative to [[retrieval-augmented-generation]] (search-based) by using integrated, continuously-trained models tailored to individuals.
 
 Cross-references: [[knowledge-management]] as organizing framework across Zettelkasten → wiki → PLM spectrum; [[second-brain]] as related metaphor; [[digital-twin]] now encompasses industrial, behavioral, and personal-knowledge variants.
+
+## [2026-04-16] ingest | NVIDIA — World Models
+Ingested: "What Are World Models and How Are They Built?" from NVIDIA glossary. Technical overview of world foundation models (WFMs) for [[physical-ai]] development.
+
+Pages created (6):
+- **Source**: nvidia-world-models
+- **Entities**: nvidia, nvidia-cosmos
+- **Concepts**: world-models, physical-ai, tokenization
+
+Key themes: [[world-models]] as neural networks learning physics and dynamics to enable prediction and simulation; three primary types (prediction, style transfer, reasoning models); critical technical component [[tokenization]] for converting high-dimensional visual data to semantic tokens enabling efficient training; massive data requirements (petabytes, millions of simulation hours); three core applications ([[autonomous-vehicles]], [[robotics]], [[video-analytics]]) where world models accelerate safety testing and synthetic data generation. [[nvidia-cosmos]] represents production-grade foundation models combining advanced tokenizers, multi-type architectures, and integration with [[reinforcement-learning]].
+
+[[physical-ai]] introduced as convergence of perception + reasoning + action in real-world environments, building on [[world-models]] as foundational technology alongside [[agentic-ai]], [[digital-twin]], and [[robotics]].
+
+Cross-references: [[world-models]] strengthens [[digital-twin]] use cases by providing simulation engines; [[tokenization]] is critical pre-processing layer in all large-scale vision models; [[physical-ai]] bridges [[autonomous-vehicles]], [[robotics]], and [[agentic-ai]] domains; [[nvidia]] and [[nvidia-cosmos]] represent cutting edge of [[world-models]] infrastructure; reinforces [[synthetic-user-modeling]] pattern applied to physics instead of user behavior.
+
+## [2026-04-16] update | Synthesis — project-overview
+Created wiki/synthesis/project-overview.md: big-picture synthesis covering all 4 topic clusters (personal knowledge management, digital twins, agentic AI, world models/physical AI), inter-source contradictions, cross-cluster connections, and knowledge gaps. Updated wiki/index.md to list the new synthesis page.
+
+## [2026-04-16] ingest | Google DeepMind — Genie 3: A new frontier for world models
+Ingested: "Genie 3: A new frontier for world models" from Google DeepMind research blog announcement.
+
+Pages created (7):
+- **Source**: genie-3-world-models
+- **Entities**: google-deepmind, genie-3, sima-agents
+- **Concepts**: video-generation, environmental-consistency, real-time-generation
+
+Pages updated (1):
+- **Concept**: world-models — added Genie 3 as contemporary state-of-the-art example alongside NVIDIA Cosmos; integrated real-time interactivity as application to agent training
+
+Key themes: [[genie-3]] represents major breakthrough in [[real-time-generation]] and [[environmental-consistency]]. Generates interactive environments at 24fps, 720p resolution with visual memory extending to 1 minute — all achieved **without explicit 3D representations**. [[environmental-consistency]] emerges implicitly from large-scale generative modeling, suggesting that learned models can rival or surpass physics engines for world simulation. [[video-generation]] as core capability, but with responsiveness to user actions (enabling [[agentic-ai]] training). [[sima-agents]] from [[google-deepmind]] successfully pursue multi-step goals in [[genie-3]] environments, validating procedurally-generated worlds for agent training.
+
+Critical insight: Genie 3 challenges the explicit-3D paradigm. Rather than building digital twins atop hand-crafted 3D representations, [[google-deepmind]] shows that [[world-models]] can generate frame-by-frame from descriptions and actions, maintaining implicit coherence. This aligns with emerging [[physical-ai]] philosophy: perception + reasoning + action all learned end-to-end, without intermediate symbolic representations.
+
+Cross-references: [[genie-3]] as practical realization of [[world-models]] at scale; [[real-time-generation]] as key enabler for interactive [[agentic-ai]] research; [[environmental-consistency]] as emergent property revealing how neural networks learn implicit spatial structure; [[google-deepmind]] competing with [[nvidia-cosmos]] in [[world-models]] space; synergies with [[digital-twin]] for interactive simulation; [[video-generation]] applications extend beyond [[nngroup-digital-twins-generative-ai]] to procedural world synthesis.
+
+## [2026-04-16] update | Synthesis — project-overview (refinement)
+Refined wiki/synthesis/project-overview.md to reflect full current wiki state after Genie 3 ingestion.
+
+Changes:
+- Resolved previous knowledge gap: [[real-time-generation]], [[video-generation]], [[environmental-consistency]] now fully indexed and integrated into Cluster 4 description
+- Expanded Cluster 4 to name all key concepts inline ([[tokenization]], [[video-generation]], [[environmental-consistency]], [[real-time-generation]], [[physical-ai]])
+- Updated knowledge gaps to remove resolved items; added new gaps (comparison pages, governance solutions, world-models ↔ digital-twins synthesis page)
+- Cross-cluster connections section tightened and made more precise

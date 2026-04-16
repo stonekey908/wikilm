@@ -12,6 +12,8 @@ type: index
 - [[ieee-ai-digital-twins]] — IEEE analysis of how AI enables autonomous monitoring, predictive maintenance, and optimization across manufacturing, healthcare, urban planning, and energy sectors
 - [[nngroup-digital-twins-generative-ai]] — Nielsen Norman Group article on using generative AI for individual-level digital twins in UX research
 - [[personal-ai-digital-twins-article]] — Personal.ai article on digital twins for individual knowledge management, personal language models, and cognitive augmentation
+- [[nvidia-world-models]] — NVIDIA glossary on world models: neural networks understanding physics and dynamics for prediction and simulation
+- [[genie-3-world-models]] — Google DeepMind announcement of Genie 3, a real-time world model generating interactive environments at 24fps with emergent environmental consistency
 
 ## Entities
 - [[andrej-karpathy]] — OpenAI co-founder, Tesla former AI lead, creator of the LLM wiki pattern
@@ -31,6 +33,11 @@ type: index
 - [[paypal]] — Fintech leader exploring agentic commerce transactions
 - [[amazon-bedrock]] — AWS cloud service providing agentic AI infrastructure for enterprise
 - [[salesforce-agentforce]] — Enterprise CRM software embedding agentic AI capabilities
+- [[nvidia]] — GPU and AI infrastructure leader; provides [[world-models]] foundation technology
+- [[nvidia-cosmos]] — NVIDIA's state-of-the-art world foundation models for physical AI development
+- [[google-deepmind]] — AI research organization within Alphabet/Google; develops world models and agentic AI systems
+- [[genie-3]] — Google DeepMind's real-time interactive world model; generates diverse procedural environments at 24fps with extended visual memory
+- [[sima-agents]] — Scalable Instructable Multiworld Agents from Google DeepMind; trained in Genie 3 environments for multi-step goal pursuit
 
 ## Concepts
 - [[llm-wiki-pattern]] — System where an LLM maintains a structured wiki from raw sources
@@ -51,6 +58,12 @@ type: index
 - [[governance-frameworks]] — Organizational structures defining what autonomous agents can do and how they're supervised
 - [[human-oversight]] — Active human role monitoring, validating, and intervening in autonomous systems; essential control mechanism
 - [[regulatory-compliance]] — Legal requirement that agent decisions and processes meet banking/sector regulations
+- [[world-models]] — Neural networks learning to understand and simulate physical dynamics, enabling prediction and reasoning in real-world environments
+- [[physical-ai]] — AI systems that perceive, reason, and take action in the physical world; convergence of embodied intelligence, robotics, and autonomous systems
+- [[tokenization]] — Converting high-dimensional data (images, video) into discrete semantic units for efficient neural network processing
+- [[video-generation]] — Synthesis of video sequences from text, images, or control signals; core capability of modern world models
+- [[environmental-consistency]] — Ability to maintain coherent object and physics properties across extended sequences; achieved implicitly in Genie 3
+- [[real-time-generation]] — High-quality content generation at interactive latencies; enables live agent interaction and user-responsive systems
 
 ## Comparisons
 
@@ -58,7 +71,7 @@ _No comparisons yet._
 
 ## Synthesis
 
-_No synthesis pages yet._
+- [[project-overview]] — Big-picture map of all wiki topics: knowledge management, digital twins, agentic AI, and world models, with cross-cluster connections and gaps
 
 ## Queries
 
