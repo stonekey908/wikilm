@@ -14,6 +14,7 @@ import {
   Tag,
   Link2,
   ChevronDown,
+  ChevronRight,
   X,
 } from "lucide-react";
 
@@ -274,6 +275,8 @@ export default function WikiPage() {
   const [detail, setDetail] = useState<WikiPageDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
+  // Navigation trail: entries are { slug, title } in visit order. Empty array = no navigation yet.
+  const [trail, setTrail] = useState<{ slug: string; title: string }[]>([]);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on outside click
@@ -309,15 +312,32 @@ export default function WikiPage() {
     return () => clearTimeout(timer);
   }, [fetchPages, search]);
 
-  // Fetch detail
-  const loadDetail = useCallback(async (slug: string) => {
+  // Fetch detail. `mode` controls what happens to the breadcrumb trail:
+  //   - "start": replace trail with just this page (used for list-panel clicks)
+  //   - "push":  append this page to trail (used for wikilink clicks)
+  //   - "jump":  truncate trail at this slug (used for breadcrumb clicks)
+  const loadDetail = useCallback(async (slug: string, mode: "start" | "push" | "jump" = "start") => {
     setSelectedSlug(slug);
     setDetailLoading(true);
     try {
       const res = await fetch(`/api/wiki/${encodeURIComponent(slug)}`);
       if (res.ok) {
-        const data = await res.json();
+        const data: WikiPageDetail = await res.json();
         setDetail(data);
+        if (mode === "start") {
+          setTrail([{ slug: data.slug, title: data.title }]);
+        } else if (mode === "push") {
+          setTrail((prev) => {
+            // If already last in trail (e.g. clicked same link twice), no-op
+            if (prev.length > 0 && prev[prev.length - 1].slug === data.slug) return prev;
+            return [...prev, { slug: data.slug, title: data.title }];
+          });
+        } else if (mode === "jump") {
+          setTrail((prev) => {
+            const idx = prev.findIndex((t) => t.slug === data.slug);
+            return idx === -1 ? [{ slug: data.slug, title: data.title }] : prev.slice(0, idx + 1);
+          });
+        }
       }
     } catch {
       // silently fail
@@ -326,21 +346,37 @@ export default function WikiPage() {
     }
   }, []);
 
-  // Handle wikilink navigation
+  // Handle wikilink navigation (from within page content)
   function handleWikilinkClick(target: string) {
-    // Try to find the page in the current list by slug match
     const normalizedTarget = target.toLowerCase().replace(/\s+/g, "-");
     const match = pages.find((p) => {
       const slugEnd = p.slug.split("/").pop()?.toLowerCase();
       return slugEnd === normalizedTarget;
     });
-    if (match) {
-      loadDetail(match.slug);
-    } else {
-      // Try direct slug load
-      loadDetail(normalizedTarget);
-    }
+    loadDetail(match ? match.slug : normalizedTarget, "push");
   }
+
+  // Parse forward wikilinks out of the current page body (unique, excluding self)
+  const forwardLinks = (() => {
+    if (!detail) return [];
+    const matches = detail.body.matchAll(/\[\[([^\]]+)\]\]/g);
+    const targets = new Set<string>();
+    for (const m of matches) {
+      const target = m[1].toLowerCase().replace(/\s+/g, "-");
+      targets.add(target);
+    }
+    // Resolve each target to a real page if possible
+    return Array.from(targets)
+      .map((target) => {
+        const match = pages.find((p) => {
+          const slugEnd = p.slug.split("/").pop()?.toLowerCase();
+          return slugEnd === target;
+        });
+        return match ? { slug: match.slug, title: match.title, type: match.type } : null;
+      })
+      .filter((x): x is { slug: string; title: string; type: string } => x !== null)
+      .filter((p) => p.slug !== detail.slug);
+  })();
 
   function getTypeConfig(type: string) {
     return TYPE_CONFIG[type] || TYPE_CONFIG.unknown;
@@ -447,8 +483,47 @@ export default function WikiPage() {
           </div>
         )}
 
+        {/* Related pages (shown when a page is selected) */}
+        {detail && (forwardLinks.length > 0 || detail.backlinks.length > 0) && (
+          <div className="px-4 pb-3 border-b border-[var(--border)]">
+            <div className="text-[11px] font-semibold text-[var(--text-4)] uppercase tracking-wider mb-2">
+              Related
+            </div>
+            <div className="flex flex-col gap-0.5">
+              {forwardLinks.map((p) => {
+                const cfg = getTypeConfig(p.type);
+                const Icon = cfg.icon;
+                return (
+                  <button
+                    key={`fwd-${p.slug}`}
+                    onClick={() => loadDetail(p.slug, "push")}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded text-left hover:bg-[var(--bg-hover)] transition-colors cursor-pointer text-[12px] text-[var(--text-2)]"
+                    title="Referenced in this page"
+                  >
+                    <ChevronRight className="w-3 h-3 text-[var(--text-4)] shrink-0" />
+                    <Icon className="w-3 h-3 shrink-0" style={{ color: cfg.color }} />
+                    <span className="truncate">{p.title}</span>
+                  </button>
+                );
+              })}
+              {detail.backlinks.map((bl) => (
+                <button
+                  key={`back-${bl.slug}`}
+                  onClick={() => loadDetail(bl.slug, "push")}
+                  className="flex items-center gap-2 px-2 py-1.5 rounded text-left hover:bg-[var(--bg-hover)] transition-colors cursor-pointer text-[12px] text-[var(--text-2)]"
+                  title="Links to this page"
+                >
+                  <ArrowLeft className="w-3 h-3 text-[var(--text-4)] shrink-0" />
+                  <Link2 className="w-3 h-3 shrink-0 text-[var(--text-3)]" />
+                  <span className="truncate">{bl.title}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Results count */}
-        <div className="px-5 pb-2">
+        <div className="px-5 pt-3 pb-2">
           <span className="text-[11px] font-semibold text-[var(--text-4)] uppercase tracking-wider">
             {loading ? "Loading..." : `${pages.length} page${pages.length !== 1 ? "s" : ""}`}
           </span>
@@ -525,14 +600,37 @@ export default function WikiPage() {
             </div>
           ) : detail ? (
             <div className="max-w-3xl mx-auto px-8 py-6">
-              {/* Back button (mobile-friendly) */}
-              <button
-                onClick={() => { setSelectedSlug(null); setDetail(null); }}
-                className="flex items-center gap-1.5 text-[13px] text-[var(--text-3)] hover:text-[var(--text-1)] mb-4 transition-colors cursor-pointer"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                Back to list
-              </button>
+              {/* Back + breadcrumb trail */}
+              <div className="flex items-center gap-1 flex-wrap mb-4 text-[13px]">
+                <button
+                  onClick={() => { setSelectedSlug(null); setDetail(null); setTrail([]); }}
+                  className="flex items-center gap-1.5 text-[var(--text-3)] hover:text-[var(--text-1)] transition-colors cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  Wiki
+                </button>
+                {trail.map((entry, idx) => {
+                  const isLast = idx === trail.length - 1;
+                  return (
+                    <div key={`${entry.slug}-${idx}`} className="flex items-center gap-1">
+                      <ChevronRight className="w-3 h-3 text-[var(--text-4)]" />
+                      {isLast ? (
+                        <span className="text-[var(--text-1)] font-[550] truncate max-w-[240px]" title={entry.title}>
+                          {entry.title}
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => loadDetail(entry.slug, "jump")}
+                          className="text-[var(--text-3)] hover:text-[var(--primary)] transition-colors cursor-pointer truncate max-w-[180px]"
+                          title={entry.title}
+                        >
+                          {entry.title}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
 
               {/* Title */}
               <h1 className="text-[22px] font-[650] tracking-tight text-[var(--text-1)] mb-3">
@@ -594,7 +692,7 @@ export default function WikiPage() {
                     {detail.backlinks.map((bl) => (
                       <button
                         key={bl.slug}
-                        onClick={() => loadDetail(bl.slug)}
+                        onClick={() => loadDetail(bl.slug, "push")}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--surface-card)] border border-[var(--border)] rounded-lg text-[13px] text-[var(--primary)] hover:border-[var(--primary)] transition-colors cursor-pointer"
                       >
                         <Link2 className="w-3 h-3" />
