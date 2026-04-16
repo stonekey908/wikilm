@@ -13,14 +13,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const maxResults = body.maxResults ?? 8;
+
   const prompt = `Search the web for sources about: ${topic}
 
-Output each result as one line: RESULT:{"title":"...","domain":"...","author":"...","type":"Paper|Blog|Article|Survey","summary":"...","relevance":85,"tags":["tag1","tag2"]}
+Output each result as one line: RESULT:{"title":"...","url":"...","domain":"...","author":"...","type":"Paper|Blog|Article|Survey","summary":"...","relevance":85,"tags":["tag1","tag2"]}
 
-Find 5-8 sources. When done output: DONE`;
+IMPORTANT: Include the actual URL for each source. Find exactly ${maxResults} sources maximum. When done output: DONE`;
 
   const projectCwd = path.join(process.cwd(), "..");
-  const stream = streamClaude({ prompt, projectCwd });
+  const stream = streamClaude({ prompt, projectCwd, type: "research" });
 
   return new Response(stream, {
     headers: {

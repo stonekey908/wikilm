@@ -66,6 +66,12 @@ export async function POST(
       projectId: source.projectId,
       type: "ingest",
       title: `Ingest: ${source.title}`,
+      onComplete: (status) => {
+        db.update(sources)
+          .set({ status: status === "completed" ? "ingested" : "failed" })
+          .where(eq(sources.id, sourceId))
+          .run();
+      },
     });
 
     return Response.json({ jobId });
