@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Search,
   FileText,
@@ -296,6 +297,7 @@ function TypeChip({ type }: { type: string }) {
 /* ─── Page Component ─── */
 
 export default function WikiPage() {
+  const searchParams = useSearchParams();
   const [pages, setPages] = useState<WikiPageMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -342,6 +344,14 @@ export default function WikiPage() {
     const timer = setTimeout(fetchPages, search ? 300 : 0);
     return () => clearTimeout(timer);
   }, [fetchPages, search]);
+
+  // If the URL has ?slug=..., auto-open that page (used by the graph view).
+  // Only reacts to slug changes, not loadDetail identity, to avoid re-loading on every render.
+  const urlSlug = searchParams.get("slug");
+  useEffect(() => {
+    if (urlSlug) loadDetail(urlSlug);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlSlug]);
 
   // Fetch detail. `mode` controls what happens to the breadcrumb trail:
   //   - "start": replace trail with just this page (used for list-panel clicks)
