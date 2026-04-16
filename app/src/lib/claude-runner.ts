@@ -272,6 +272,45 @@ function killWithEscalation(pid: number): void {
 }
 
 /**
+ * On server startup, find jobs stuck in "running" state.
+ * If the PID is dead, mark as failed. If alive, kill it.
+ */
+export function cleanupOrphanedJobs(): void {
+  const staleJobs = db
+    .select()
+    .from(jobs)
+    .where(eq(jobs.status, "running"))
+    .all();
+
+  for (const job of staleJobs) {
+    if (!job.pid || !isProcessAlive(job.pid)) {
+      db.update(jobs)
+        .set({
+          status: "failed",
+          error: "Process orphaned — cleaned up on server restart",
+          completedAt: new Date().toISOString(),
+        })
+        .where(eq(jobs.id, job.id))
+        .run();
+    } else {
+      killWithEscalation(job.pid);
+      db.update(jobs)
+        .set({
+          status: "cancelled",
+          error: "Orphaned process killed on server restart",
+          completedAt: new Date().toISOString(),
+        })
+        .where(eq(jobs.id, job.id))
+        .run();
+    }
+  }
+
+  if (staleJobs.length > 0) {
+    console.log(`[cleanup] Resolved ${staleJobs.length} orphaned job(s)`);
+  }
+}
+
+/**
  * Cancel a running job. Tries in-memory process first, falls back to PID from DB.
  * Sends SIGTERM, then SIGKILL after 3s if the process is still alive.
  */
