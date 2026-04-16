@@ -100,12 +100,28 @@ export default function SourcesPage() {
   const [tab, setTab] = useState<"library" | "research">("library");
   const [sources, setSources] = useState<Source[]>([]);
   const [dragOver, setDragOver] = useState(false);
-  const [researchQuery, setResearchQuery] = useState("");
-  const [results, setResults] = useState<ResearchResult[]>([]);
+  const [researchQuery, setResearchQuery] = useState(() => {
+    if (typeof window !== "undefined") return sessionStorage.getItem("sb_research_query") ?? "";
+    return "";
+  });
+  const [results, setResults] = useState<ResearchResult[]>(() => {
+    if (typeof window !== "undefined") {
+      try { return JSON.parse(sessionStorage.getItem("sb_research_results") ?? "[]"); } catch { return []; }
+    }
+    return [];
+  });
   const [isSearching, setIsSearching] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const nextResultId = useRef(0);
+
+  // Persist research state to sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem("sb_research_results", JSON.stringify(results));
+  }, [results]);
+  useEffect(() => {
+    sessionStorage.setItem("sb_research_query", researchQuery);
+  }, [researchQuery]);
 
   /* ── Fetch sources (poll while any are ingesting) ── */
   useEffect(() => {
@@ -275,22 +291,27 @@ export default function SourcesPage() {
         if (!result) return;
 
         try {
-          await fetch("/api/claude/job", {
+          await fetch("/api/sources/ingest-web", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
+              title: result.title,
+              url: result.url,
+              domain: result.domain,
+              author: result.author,
+              type: result.type,
+              summary: result.summary,
+              tags: result.tags,
               projectId: 1,
-              type: "ingest",
-              title: `Ingest: ${result.title}`,
-              prompt: `Fetch and ingest the following source into the wiki:\n\nTitle: ${result.title}\nDomain: ${result.domain}\nAuthor: ${result.author}\nType: ${result.type}\nSummary: ${result.summary}\nTags: ${result.tags.join(", ")}\n\nSearch the web for this source, download or read its content, create a source summary in wiki/sources/, identify entities and concepts, update existing wiki pages with cross-references, and update wiki/index.md and wiki/log.md.`,
             }),
           });
+          refreshSources();
         } catch {
           // job submission failed — leave the UI as approved
         }
       }
     },
-    [results]
+    [results, refreshSources]
   );
 
   const approvedCount = results.filter((r) => r.status === "approved").length;
@@ -642,9 +663,16 @@ export default function SourcesPage() {
                     >
                       <BookmarkIcon /> Bookmark
                     </button>
-                    <button className="text-xs font-[550] px-3 py-[5px] rounded-md bg-transparent text-[var(--text-3)] border border-[var(--border)] cursor-pointer ml-auto transition-all hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]">
-                      Preview
-                    </button>
+                    {r.url && (
+                      <a
+                        href={r.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs font-[550] px-3 py-[5px] rounded-md bg-transparent text-[var(--text-3)] border border-[var(--border)] cursor-pointer ml-auto transition-all hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)] no-underline"
+                      >
+                        Preview
+                      </a>
+                    )}
                   </div>
                 )}
               </div>
