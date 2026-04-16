@@ -505,13 +505,19 @@ function parseProgress(output: string): { current: number; total: number } | nul
   return null;
 }
 
-/**
- * Trigger a synthesis update job. Called after successful ingest.
- * Refines wiki/synthesis/project-overview.md based on current index + existing synthesis.
- * Kept to ~500 words so chat can cheaply include it as context.
- */
-export async function triggerSynthesisUpdate(projectCwd: string, projectId: number): Promise<number> {
-  const prompt = `Update the project-wide synthesis page at wiki/synthesis/project-overview.md.
+// ─── Synthesis coalescing ──────────────────────────────────────────────────
+// Multiple ingests finishing in quick succession shouldn't spawn N synthesis
+// jobs — one is enough to capture the current state. We track a single
+// in-flight synthesis and a "pending" flag. Any trigger while one is in-flight
+// flips the flag; on completion, if pending, we fire exactly one more run to
+// capture anything that finished during the in-flight read. This converges
+// to at most 2 runs regardless of how many ingests completed in a burst.
+let synthesisInFlight = false;
+let synthesisPending = false;
+let lastProjectCwd: string | null = null;
+let lastProjectId: number | null = null;
+
+const SYNTHESIS_PROMPT = `Update the project-wide synthesis page at wiki/synthesis/project-overview.md.
 
 Process:
 1. Read wiki/index.md to see what pages exist
@@ -528,11 +534,46 @@ Constraints:
 
 After updating, also update wiki/index.md if this synthesis wasn't already listed, and append an entry to wiki/log.md.`;
 
+function scheduleSynthesisJob(projectCwd: string, projectId: number): Promise<number> {
+  synthesisInFlight = true;
+  synthesisPending = false;
   return startJob({
-    prompt,
+    prompt: SYNTHESIS_PROMPT,
     projectCwd,
     projectId,
     type: "synthesis",
     title: "Update project synthesis",
+    onComplete: () => {
+      synthesisInFlight = false;
+      // If any ingest finished during this run, fire exactly one more pass
+      if (synthesisPending && lastProjectCwd && lastProjectId !== null) {
+        scheduleSynthesisJob(lastProjectCwd, lastProjectId).catch((err) => {
+          console.error("[synthesis] follow-up run failed:", err);
+        });
+      }
+    },
   });
+}
+
+/**
+ * Trigger a synthesis update. Coalesces rapid-fire triggers so at most one
+ * synthesis is queued/running at any time, plus at most one follow-up to
+ * capture ingests that completed during the in-flight run.
+ *
+ * Returns the jobId of the newly scheduled synthesis, or null if the caller
+ * was coalesced into an already-in-flight run.
+ */
+export async function triggerSynthesisUpdate(
+  projectCwd: string,
+  projectId: number
+): Promise<number | null> {
+  // Remember the latest project — the follow-up run uses these
+  lastProjectCwd = projectCwd;
+  lastProjectId = projectId;
+
+  if (synthesisInFlight) {
+    synthesisPending = true;
+    return null;
+  }
+  return scheduleSynthesisJob(projectCwd, projectId);
 }
