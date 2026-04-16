@@ -13,12 +13,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const prompt = `Search the web for high-quality sources about: ${topic}
+  const prompt = `Search the web for sources about: ${topic}
 
-For each source you find, output EXACTLY one JSON line in this format (no other text before or after each JSON line):
-RESULT:{"title":"...","domain":"...","author":"...","type":"Paper|Blog|Article|Book|Survey","summary":"...","relevance":85,"tags":["tag1","tag2"]}
+Output each result as one line: RESULT:{"title":"...","domain":"...","author":"...","type":"Paper|Blog|Article|Survey","summary":"...","relevance":85,"tags":["tag1","tag2"]}
 
-Find 5-8 relevant sources. Focus on academic papers, authoritative blogs, and high-quality articles. After all results, output: DONE`;
+Find 5-8 sources. When done output: DONE`;
 
   const projectCwd = path.join(process.cwd(), "..");
   const stream = streamClaude({ prompt, projectCwd });

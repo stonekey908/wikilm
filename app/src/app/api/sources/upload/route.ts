@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     // Auto-start ingestion job
     const projectCwd = path.join(process.cwd(), "..");
-    const prompt = `Ingest the source file at raw/${filename} into the wiki. Read the file completely, create a source summary page, identify entities and concepts, create or update wiki pages, add wikilinks throughout, and update wiki/index.md and wiki/log.md.`;
+    const prompt = `Ingest raw/${filename}`;
 
     const jobId = await startJob({
       prompt,
