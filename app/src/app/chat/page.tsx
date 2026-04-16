@@ -313,12 +313,7 @@ export default function ChatPage() {
         await saveMessageToDb(sessionId, "user", trimmed);
       }
 
-      // Build the prompt with wiki context
-      const scope = searchAllProjects
-        ? "Search across ALL projects in the knowledge base."
-        : "Read wiki/index.md, find relevant pages, then synthesize an answer with citations to specific wiki pages.";
-
-      const prompt = `${scope}\n\nUser question: ${trimmed}`;
+      const prompt = trimmed;
 
       const controller = new AbortController();
       abortRef.current = controller;
@@ -465,11 +460,7 @@ tags: [${tags}]
 
 ${message.content}`;
 
-      const prompt = `Create the file wiki/queries/${slug}.md with this exact content, then update wiki/index.md to include it, and append to wiki/log.md:
-
-\`\`\`
-${fileContent}
-\`\`\``;
+      const prompt = `Save this as a query page wiki/queries/${slug}.md:\n\n${fileContent}`;
 
       try {
         const response = await fetch("/api/claude/stream", {
