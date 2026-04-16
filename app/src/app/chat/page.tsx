@@ -120,7 +120,7 @@ interface Message {
 
 /* ── Constants ──────────────────────────────────────────────────── */
 
-const PROJECT_CWD = process.env.NEXT_PUBLIC_PROJECT_CWD ?? "<user-home>/SecondBrain";
+// projectCwd is resolved server-side in the API route
 
 /* ── Component ──────────────────────────────────────────────────── */
 
@@ -188,7 +188,7 @@ export default function ChatPage() {
         const response = await fetch("/api/claude/stream", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt, projectCwd: PROJECT_CWD }),
+          body: JSON.stringify({ prompt }),
           signal: controller.signal,
         });
 
@@ -317,7 +317,7 @@ ${fileContent}
         const response = await fetch("/api/claude/stream", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt, projectCwd: PROJECT_CWD }),
+          body: JSON.stringify({ prompt }),
         });
         if (response.ok) {
           alert("Saved to wiki as a query page.");
