@@ -351,6 +351,29 @@ export function cancelJob(jobId: number): boolean {
  * Try to extract progress info from Claude's output.
  * Looks for patterns like "Processing 3/12 pages" or similar.
  */
+/**
+ * On server shutdown, kill all tracked running processes.
+ */
+function handleShutdown() {
+  for (const [jobId, proc] of runningProcesses) {
+    try {
+      if (proc.pid) {
+        process.kill(proc.pid, "SIGKILL"); // immediate — server is going down
+      }
+    } catch {
+      // already dead
+    }
+    db.update(jobs)
+      .set({ status: "cancelled", error: "Server shutdown", completedAt: new Date().toISOString() })
+      .where(eq(jobs.id, jobId))
+      .run();
+  }
+  runningProcesses.clear();
+}
+
+process.on("SIGINT", handleShutdown);
+process.on("SIGTERM", handleShutdown);
+
 function parseProgress(output: string): { current: number; total: number } | null {
   const lines = output.split("\n").reverse();
   for (const line of lines) {
