@@ -75,6 +75,11 @@ export const chatMessages = sqliteTable("chat_messages", {
     .$defaultFn(() => new Date().toISOString()),
 });
 
+export const settings = sqliteTable("settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(),
+});
+
 export const jobs = sqliteTable("jobs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   projectId: integer("project_id")
