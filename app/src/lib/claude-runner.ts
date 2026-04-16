@@ -8,12 +8,28 @@ export const isMockMode = process.env.MOCK_MODE === "true";
 
 const MAX_CONCURRENT_JOBS = 3;
 
+// Model configuration per operation type. Override via env vars:
+// CLAUDE_MODEL_INGEST, CLAUDE_MODEL_RESEARCH, CLAUDE_MODEL_QUERY, CLAUDE_MODEL_LINT, CLAUDE_MODEL_CHAT
+const DEFAULT_MODELS: Record<string, string> = {
+  ingest: process.env.CLAUDE_MODEL_INGEST ?? process.env.CLAUDE_MODEL ?? "sonnet",
+  research: process.env.CLAUDE_MODEL_RESEARCH ?? process.env.CLAUDE_MODEL ?? "sonnet",
+  query: process.env.CLAUDE_MODEL_QUERY ?? process.env.CLAUDE_MODEL ?? "sonnet",
+  lint: process.env.CLAUDE_MODEL_LINT ?? process.env.CLAUDE_MODEL ?? "sonnet",
+  chat: process.env.CLAUDE_MODEL_CHAT ?? process.env.CLAUDE_MODEL ?? "sonnet",
+};
+
+function getModelArgs(type: string): string[] {
+  const model = DEFAULT_MODELS[type] ?? DEFAULT_MODELS.chat;
+  return ["--model", model];
+}
+
 // Track running processes by job ID
 const runningProcesses = new Map<number, ChildProcess>();
 
 interface StreamOptions {
   prompt: string;
   projectCwd: string;
+  type?: string;
 }
 
 interface JobOptions {
@@ -22,6 +38,7 @@ interface JobOptions {
   projectId: number;
   type: "ingest" | "query" | "lint" | "research";
   title: string;
+  onComplete?: (status: "completed" | "failed") => void;
 }
 
 /**
@@ -35,7 +52,7 @@ export function getRunningJobCount(): number {
  * Stream mode — returns a ReadableStream of SSE data.
  * Used for real-time chat responses.
  */
-export function streamClaude({ prompt, projectCwd }: StreamOptions): ReadableStream {
+export function streamClaude({ prompt, projectCwd, type }: StreamOptions): ReadableStream {
   if (isMockMode) {
     const type = prompt.toLowerCase().includes("ingest")
       ? "ingest"
@@ -51,7 +68,11 @@ export function streamClaude({ prompt, projectCwd }: StreamOptions): ReadableStr
 
   return new ReadableStream({
     start(controller) {
-      const proc = spawn("claude", ["-p", prompt], {
+      const proc = spawn("claude", [
+        "-p", prompt,
+        ...getModelArgs(type ?? "chat"),
+        "--allowedTools", "Write", "Edit", "Read", "WebSearch", "WebFetch", "Bash(ls:*)", "Bash(mkdir:*)",
+      ], {
         cwd: projectCwd,
         stdio: ["ignore", "pipe", "pipe"],
         env: { ...process.env },
@@ -153,6 +174,7 @@ export async function startJob(options: JobOptions): Promise<number> {
         })
         .where(eq(jobs.id, jobId))
         .run();
+      options.onComplete?.("completed");
     })();
 
     return jobId;
@@ -173,7 +195,11 @@ export async function startJob(options: JobOptions): Promise<number> {
 
   const jobId = result[0].id;
 
-  const proc = spawn("claude", ["-p", options.prompt], {
+  const proc = spawn("claude", [
+    "-p", options.prompt,
+    ...getModelArgs(options.type),
+    "--allowedTools", "Write", "Edit", "Read", "WebSearch", "WebFetch", "Bash(ls:*)", "Bash(mkdir:*)",
+  ], {
     cwd: options.projectCwd,
     stdio: ["ignore", "pipe", "pipe"],
     env: { ...process.env },
@@ -221,6 +247,7 @@ export async function startJob(options: JobOptions): Promise<number> {
       })
       .where(eq(jobs.id, jobId))
       .run();
+    options.onComplete?.(finalStatus);
   });
 
   proc.on("error", (err) => {
@@ -233,6 +260,7 @@ export async function startJob(options: JobOptions): Promise<number> {
       })
       .where(eq(jobs.id, jobId))
       .run();
+    options.onComplete?.("failed");
   });
 
   return jobId;

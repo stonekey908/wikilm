@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
 
   // Resolve project root (parent of app/)
   const projectCwd = path.join(process.cwd(), "..");
-  const stream = streamClaude({ prompt, projectCwd });
+  const stream = streamClaude({ prompt, projectCwd, type: "chat" });
 
   return new Response(stream, {
     headers: {

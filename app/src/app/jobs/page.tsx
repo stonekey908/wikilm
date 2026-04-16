@@ -130,6 +130,19 @@ export default function JobsPage() {
     }
   };
 
+  const dismissJob = async (id: number) => {
+    try {
+      await fetch(`/api/claude/job/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "dismiss" }),
+      });
+      fetchJobs();
+    } catch {
+      // ignore
+    }
+  };
+
   const filteredJobs = jobs.filter((job) => {
     if (statusFilter !== "all" && job.status !== statusFilter) return false;
     if (typeFilter !== "all" && job.type !== typeFilter) return false;
@@ -266,6 +279,20 @@ export default function JobsPage() {
                       }}
                       className="p-1 rounded hover:bg-[var(--red-dim)] text-[var(--text-4)] hover:text-[var(--red)] transition-colors shrink-0"
                       title="Cancel job"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+
+                  {/* Dismiss button */}
+                  {(job.status === "completed" || job.status === "failed" || job.status === "cancelled") && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        dismissJob(job.id);
+                      }}
+                      className="p-1 rounded hover:bg-[var(--bg-3)] text-[var(--text-4)] hover:text-[var(--text-2)] transition-colors shrink-0"
+                      title="Dismiss"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>

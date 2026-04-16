@@ -19,6 +19,7 @@ interface Source {
 interface ResearchResult {
   id: string;
   title: string;
+  url: string;
   relevance: number;
   domain: string;
   author: string;
@@ -106,12 +107,17 @@ export default function SourcesPage() {
   const abortRef = useRef<AbortController | null>(null);
   const nextResultId = useRef(0);
 
-  /* ── Fetch sources ── */
+  /* ── Fetch sources (poll while any are ingesting) ── */
   useEffect(() => {
-    fetch("/api/sources")
-      .then((r) => r.json())
-      .then((d) => setSources(d.sources ?? []))
-      .catch(() => {});
+    const fetchSources = () => {
+      fetch("/api/sources")
+        .then((r) => r.json())
+        .then((d) => setSources(d.sources ?? []))
+        .catch(() => {});
+    };
+    fetchSources();
+    const interval = setInterval(fetchSources, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   /* ── Research stream ── */
@@ -164,6 +170,7 @@ export default function SourcesPage() {
                   const result: ResearchResult = {
                     id: `r${nextResultId.current++}`,
                     title: json.title ?? "Untitled",
+                    url: json.url ?? "",
                     domain: json.domain ?? "",
                     author: json.author ?? "Unknown",
                     type: json.type ?? "Article",
@@ -562,7 +569,11 @@ export default function SourcesPage() {
                 {/* Title row */}
                 <div className="flex items-start justify-between gap-3 mb-1.5">
                   <div className="text-sm font-semibold text-[var(--text-1)] leading-snug">
-                    {r.title}
+                    {r.url ? (
+                      <a href={r.url} target="_blank" rel="noopener noreferrer" className="hover:text-[var(--primary)] transition-colors">{r.title}</a>
+                    ) : (
+                      r.title
+                    )}
                   </div>
                   <span
                     className={`font-mono text-[11px] font-medium px-[7px] py-0.5 rounded-[10px] shrink-0 ${relClass(r.relevance)}`}
@@ -573,7 +584,11 @@ export default function SourcesPage() {
 
                 {/* Meta */}
                 <div className="flex items-center gap-2 text-xs text-[var(--text-3)] mb-2">
-                  <span>{r.domain}</span>
+                  {r.url ? (
+                    <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-[var(--primary)] hover:underline">{r.domain || r.url}</a>
+                  ) : (
+                    <span>{r.domain}</span>
+                  )}
                   <span className="w-0.5 h-0.5 rounded-full bg-[var(--text-4)]" />
                   <span>{r.author}</span>
                   <span className="w-0.5 h-0.5 rounded-full bg-[var(--text-4)]" />
