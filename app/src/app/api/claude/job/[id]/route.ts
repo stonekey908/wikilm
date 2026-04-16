@@ -38,10 +38,12 @@ export async function DELETE(
   const cancelled = cancelJob(jobId);
 
   if (!cancelled) {
-    return Response.json(
-      { error: "Job not found or not running" },
-      { status: 404 }
-    );
+    // Check if job exists but is already in a terminal state
+    const job = db.select({ status: jobs.status }).from(jobs).where(eq(jobs.id, jobId)).get();
+    if (job && job.status !== "running" && job.status !== "queued") {
+      return Response.json({ error: "Job already finished", status: job.status }, { status: 409 });
+    }
+    return Response.json({ error: "Job not found" }, { status: 404 });
   }
 
   return Response.json({ success: true });
