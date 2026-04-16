@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/db";
 import { sources } from "@/db/schema";
+import { startJob } from "@/lib/claude-runner";
 import path from "path";
 import { writeFile, mkdir } from "fs/promises";
 
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
 
   await mkdir(RAW_DIR, { recursive: true });
 
-  const created: Array<{ id: number; title: string }> = [];
+  const created: Array<{ id: number; title: string; jobId: number }> = [];
 
   for (const entry of files) {
     if (!(entry instanceof File)) continue;
@@ -45,12 +46,26 @@ export async function POST(request: NextRequest) {
         title,
         type,
         filePath: `raw/${filename}`,
-        status: "pending",
+        status: "ingesting",
       })
       .returning({ id: sources.id })
       .all();
 
-    created.push({ id: result[0].id, title });
+    const sourceId = result[0].id;
+
+    // Auto-start ingestion job
+    const projectCwd = path.join(process.cwd(), "..");
+    const prompt = `Ingest the source file at raw/${filename} into the wiki. Read the file completely, create a source summary page, identify entities and concepts, create or update wiki pages, add wikilinks throughout, and update wiki/index.md and wiki/log.md.`;
+
+    const jobId = await startJob({
+      prompt,
+      projectCwd,
+      projectId: 1,
+      type: "ingest",
+      title: `Ingest: ${title}`,
+    });
+
+    created.push({ id: sourceId, title, jobId });
   }
 
   return Response.json({ created }, { status: 201 });
