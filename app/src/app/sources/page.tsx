@@ -111,6 +111,7 @@ export default function SourcesPage() {
     return [];
   });
   const [isSearching, setIsSearching] = useState(false);
+  const [maxResults, setMaxResults] = useState(8);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const nextResultId = useRef(0);
@@ -151,7 +152,7 @@ export default function SourcesPage() {
       const res = await fetch("/api/sources/research", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic: researchQuery }),
+        body: JSON.stringify({ topic: researchQuery, maxResults }),
         signal: controller.signal,
       });
 
@@ -521,6 +522,18 @@ export default function SourcesPage() {
               placeholder="Enter a research topic..."
               className="flex-1 bg-[var(--bg-0)] border border-[var(--border-input)] rounded-lg px-3.5 py-2.5 text-sm text-[var(--text-1)] outline-none transition-all placeholder:text-[var(--text-4)] focus:border-[var(--primary)] focus:shadow-[0_0_0_3px_var(--ring)]"
             />
+            <div className="flex items-center gap-2 bg-[var(--bg-2)] border border-[var(--border)] rounded-lg px-3 py-1.5 shrink-0">
+              <span className="text-[11px] font-medium text-[var(--text-3)] whitespace-nowrap">Max</span>
+              <select
+                value={maxResults}
+                onChange={(e) => setMaxResults(Number(e.target.value))}
+                className="bg-transparent text-[13px] font-semibold text-[var(--text-1)] outline-none cursor-pointer"
+              >
+                {[5, 8, 12, 15, 20].map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </div>
             <button
               onClick={startResearch}
               disabled={isSearching || !researchQuery.trim()}

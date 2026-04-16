@@ -8,6 +8,19 @@ export const isMockMode = process.env.MOCK_MODE === "true";
 
 const MAX_CONCURRENT_JOBS = 3;
 
+// Queue of jobs waiting to start
+const jobQueue: Array<{ jobId: number; options: JobOptions }> = [];
+
+/**
+ * Try to start the next queued job if there's capacity.
+ */
+function drainQueue() {
+  while (runningProcesses.size < MAX_CONCURRENT_JOBS && jobQueue.length > 0) {
+    const next = jobQueue.shift()!;
+    spawnJob(next.jobId, next.options);
+  }
+}
+
 // Model configuration: DB settings > env vars > default (sonnet)
 const ENV_MODELS: Record<string, string | undefined> = {
   ingest: process.env.CLAUDE_MODEL_INGEST ?? process.env.CLAUDE_MODEL,
@@ -129,16 +142,92 @@ export function streamClaude({ prompt, projectCwd, type }: StreamOptions): Reada
 }
 
 /**
- * Background job mode — spawns process, tracks in SQLite.
+ * Spawn a process for an existing job record.
+ */
+function spawnJob(jobId: number, options: JobOptions): void {
+  db.update(jobs)
+    .set({ status: "running", startedAt: new Date().toISOString() })
+    .where(eq(jobs.id, jobId))
+    .run();
+
+  const proc = spawn("claude", [
+    "-p", options.prompt,
+    ...getModelArgs(options.type),
+    "--allowedTools", "Write", "Edit", "Read", "WebSearch", "WebFetch", "Bash(ls:*)", "Bash(mkdir:*)",
+  ], {
+    cwd: options.projectCwd,
+    stdio: ["ignore", "pipe", "pipe"],
+    env: { ...process.env },
+  });
+
+  runningProcesses.set(jobId, proc);
+
+  // Update PID
+  db.update(jobs).set({ pid: proc.pid }).where(eq(jobs.id, jobId)).run();
+
+  let output = "";
+  let error = "";
+
+  proc.stdout.on("data", (chunk: Buffer) => {
+    output += chunk.toString();
+    const progress = parseProgress(output);
+    if (progress) {
+      db.update(jobs)
+        .set({ progress: JSON.stringify(progress), output })
+        .where(eq(jobs.id, jobId))
+        .run();
+    } else {
+      db.update(jobs).set({ output }).where(eq(jobs.id, jobId)).run();
+    }
+  });
+
+  proc.stderr.on("data", (chunk: Buffer) => {
+    error += chunk.toString();
+    db.update(jobs).set({ error }).where(eq(jobs.id, jobId)).run();
+  });
+
+  proc.on("close", (code) => {
+    runningProcesses.delete(jobId);
+    // Don't overwrite if already cancelled/completed
+    const current = db.select({ status: jobs.status }).from(jobs).where(eq(jobs.id, jobId)).get();
+    if (current?.status === "cancelled" || current?.status === "completed") {
+      drainQueue();
+      return;
+    }
+    const finalStatus = code === 0 ? "completed" : "failed";
+    db.update(jobs)
+      .set({
+        status: finalStatus,
+        output,
+        error: error || null,
+        completedAt: new Date().toISOString(),
+      })
+      .where(eq(jobs.id, jobId))
+      .run();
+    options.onComplete?.(finalStatus);
+    drainQueue();
+  });
+
+  proc.on("error", (err) => {
+    runningProcesses.delete(jobId);
+    db.update(jobs)
+      .set({
+        status: "failed",
+        error: err.message,
+        completedAt: new Date().toISOString(),
+      })
+      .where(eq(jobs.id, jobId))
+      .run();
+    options.onComplete?.("failed");
+    drainQueue();
+  });
+}
+
+/**
+ * Background job mode — spawns process or queues if at capacity.
  * Used for ingest, lint, research operations.
  */
 export async function startJob(options: JobOptions): Promise<number> {
-  if (runningProcesses.size >= MAX_CONCURRENT_JOBS) {
-    throw new Error(
-      `Maximum concurrent jobs (${MAX_CONCURRENT_JOBS}) reached. Wait for a job to complete.`
-    );
-  }
-
   // Mock mode: simulate a job with fake output
   if (isMockMode) {
     const result = db
@@ -183,87 +272,26 @@ export async function startJob(options: JobOptions): Promise<number> {
   }
 
   // Create job record
+  const isQueued = runningProcesses.size >= MAX_CONCURRENT_JOBS;
   const result = db
     .insert(jobs)
     .values({
       projectId: options.projectId,
       type: options.type,
       title: options.title,
-      status: "running",
-      startedAt: new Date().toISOString(),
+      status: isQueued ? "queued" : "running",
+      startedAt: isQueued ? null : new Date().toISOString(),
     })
     .returning({ id: jobs.id })
     .all();
 
   const jobId = result[0].id;
 
-  const proc = spawn("claude", [
-    "-p", options.prompt,
-    ...getModelArgs(options.type),
-    "--allowedTools", "Write", "Edit", "Read", "WebSearch", "WebFetch", "Bash(ls:*)", "Bash(mkdir:*)",
-  ], {
-    cwd: options.projectCwd,
-    stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env },
-  });
-
-  runningProcesses.set(jobId, proc);
-
-  // Update PID
-  db.update(jobs).set({ pid: proc.pid }).where(eq(jobs.id, jobId)).run();
-
-  let output = "";
-  let error = "";
-
-  proc.stdout.on("data", (chunk: Buffer) => {
-    output += chunk.toString();
-    // Try to parse progress from output
-    const progress = parseProgress(output);
-    if (progress) {
-      db.update(jobs)
-        .set({ progress: JSON.stringify(progress), output })
-        .where(eq(jobs.id, jobId))
-        .run();
-    } else {
-      db.update(jobs).set({ output }).where(eq(jobs.id, jobId)).run();
-    }
-  });
-
-  proc.stderr.on("data", (chunk: Buffer) => {
-    error += chunk.toString();
-    db.update(jobs).set({ error }).where(eq(jobs.id, jobId)).run();
-  });
-
-  proc.on("close", (code) => {
-    runningProcesses.delete(jobId);
-    // Don't overwrite if already cancelled/completed
-    const current = db.select({ status: jobs.status }).from(jobs).where(eq(jobs.id, jobId)).get();
-    if (current?.status === "cancelled" || current?.status === "completed") return;
-    const finalStatus = code === 0 ? "completed" : "failed";
-    db.update(jobs)
-      .set({
-        status: finalStatus,
-        output,
-        error: error || null,
-        completedAt: new Date().toISOString(),
-      })
-      .where(eq(jobs.id, jobId))
-      .run();
-    options.onComplete?.(finalStatus);
-  });
-
-  proc.on("error", (err) => {
-    runningProcesses.delete(jobId);
-    db.update(jobs)
-      .set({
-        status: "failed",
-        error: err.message,
-        completedAt: new Date().toISOString(),
-      })
-      .where(eq(jobs.id, jobId))
-      .run();
-    options.onComplete?.("failed");
-  });
+  if (isQueued) {
+    jobQueue.push({ jobId, options });
+  } else {
+    spawnJob(jobId, options);
+  }
 
   return jobId;
 }
