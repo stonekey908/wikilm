@@ -208,6 +208,9 @@ export async function startJob(options: JobOptions): Promise<number> {
 
   proc.on("close", (code) => {
     runningProcesses.delete(jobId);
+    // Don't overwrite if already cancelled/completed
+    const current = db.select({ status: jobs.status }).from(jobs).where(eq(jobs.id, jobId)).get();
+    if (current?.status === "cancelled" || current?.status === "completed") return;
     const finalStatus = code === 0 ? "completed" : "failed";
     db.update(jobs)
       .set({
@@ -276,7 +279,9 @@ export function cancelJob(jobId: number): boolean {
   const proc = runningProcesses.get(jobId);
 
   if (proc) {
-    killWithEscalation(proc.pid!);
+    if (proc.pid) {
+      killWithEscalation(proc.pid);
+    }
     runningProcesses.delete(jobId);
   } else {
     // Fallback: look up PID from database
