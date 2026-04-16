@@ -179,19 +179,22 @@ This is a general-purpose knowledge base. Topics are handled via tags in frontma
 
 ## Current Phase
 
-Core app is functional: PDF upload, web research, ingestion via claude -p, wiki browsing, chat, jobs management. Process management is robust (PID fallback, orphan cleanup, graceful shutdown, job queue). Model selection is configurable per operation via Settings UI. Next phase is wiki UX improvements and auto-synthesis.
+Wiki UX + smart chat + multi-provider shipped. All 7 Linear tickets complete and merged to main. App now has: auto-updating synthesis, smart chat routing (reads index + synthesis first), breadcrumbs + related pages, TOC, quick URL input, Ollama provider support, SVG graph visualization. Next phase is open — no active tickets.
 
 ## Known Issues
 
 - Wiki pages are filesystem-based (not DB-backed) — search is server-side file reads
 - Research results from web search depend on Claude's web grounding quality — URLs are sometimes approximate
 - `wiki_pages` DB table exists but is not synced with filesystem wiki — API reads from disk directly
+- Synthesis pending flag is in-memory only — if server restarts during a synthesis burst, follow-up is lost (next ingest re-triggers; not a data-loss issue, just a staleness window)
 
 ## Known Gotchas
 
 - **`claude -p` asks for write permissions** → spawned without `--allowedTools` → fix: pass `--allowedTools "Write" "Edit" "Read" "WebSearch" "WebFetch"` in spawn args
 - **Hot-reload doesn't pick up claude-runner.ts changes** → module cached by Next.js → fix: restart dev server after changing claude-runner.ts
 - **Jobs beyond MAX_CONCURRENT (3) silently failed** → `startJob` threw error caught by caller → fix: implemented job queue with auto-drain
+- **Rapid ingest bursts would queue N synthesis jobs** → each onComplete fires trigger independently → fix: coalescing flags in claude-runner.ts (synthesisInFlight + synthesisPending) collapse to at most 2 runs per burst
+- **Model setting value format** → bare aliases ("sonnet") = Claude; "ollama:<model>" prefix = Ollama HTTP path. `startJobProcess` dispatches based on prefix.
 
 ## Last Session
 
@@ -199,26 +202,17 @@ Core app is functional: PDF upload, web research, ingestion via claude -p, wiki 
 **Date:** 2026-04-16
 **Who:** Claude session
 **What was done:**
-- Fixed stop button: cancelJob falls back to PID from DB when in-memory Map is empty
-- Added SIGTERM → SIGKILL escalation (3s grace period)
-- Added orphan cleanup on server startup via instrumentation.ts
-- Added graceful shutdown handler (SIGINT/SIGTERM kills tracked processes)
-- Added job dismiss (PATCH endpoint, X button on completed/failed jobs)
-- Fixed source status: onComplete callback updates source to ingested/failed
-- Added per-operation model config (Haiku/Sonnet/Opus) in Settings UI with DB persistence
-- Added WebSearch/WebFetch to allowed tools for spawned processes
-- Web research results now include URLs, clickable titles/domains, preview button
-- Research results persist in sessionStorage across tab switches
-- Web sources now create proper source records via /api/sources/ingest-web
-- Implemented job queue: jobs beyond MAX_CONCURRENT are queued and auto-drain
-- Added configurable max results selector (5/8/12/15/20) for research
-- Created 5 Linear tickets for next phase (STO-1722 through STO-1726)
+- STO-1726: auto-updating synthesis page (triggers after each ingest, 500-word cap)
+- STO-1728: smart chat routing — wraps chat prompt to read index.md + synthesis first, then only relevant pages (NotebookLM-style hierarchical retrieval)
+- STO-1723: quick add URL input in sources library (paste URL, creates web source, starts ingest)
+- STO-1722: breadcrumb trail in detail pane + related pages panel (forward wikilinks + backlinks) in list pane
+- STO-1724: collapsible table of contents for wiki pages with 3+ headings, IntersectionObserver for active section
+- STO-1729: Ollama provider support — detectOllamaModels() + runOllamaJob(); Settings UI shows per-operation Claude/Ollama picker; AbortController-based cancel
+- STO-1725: SVG graph visualization — deterministic circular layout grouped by type, pan/zoom/hover-highlight, click to navigate
+- Coalescing fix: synthesisInFlight + synthesisPending flags prevent N redundant synthesis runs during rapid ingest bursts (follow-up guarantees final state is captured)
 **What's next:**
-- STO-1722: Breadcrumb trail + related pages panel (High)
-- STO-1726: Auto-updating synthesis page per project (High)
-- STO-1723: Quick add URL input (Medium)
-- STO-1724: Table of contents for long pages (Medium)
-- STO-1725: Graph visualization (Low)
-**Branch:** feat/automate-STO-1678-1688
+- No active tickets — backlog open
+- Possible future work: Ollama streaming for chat (sub-ticket), force-directed graph upgrade, DB-backed wiki_pages sync, synthesis requeue-on-restart
+**Branch:** merged to main
 **Blockers:** None
 ```
