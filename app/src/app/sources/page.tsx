@@ -112,6 +112,8 @@ export default function SourcesPage() {
   });
   const [isSearching, setIsSearching] = useState(false);
   const [maxResults, setMaxResults] = useState(8);
+  const [quickUrl, setQuickUrl] = useState("");
+  const [addingUrl, setAddingUrl] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const nextResultId = useRef(0);
@@ -248,6 +250,45 @@ export default function SourcesPage() {
     });
     refreshSources();
   }, [refreshSources]);
+
+  /* ── Quick add URL ── */
+  const addUrl = useCallback(async () => {
+    const url = quickUrl.trim();
+    if (!url || addingUrl) return;
+
+    // Basic URL validation
+    let parsed: URL;
+    try {
+      parsed = new URL(url.startsWith("http") ? url : `https://${url}`);
+    } catch {
+      alert("Please enter a valid URL");
+      return;
+    }
+
+    setAddingUrl(true);
+    try {
+      // Extract title from URL path as a reasonable default; ingestion will improve it
+      const fallbackTitle = parsed.hostname.replace(/^www\./, "") + parsed.pathname;
+      const res = await fetch("/api/sources/ingest-web", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: fallbackTitle,
+          url: parsed.toString(),
+          domain: parsed.hostname.replace(/^www\./, ""),
+          projectId: 1,
+        }),
+      });
+      if (res.ok) {
+        setQuickUrl("");
+        refreshSources();
+      }
+    } catch {
+      // ignore — user can retry
+    } finally {
+      setAddingUrl(false);
+    }
+  }, [quickUrl, addingUrl, refreshSources]);
 
   /* ── Upload handler ── */
   const uploadFiles = useCallback(async (files: FileList | File[]) => {
@@ -425,6 +466,27 @@ export default function SourcesPage() {
                 if (e.target.files?.length) uploadFiles(e.target.files);
               }}
             />
+          </div>
+
+          {/* Quick add URL */}
+          <div className="flex gap-2 mb-6">
+            <input
+              value={quickUrl}
+              onChange={(e) => setQuickUrl(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") addUrl();
+              }}
+              placeholder="Or paste a URL to add directly..."
+              disabled={addingUrl}
+              className="flex-1 bg-[var(--bg-0)] border border-[var(--border-input)] rounded-lg px-3.5 py-2.5 text-sm text-[var(--text-1)] outline-none transition-all placeholder:text-[var(--text-4)] focus:border-[var(--primary)] focus:shadow-[0_0_0_3px_var(--ring)] disabled:opacity-50"
+            />
+            <button
+              onClick={addUrl}
+              disabled={addingUrl || !quickUrl.trim()}
+              className="bg-[var(--primary)] text-[var(--primary-fg)] text-[13px] font-semibold px-[18px] py-2.5 border-none rounded-lg cursor-pointer transition-all whitespace-nowrap hover:bg-[var(--primary-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {addingUrl ? "Adding..." : "Add URL"}
+            </button>
           </div>
 
           {/* Source cards grid */}
