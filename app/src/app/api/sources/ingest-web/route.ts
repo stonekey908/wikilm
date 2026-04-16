@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/db";
 import { sources } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { startJob } from "@/lib/claude-runner";
+import { startJob, triggerSynthesisUpdate } from "@/lib/claude-runner";
 import path from "path";
 
 export async function POST(request: NextRequest) {
@@ -54,6 +54,11 @@ Search the web for this source, download or read its content, create a source su
         .set({ status: status === "completed" ? "ingested" : "failed" })
         .where(eq(sources.id, sourceId))
         .run();
+      if (status === "completed") {
+        triggerSynthesisUpdate(projectCwd, projectId ?? 1).catch((err) => {
+          console.error("[synthesis] failed to trigger:", err);
+        });
+      }
     },
   });
 

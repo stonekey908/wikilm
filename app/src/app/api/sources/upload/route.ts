@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/db";
 import { sources } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { startJob } from "@/lib/claude-runner";
+import { startJob, triggerSynthesisUpdate } from "@/lib/claude-runner";
 import path from "path";
 import { writeFile, mkdir } from "fs/promises";
 
@@ -69,6 +69,11 @@ export async function POST(request: NextRequest) {
           .set({ status: status === "completed" ? "ingested" : "failed" })
           .where(eq(sources.id, sourceId))
           .run();
+        if (status === "completed") {
+          triggerSynthesisUpdate(projectCwd, 1).catch((err) => {
+            console.error("[synthesis] failed to trigger:", err);
+          });
+        }
       },
     });
 
