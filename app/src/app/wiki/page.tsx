@@ -55,11 +55,38 @@ const ALL_TYPES = ["source", "entity", "concept", "comparison", "synthesis", "qu
 
 /* ─── Markdown Renderer ─── */
 
+// Extract headings (h1-h3) from markdown body with deterministic slug ids.
+// Used by the TOC to build the outline and by the renderer to tag each heading.
+function extractHeadings(body: string): { id: string; level: number; text: string }[] {
+  const headings: { id: string; level: number; text: string }[] = [];
+  const seen = new Map<string, number>();
+
+  for (const line of body.split("\n")) {
+    const m = line.match(/^(#{1,3})\s+(.+)$/);
+    if (!m) continue;
+    const level = m[1].length;
+    const text = m[2].replace(/\[\[([^\]]+)\]\]/g, "$1").replace(/[*`_]/g, "").trim();
+    const base = text
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "section";
+    const count = (seen.get(base) ?? 0) + 1;
+    seen.set(base, count);
+    const id = count === 1 ? base : `${base}-${count}`;
+    headings.push({ id, level, text });
+  }
+  return headings;
+}
+
 function renderMarkdown(body: string, onLinkClick: (slug: string) => void): React.ReactNode[] {
   const lines = body.split("\n");
   const elements: React.ReactNode[] = [];
   let listItems: string[] = [];
   let listType: "ul" | "ol" | null = null;
+
+  // Pre-compute heading ids so in-page and TOC links stay in sync
+  const headingIds = extractHeadings(body);
+  let headingIdx = 0;
 
   function flushList() {
     if (listItems.length === 0) return;
@@ -88,15 +115,17 @@ function renderMarkdown(body: string, onLinkClick: (slug: string) => void): Reac
       const level = headingMatch[1].length;
       const text = headingMatch[2];
       const sizes: Record<number, string> = {
-        1: "text-[20px] font-[650] tracking-tight mt-6 mb-3",
-        2: "text-[17px] font-[620] tracking-tight mt-5 mb-2.5",
-        3: "text-[15px] font-[600] mt-4 mb-2",
+        1: "text-[20px] font-[650] tracking-tight mt-6 mb-3 scroll-mt-6",
+        2: "text-[17px] font-[620] tracking-tight mt-5 mb-2.5 scroll-mt-6",
+        3: "text-[15px] font-[600] mt-4 mb-2 scroll-mt-6",
         4: "text-[14px] font-[580] mt-3 mb-1.5",
         5: "text-[13px] font-[560] mt-2 mb-1",
         6: "text-[13px] font-[540] mt-2 mb-1 text-[var(--text-2)]",
       };
+      // Only h1-h3 get ids (matches extractHeadings); deeper headings render plainly
+      const id = level <= 3 ? headingIds[headingIdx++]?.id : undefined;
       elements.push(
-        <div key={i} className={sizes[level] || sizes[3]}>
+        <div key={i} id={id} className={sizes[level] || sizes[3]}>
           {renderInline(text, onLinkClick)}
         </div>
       );
@@ -277,6 +306,8 @@ export default function WikiPage() {
   const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
   // Navigation trail: entries are { slug, title } in visit order. Empty array = no navigation yet.
   const [trail, setTrail] = useState<{ slug: string; title: string }[]>([]);
+  const [activeHeading, setActiveHeading] = useState<string | null>(null);
+  const [tocExpanded, setTocExpanded] = useState(true);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on outside click
@@ -355,6 +386,38 @@ export default function WikiPage() {
     });
     loadDetail(match ? match.slug : normalizedTarget, "push");
   }
+
+  // Extract TOC headings (h1-h3 only). Show TOC when >= 3 headings.
+  const tocHeadings = detail ? extractHeadings(detail.body) : [];
+  const showToc = tocHeadings.length >= 3;
+
+  // Track the currently-visible heading via IntersectionObserver
+  useEffect(() => {
+    if (!detail || !showToc) {
+      setActiveHeading(null);
+      return;
+    }
+    const elements = tocHeadings
+      .map((h) => document.getElementById(h.id))
+      .filter((el): el is HTMLElement => el !== null);
+    if (elements.length === 0) return;
+
+    // Use rootMargin so the "active" heading is the one near the top of the viewport
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Pick the heading nearest the top that is currently intersecting
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible.length > 0) {
+          setActiveHeading(visible[0].target.id);
+        }
+      },
+      { rootMargin: "-10% 0px -70% 0px", threshold: 0 }
+    );
+    elements.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, [detail, showToc, tocHeadings]);
 
   // Parse forward wikilinks out of the current page body (unique, excluding self)
   const forwardLinks = (() => {
@@ -675,6 +738,53 @@ export default function WikiPage() {
                   Source: {detail.meta.source_file}
                 </div>
               ) : null}
+
+              {/* Table of contents (for pages with 3+ headings) */}
+              {showToc && (
+                <div className="mb-5 bg-[var(--bg-1)] border border-[var(--border)] rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => setTocExpanded((v) => !v)}
+                    className="w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
+                  >
+                    <ChevronDown
+                      className={`w-3.5 h-3.5 text-[var(--text-4)] transition-transform ${tocExpanded ? "" : "-rotate-90"}`}
+                    />
+                    <span className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wider">
+                      On this page
+                    </span>
+                    <span className="ml-auto text-[11px] text-[var(--text-4)] font-mono">
+                      {tocHeadings.length}
+                    </span>
+                  </button>
+                  {tocExpanded && (
+                    <div className="px-4 pb-3 pt-1">
+                      <ul className="space-y-0.5 text-[13px]">
+                        {tocHeadings.map((h) => {
+                          const isActive = activeHeading === h.id;
+                          return (
+                            <li key={h.id}>
+                              <button
+                                onClick={() => {
+                                  const el = document.getElementById(h.id);
+                                  el?.scrollIntoView({ behavior: "smooth", block: "start" });
+                                }}
+                                className={`w-full text-left py-1 transition-colors cursor-pointer border-l-2 pl-3 ${
+                                  isActive
+                                    ? "border-[var(--primary)] text-[var(--primary)] font-[550]"
+                                    : "border-transparent text-[var(--text-3)] hover:text-[var(--text-1)] hover:border-[var(--border-strong)]"
+                                }`}
+                                style={{ paddingLeft: `${(h.level - 1) * 12 + 12}px` }}
+                              >
+                                {h.text}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Rendered body */}
               <div className="wiki-content">
