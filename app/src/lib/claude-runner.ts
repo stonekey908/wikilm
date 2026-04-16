@@ -2,6 +2,9 @@ import { spawn, type ChildProcess } from "child_process";
 import { db } from "@/db";
 import { jobs } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { createMockStream, getMockResponse } from "@/lib/__mocks__/claude-mock";
+
+export const isMockMode = process.env.MOCK_MODE === "true";
 
 const MAX_CONCURRENT_JOBS = 3;
 
@@ -33,6 +36,17 @@ export function getRunningJobCount(): number {
  * Used for real-time chat responses.
  */
 export function streamClaude({ prompt, projectCwd }: StreamOptions): ReadableStream {
+  if (isMockMode) {
+    const type = prompt.toLowerCase().includes("ingest")
+      ? "ingest"
+      : prompt.toLowerCase().includes("lint")
+        ? "lint"
+        : prompt.toLowerCase().includes("research")
+          ? "research"
+          : "query";
+    return createMockStream(type);
+  }
+
   const encoder = new TextEncoder();
 
   return new ReadableStream({
@@ -100,6 +114,48 @@ export async function startJob(options: JobOptions): Promise<number> {
     throw new Error(
       `Maximum concurrent jobs (${MAX_CONCURRENT_JOBS}) reached. Wait for a job to complete.`
     );
+  }
+
+  // Mock mode: simulate a job with fake output
+  if (isMockMode) {
+    const result = db
+      .insert(jobs)
+      .values({
+        projectId: options.projectId,
+        type: options.type,
+        title: options.title,
+        status: "running",
+        startedAt: new Date().toISOString(),
+      })
+      .returning({ id: jobs.id })
+      .all();
+
+    const jobId = result[0].id;
+    const lines = getMockResponse(options.type);
+
+    // Simulate async progress
+    (async () => {
+      for (let i = 0; i < lines.length; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        db.update(jobs)
+          .set({
+            output: lines.slice(0, i + 1).join("\n"),
+            progress: JSON.stringify({ current: i + 1, total: lines.length }),
+          })
+          .where(eq(jobs.id, jobId))
+          .run();
+      }
+      db.update(jobs)
+        .set({
+          status: "completed",
+          output: lines.join("\n"),
+          completedAt: new Date().toISOString(),
+        })
+        .where(eq(jobs.id, jobId))
+        .run();
+    })();
+
+    return jobId;
   }
 
   // Create job record
