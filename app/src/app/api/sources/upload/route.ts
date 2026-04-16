@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/db";
 import { sources } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { startJob } from "@/lib/claude-runner";
 import path from "path";
 import { writeFile, mkdir } from "fs/promises";
@@ -63,6 +64,12 @@ export async function POST(request: NextRequest) {
       projectId: 1,
       type: "ingest",
       title: `Ingest: ${title}`,
+      onComplete: (status) => {
+        db.update(sources)
+          .set({ status: status === "completed" ? "ingested" : "failed" })
+          .where(eq(sources.id, sourceId))
+          .run();
+      },
     });
 
     created.push({ id: sourceId, title, jobId });
