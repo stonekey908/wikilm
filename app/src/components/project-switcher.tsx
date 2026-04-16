@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, createContext, useContext } from "react";
-import { ChevronDown, Plus } from "lucide-react";
+import { ChevronDown, Plus, Trash2 } from "lucide-react";
 
 interface Project {
   id: number;
@@ -85,6 +85,24 @@ export function ProjectSwitcher() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  async function handleDelete(project: Project, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!confirm(`Delete project "${project.name}" and all its data? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`/api/projects/${project.id}`, { method: "DELETE" });
+      if (res.ok) {
+        refreshProjects();
+        if (activeProject?.id === project.id) {
+          // Switch to another project or null
+          const remaining = projects.filter((p) => p.id !== project.id);
+          if (remaining.length > 0) setActiveProject(remaining[0]);
+        }
+      }
+    } catch {
+      // silently fail
+    }
+  }
+
   async function handleCreate() {
     if (!newName.trim()) return;
     try {
@@ -132,24 +150,35 @@ export function ProjectSwitcher() {
       {open && (
         <div className="absolute top-full left-2.5 w-[220px] bg-[var(--surface-card)] border border-[var(--border)] rounded-lg shadow-[var(--shadow-lg)] z-50 p-1 mt-1">
           {projects.map((project) => (
-            <button
+            <div
               key={project.id}
-              className={`flex items-center gap-2 px-2.5 py-2 rounded-md w-full text-[13px] transition-colors duration-100 ${
+              className={`flex items-center gap-2 px-2.5 py-2 rounded-md text-[13px] transition-colors duration-100 group ${
                 activeProject?.id === project.id
                   ? "bg-[var(--primary-dim)] text-[var(--primary)] font-[550]"
                   : "text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
               }`}
-              onClick={() => {
-                setActiveProject(project);
-                setOpen(false);
-              }}
             >
-              <span
-                className="w-[7px] h-[7px] rounded-full shrink-0"
-                style={{ background: project.color }}
-              />
-              {project.name}
-            </button>
+              <button
+                className="flex items-center gap-2 flex-1 min-w-0"
+                onClick={() => {
+                  setActiveProject(project);
+                  setOpen(false);
+                }}
+              >
+                <span
+                  className="w-[7px] h-[7px] rounded-full shrink-0"
+                  style={{ background: project.color }}
+                />
+                <span className="truncate">{project.name}</span>
+              </button>
+              <button
+                onClick={(e) => handleDelete(project, e)}
+                className="opacity-0 group-hover:opacity-100 text-[var(--text-4)] hover:text-[var(--red)] transition-all shrink-0 p-0.5"
+                title="Delete project"
+              >
+                <Trash2 className="w-3 h-3" />
+              </button>
+            </div>
           ))}
 
           {projects.length > 0 && <div className="h-px bg-[var(--border)] my-1" />}

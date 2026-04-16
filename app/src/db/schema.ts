@@ -49,6 +49,32 @@ export const wikiPages = sqliteTable("wiki_pages", {
     .$defaultFn(() => new Date().toISOString()),
 });
 
+export const chatSessions = sqliteTable("chat_sessions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  projectId: integer("project_id")
+    .notNull()
+    .references(() => projects.id),
+  title: text("title").notNull(),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  updatedAt: text("updated_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
+export const chatMessages = sqliteTable("chat_messages", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  sessionId: integer("session_id")
+    .notNull()
+    .references(() => chatSessions.id),
+  role: text("role").notNull(), // "user" | "assistant"
+  content: text("content").notNull(),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
 export const jobs = sqliteTable("jobs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   projectId: integer("project_id")

@@ -29,72 +29,6 @@ interface ResearchResult {
   ingestProgress?: { current: number; total: number };
 }
 
-/* ──────────────────────── Static mock data ────────────────────── */
-
-const MOCK_RESULTS: ResearchResult[] = [
-  {
-    id: "r1",
-    title: "Toolformer: Language Models Can Teach Themselves to Use Tools",
-    relevance: 96,
-    domain: "arxiv.org",
-    author: "Schick et al., 2023",
-    type: "Paper",
-    summary:
-      "Introduces Toolformer where LLMs learn to decide which APIs to call, when, and what arguments to pass. Demonstrates self-supervised learning of tool use without extensive human annotation.",
-    tags: ["tool-use", "self-supervised", "API"],
-    status: "approved",
-    ingestProgress: { current: 4, total: 12 },
-  },
-  {
-    id: "r2",
-    title: "ReAct: Synergizing Reasoning and Acting in Language Models",
-    relevance: 93,
-    domain: "arxiv.org",
-    author: "Yao et al., 2023",
-    type: "Paper",
-    summary:
-      "Proposes the ReAct paradigm for interleaving reasoning traces and task-specific actions. Shows that combining chain-of-thought reasoning with action planning overcomes limitations of each in isolation.",
-    tags: ["reasoning", "agents", "chain-of-thought"],
-    status: "pending",
-  },
-  {
-    id: "r3",
-    title: "Voyager: An Open-Ended Embodied Agent with Large Language Models",
-    relevance: 91,
-    domain: "arxiv.org",
-    author: "Wang et al., 2023",
-    type: "Paper",
-    summary:
-      "First LLM-powered embodied lifelong learning agent in Minecraft that continuously explores, acquires diverse skills, and makes novel discoveries without human intervention.",
-    tags: ["embodied-agents", "lifelong-learning", "exploration"],
-    status: "pending",
-  },
-  {
-    id: "r4",
-    title: "The Landscape of Emerging AI Agent Architectures: A Survey",
-    relevance: 84,
-    domain: "semanticscholar.org",
-    author: "Masterman et al., 2024",
-    type: "Survey",
-    summary:
-      "Comprehensive survey of emerging AI agent architectures including single-agent, multi-agent, and human-agent collaboration patterns. Covers tool integration, memory systems, and planning.",
-    tags: ["survey", "multi-agent", "architecture"],
-    status: "pending",
-  },
-  {
-    id: "r5",
-    title: "A Practical Guide to Building AI Agents with LangChain",
-    relevance: 72,
-    domain: "blog.langchain.dev",
-    author: "Harrison Chase, 2024",
-    type: "Blog",
-    summary:
-      "Practical walkthrough for building tool-using AI agents with LangChain. Covers agent types, tool definitions, memory management, and production deployment patterns.",
-    tags: ["langchain", "tutorial", "production"],
-    status: "pending",
-  },
-];
-
 /* ──────────────────────── Helper: SVG icons ──────────────────── */
 
 function SearchIcon({ size = 14 }: { size?: number }) {
@@ -165,12 +99,12 @@ export default function SourcesPage() {
   const [tab, setTab] = useState<"library" | "research">("library");
   const [sources, setSources] = useState<Source[]>([]);
   const [dragOver, setDragOver] = useState(false);
-  const [researchQuery, setResearchQuery] = useState(
-    "autonomous AI agents and tool use"
-  );
-  const [results, setResults] = useState<ResearchResult[]>(MOCK_RESULTS);
-  const [isSearching] = useState(true); // static: always show searching state
+  const [researchQuery, setResearchQuery] = useState("");
+  const [results, setResults] = useState<ResearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const nextResultId = useRef(0);
 
   /* ── Fetch sources ── */
   useEffect(() => {
@@ -178,6 +112,94 @@ export default function SourcesPage() {
       .then((r) => r.json())
       .then((d) => setSources(d.sources ?? []))
       .catch(() => {});
+  }, []);
+
+  /* ── Research stream ── */
+  const startResearch = useCallback(async () => {
+    if (!researchQuery.trim() || isSearching) return;
+
+    setResults([]);
+    setIsSearching(true);
+    nextResultId.current = 0;
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      const res = await fetch("/api/sources/research", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic: researchQuery }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok || !res.body) {
+        setIsSearching(false);
+        return;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const payload = line.slice(6);
+          try {
+            const evt = JSON.parse(payload);
+            if (evt.type === "content") {
+              const text: string = evt.text;
+              // Check for RESULT: lines
+              if (text.startsWith("RESULT:")) {
+                try {
+                  const json = JSON.parse(text.slice(7));
+                  const result: ResearchResult = {
+                    id: `r${nextResultId.current++}`,
+                    title: json.title ?? "Untitled",
+                    domain: json.domain ?? "",
+                    author: json.author ?? "Unknown",
+                    type: json.type ?? "Article",
+                    summary: json.summary ?? "",
+                    relevance: json.relevance ?? 50,
+                    tags: json.tags ?? [],
+                    status: "pending",
+                  };
+                  setResults((prev) => [...prev, result]);
+                } catch {
+                  // malformed JSON line, skip
+                }
+              } else if (text.trim() === "DONE") {
+                setIsSearching(false);
+              }
+            } else if (evt.type === "done") {
+              setIsSearching(false);
+            }
+          } catch {
+            // malformed SSE payload, skip
+          }
+        }
+      }
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        // user cancelled
+      }
+    } finally {
+      setIsSearching(false);
+      abortRef.current = null;
+    }
+  }, [researchQuery, isSearching]);
+
+  const cancelResearch = useCallback(() => {
+    abortRef.current?.abort();
+    setIsSearching(false);
   }, []);
 
   /* ── Upload handler ── */
@@ -206,24 +228,44 @@ export default function SourcesPage() {
   );
 
   /* ── Research result actions ── */
-  const setResultStatus = (
-    id: string,
-    status: ResearchResult["status"]
-  ) => {
-    setResults((prev) =>
-      prev.map((r) =>
-        r.id === id
-          ? {
-              ...r,
-              status,
-              ...(status === "approved"
-                ? { ingestProgress: { current: 0, total: 12 } }
-                : {}),
-            }
-          : r
-      )
-    );
-  };
+  const setResultStatus = useCallback(
+    async (id: string, status: ResearchResult["status"]) => {
+      setResults((prev) =>
+        prev.map((r) =>
+          r.id === id
+            ? {
+                ...r,
+                status,
+                ...(status === "approved"
+                  ? { ingestProgress: { current: 0, total: 12 } }
+                  : {}),
+              }
+            : r
+        )
+      );
+
+      if (status === "approved") {
+        const result = results.find((r) => r.id === id);
+        if (!result) return;
+
+        try {
+          await fetch("/api/claude/job", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              projectId: 1,
+              type: "ingest",
+              title: `Ingest: ${result.title}`,
+              prompt: `Fetch and ingest the following source into the wiki:\n\nTitle: ${result.title}\nDomain: ${result.domain}\nAuthor: ${result.author}\nType: ${result.type}\nSummary: ${result.summary}\nTags: ${result.tags.join(", ")}\n\nSearch the web for this source, download or read its content, create a source summary in wiki/sources/, identify entities and concepts, update existing wiki pages with cross-references, and update wiki/index.md and wiki/log.md.`,
+            }),
+          });
+        } catch {
+          // job submission failed — leave the UI as approved
+        }
+      }
+    },
+    [results]
+  );
 
   const approvedCount = results.filter((r) => r.status === "approved").length;
   const foundCount = results.length;
@@ -402,12 +444,19 @@ export default function SourcesPage() {
             <input
               value={researchQuery}
               onChange={(e) => setResearchQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") startResearch();
+              }}
               placeholder="Enter a research topic..."
               className="flex-1 bg-[var(--bg-0)] border border-[var(--border-input)] rounded-lg px-3.5 py-2.5 text-sm text-[var(--text-1)] outline-none transition-all placeholder:text-[var(--text-4)] focus:border-[var(--primary)] focus:shadow-[0_0_0_3px_var(--ring)]"
             />
-            <button className="bg-[var(--primary)] text-[var(--primary-fg)] text-[13px] font-semibold px-[18px] py-2.5 border-none rounded-lg cursor-pointer flex items-center gap-1.5 transition-all whitespace-nowrap hover:bg-[var(--primary-hover)]">
+            <button
+              onClick={startResearch}
+              disabled={isSearching || !researchQuery.trim()}
+              className="bg-[var(--primary)] text-[var(--primary-fg)] text-[13px] font-semibold px-[18px] py-2.5 border-none rounded-lg cursor-pointer flex items-center gap-1.5 transition-all whitespace-nowrap hover:bg-[var(--primary-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               <SearchIcon />
-              Research
+              {isSearching ? "Searching..." : "Research"}
             </button>
           </div>
 
@@ -419,9 +468,12 @@ export default function SourcesPage() {
               <div className="flex-1 h-[3px] bg-[rgba(13,148,136,0.15)] rounded-sm overflow-hidden">
                 <div className="h-full w-[65%] bg-[var(--primary)] rounded-sm" />
               </div>
-              <span className="text-[var(--text-3)] text-xs cursor-pointer underline underline-offset-2 shrink-0 hover:text-[var(--text-2)]">
+              <button
+                onClick={cancelResearch}
+                className="text-[var(--text-3)] text-xs cursor-pointer underline underline-offset-2 shrink-0 hover:text-[var(--text-2)] bg-transparent border-none p-0"
+              >
                 Cancel
-              </span>
+              </button>
             </div>
           )}
 
