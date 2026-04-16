@@ -1,0 +1,623 @@
+"use client";
+
+import { useEffect, useState, useCallback, useRef } from "react";
+import {
+  Search,
+  FileText,
+  User,
+  Lightbulb,
+  GitCompare,
+  Layers,
+  HelpCircle,
+  BookOpen,
+  ArrowLeft,
+  Tag,
+  Link2,
+  ChevronDown,
+  X,
+} from "lucide-react";
+
+/* ─── Types ─── */
+
+interface WikiPageMeta {
+  title: string;
+  type: string;
+  tags: string[];
+  slug: string;
+  filePath: string;
+}
+
+interface WikiPageDetail {
+  slug: string;
+  title: string;
+  type: string;
+  tags: string[];
+  meta: Record<string, unknown>;
+  body: string;
+  backlinks: { slug: string; title: string }[];
+}
+
+/* ─── Constants ─── */
+
+const TYPE_CONFIG: Record<string, { icon: typeof FileText; label: string; color: string; dimColor: string }> = {
+  source: { icon: BookOpen, label: "Source", color: "var(--blue)", dimColor: "var(--blue-dim)" },
+  entity: { icon: User, label: "Entity", color: "var(--orange)", dimColor: "var(--orange-dim)" },
+  concept: { icon: Lightbulb, label: "Concept", color: "var(--primary)", dimColor: "var(--primary-dim)" },
+  comparison: { icon: GitCompare, label: "Comparison", color: "var(--chart-3)", dimColor: "rgba(99,102,241,0.08)" },
+  synthesis: { icon: Layers, label: "Synthesis", color: "var(--chart-4)", dimColor: "rgba(139,92,246,0.08)" },
+  query: { icon: HelpCircle, label: "Query", color: "var(--green)", dimColor: "var(--green-dim)" },
+  index: { icon: FileText, label: "Index", color: "var(--text-3)", dimColor: "var(--bg-2)" },
+  unknown: { icon: FileText, label: "Page", color: "var(--text-3)", dimColor: "var(--bg-2)" },
+};
+
+const ALL_TYPES = ["source", "entity", "concept", "comparison", "synthesis", "query"];
+
+/* ─── Markdown Renderer ─── */
+
+function renderMarkdown(body: string, onLinkClick: (slug: string) => void): React.ReactNode[] {
+  const lines = body.split("\n");
+  const elements: React.ReactNode[] = [];
+  let listItems: string[] = [];
+  let listType: "ul" | "ol" | null = null;
+
+  function flushList() {
+    if (listItems.length === 0) return;
+    const Tag = listType === "ol" ? "ol" : "ul";
+    elements.push(
+      <Tag
+        key={`list-${elements.length}`}
+        className={`${listType === "ol" ? "list-decimal" : "list-disc"} pl-6 space-y-1 text-[14px] leading-relaxed text-[var(--text-2)]`}
+      >
+        {listItems.map((item, i) => (
+          <li key={i}>{renderInline(item, onLinkClick)}</li>
+        ))}
+      </Tag>
+    );
+    listItems = [];
+    listType = null;
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Headings
+    const headingMatch = line.match(/^(#{1,6})\s+(.+)$/);
+    if (headingMatch) {
+      flushList();
+      const level = headingMatch[1].length;
+      const text = headingMatch[2];
+      const sizes: Record<number, string> = {
+        1: "text-[20px] font-[650] tracking-tight mt-6 mb-3",
+        2: "text-[17px] font-[620] tracking-tight mt-5 mb-2.5",
+        3: "text-[15px] font-[600] mt-4 mb-2",
+        4: "text-[14px] font-[580] mt-3 mb-1.5",
+        5: "text-[13px] font-[560] mt-2 mb-1",
+        6: "text-[13px] font-[540] mt-2 mb-1 text-[var(--text-2)]",
+      };
+      elements.push(
+        <div key={i} className={sizes[level] || sizes[3]}>
+          {renderInline(text, onLinkClick)}
+        </div>
+      );
+      continue;
+    }
+
+    // Horizontal rule
+    if (/^---+$/.test(line.trim())) {
+      flushList();
+      elements.push(<hr key={i} className="border-[var(--border)] my-4" />);
+      continue;
+    }
+
+    // Unordered list
+    const ulMatch = line.match(/^[\s]*[-*]\s+(.+)$/);
+    if (ulMatch) {
+      if (listType === "ol") flushList();
+      listType = "ul";
+      listItems.push(ulMatch[1]);
+      continue;
+    }
+
+    // Ordered list
+    const olMatch = line.match(/^[\s]*\d+\.\s+(.+)$/);
+    if (olMatch) {
+      if (listType === "ul") flushList();
+      listType = "ol";
+      listItems.push(olMatch[1]);
+      continue;
+    }
+
+    flushList();
+
+    // Empty line
+    if (line.trim() === "") {
+      continue;
+    }
+
+    // Code block (simple inline approach, not full fenced blocks)
+    if (line.startsWith("```")) {
+      const codeLines: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].startsWith("```")) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+      elements.push(
+        <pre
+          key={`code-${elements.length}`}
+          className="bg-[var(--bg-2)] border border-[var(--border)] rounded-md p-3 text-[13px] font-mono overflow-x-auto my-3 text-[var(--text-2)]"
+        >
+          <code>{codeLines.join("\n")}</code>
+        </pre>
+      );
+      continue;
+    }
+
+    // Blockquote
+    if (line.startsWith(">")) {
+      const text = line.replace(/^>\s?/, "");
+      elements.push(
+        <blockquote
+          key={i}
+          className="border-l-2 border-[var(--primary)] pl-3 py-0.5 text-[14px] text-[var(--text-2)] italic my-2"
+        >
+          {renderInline(text, onLinkClick)}
+        </blockquote>
+      );
+      continue;
+    }
+
+    // Regular paragraph
+    elements.push(
+      <p key={i} className="text-[14px] leading-relaxed text-[var(--text-2)] my-1.5">
+        {renderInline(line, onLinkClick)}
+      </p>
+    );
+  }
+
+  flushList();
+  return elements;
+}
+
+function renderInline(text: string, onLinkClick: (slug: string) => void): React.ReactNode {
+  // Split on wikilinks, bold, italic, code, and regular links
+  const parts: React.ReactNode[] = [];
+  // Pattern: [[wikilink]], **bold**, *italic*, `code`, [text](url)
+  const pattern = /(\[\[([^\]]+)\]\]|\*\*(.+?)\*\*|\*(.+?)\*|`([^`]+)`|\[([^\]]+)\]\(([^)]+)\))/g;
+
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(text)) !== null) {
+    // Text before this match
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+
+    if (match[2] !== undefined) {
+      // [[wikilink]]
+      const linkTarget = match[2];
+      parts.push(
+        <button
+          key={`wl-${match.index}`}
+          onClick={() => onLinkClick(linkTarget)}
+          className="text-[var(--primary)] hover:text-[var(--primary-hover)] font-medium underline decoration-[var(--primary)]/30 underline-offset-2 cursor-pointer transition-colors"
+        >
+          {linkTarget}
+        </button>
+      );
+    } else if (match[3] !== undefined) {
+      // **bold**
+      parts.push(<strong key={`b-${match.index}`} className="font-[600] text-[var(--text-1)]">{match[3]}</strong>);
+    } else if (match[4] !== undefined) {
+      // *italic*
+      parts.push(<em key={`i-${match.index}`}>{match[4]}</em>);
+    } else if (match[5] !== undefined) {
+      // `code`
+      parts.push(
+        <code
+          key={`c-${match.index}`}
+          className="bg-[var(--bg-2)] px-1.5 py-0.5 rounded text-[13px] font-mono text-[var(--primary)]"
+        >
+          {match[5]}
+        </code>
+      );
+    } else if (match[6] !== undefined && match[7] !== undefined) {
+      // [text](url)
+      parts.push(
+        <a
+          key={`a-${match.index}`}
+          href={match[7]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[var(--primary)] hover:text-[var(--primary-hover)] underline underline-offset-2"
+        >
+          {match[6]}
+        </a>
+      );
+    }
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts.length === 1 ? parts[0] : <>{parts}</>;
+}
+
+/* ─── Helper Components ─── */
+
+function TypeChip({ type }: { type: string }) {
+  const cfg = TYPE_CONFIG[type] || TYPE_CONFIG.unknown;
+  const Icon = cfg.icon;
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-[550]"
+      style={{ color: cfg.color, background: cfg.dimColor }}
+    >
+      <Icon className="w-3 h-3" />
+      {cfg.label}
+    </span>
+  );
+}
+
+/* ─── Page Component ─── */
+
+export default function WikiPage() {
+  const [pages, setPages] = useState<WikiPageMeta[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
+  const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
+  const [detail, setDetail] = useState<WikiPageDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setTypeDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  // Fetch pages
+  const fetchPages = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (search) params.set("search", search);
+      if (typeFilter) params.set("type", typeFilter);
+      const res = await fetch(`/api/wiki?${params.toString()}`);
+      const data = await res.json();
+      setPages(data.pages);
+    } catch {
+      setPages([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [search, typeFilter]);
+
+  useEffect(() => {
+    const timer = setTimeout(fetchPages, search ? 300 : 0);
+    return () => clearTimeout(timer);
+  }, [fetchPages, search]);
+
+  // Fetch detail
+  const loadDetail = useCallback(async (slug: string) => {
+    setSelectedSlug(slug);
+    setDetailLoading(true);
+    try {
+      const res = await fetch(`/api/wiki/${encodeURIComponent(slug)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setDetail(data);
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setDetailLoading(false);
+    }
+  }, []);
+
+  // Handle wikilink navigation
+  function handleWikilinkClick(target: string) {
+    // Try to find the page in the current list by slug match
+    const normalizedTarget = target.toLowerCase().replace(/\s+/g, "-");
+    const match = pages.find((p) => {
+      const slugEnd = p.slug.split("/").pop()?.toLowerCase();
+      return slugEnd === normalizedTarget;
+    });
+    if (match) {
+      loadDetail(match.slug);
+    } else {
+      // Try direct slug load
+      loadDetail(normalizedTarget);
+    }
+  }
+
+  function getTypeConfig(type: string) {
+    return TYPE_CONFIG[type] || TYPE_CONFIG.unknown;
+  }
+
+  const allTags = Array.from(new Set(pages.flatMap((p) => p.tags))).sort();
+
+  return (
+    <div className="flex h-full">
+      {/* ─── List Panel ─── */}
+      <div
+        className={`flex flex-col border-r border-[var(--border)] bg-[var(--bg-0)] transition-all duration-200 ${
+          selectedSlug ? "w-[340px] shrink-0" : "flex-1 max-w-2xl mx-auto"
+        }`}
+      >
+        {/* Header */}
+        <div className="px-5 pt-5 pb-4">
+          <h1 className="text-[22px] font-[650] tracking-tight text-[var(--text-1)]">
+            Wiki
+          </h1>
+          <p className="text-sm text-[var(--text-3)] mt-0.5">
+            Browse and search your knowledge base
+          </p>
+        </div>
+
+        {/* Search + Filter */}
+        <div className="px-4 pb-3 flex gap-2">
+          <div className="flex-1 relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-4)]" />
+            <input
+              type="text"
+              placeholder="Search pages..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 text-[13px] bg-[var(--bg-1)] border border-[var(--border-input)] rounded-md text-[var(--text-1)] placeholder:text-[var(--text-4)] focus:outline-none focus:ring-2 focus:ring-[var(--ring)] focus:border-[var(--primary)] transition-all"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-4)] hover:text-[var(--text-2)] cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Type filter dropdown */}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={() => setTypeDropdownOpen(!typeDropdownOpen)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-[13px] border rounded-md transition-all cursor-pointer ${
+                typeFilter
+                  ? "bg-[var(--primary-dim)] border-[var(--primary)] text-[var(--primary)]"
+                  : "bg-[var(--bg-1)] border-[var(--border-input)] text-[var(--text-3)] hover:border-[var(--border-strong)]"
+              }`}
+            >
+              {typeFilter ? getTypeConfig(typeFilter).label : "All types"}
+              <ChevronDown className="w-3.5 h-3.5" />
+            </button>
+
+            {typeDropdownOpen && (
+              <div className="absolute right-0 top-full mt-1 w-44 bg-[var(--surface-card)] border border-[var(--border)] rounded-lg shadow-[var(--shadow-lg)] z-20 py-1">
+                <button
+                  onClick={() => { setTypeFilter(""); setTypeDropdownOpen(false); }}
+                  className={`w-full text-left px-3 py-1.5 text-[13px] transition-colors cursor-pointer ${
+                    !typeFilter ? "bg-[var(--primary-dim)] text-[var(--primary)] font-[550]" : "text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
+                  }`}
+                >
+                  All types
+                </button>
+                {ALL_TYPES.map((t) => {
+                  const cfg = getTypeConfig(t);
+                  const Icon = cfg.icon;
+                  return (
+                    <button
+                      key={t}
+                      onClick={() => { setTypeFilter(t); setTypeDropdownOpen(false); }}
+                      className={`w-full text-left px-3 py-1.5 text-[13px] flex items-center gap-2 transition-colors cursor-pointer ${
+                        typeFilter === t ? "bg-[var(--primary-dim)] text-[var(--primary)] font-[550]" : "text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
+                      }`}
+                    >
+                      <Icon className="w-3.5 h-3.5" style={{ color: cfg.color }} />
+                      {cfg.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Tag pills (when tags exist) */}
+        {allTags.length > 0 && (
+          <div className="px-4 pb-3 flex flex-wrap gap-1.5">
+            {allTags.slice(0, 12).map((tag) => (
+              <button
+                key={tag}
+                onClick={() => setSearch(tag)}
+                className="px-2 py-0.5 text-[11px] font-medium bg-[var(--bg-2)] text-[var(--text-3)] rounded-full hover:bg-[var(--bg-3)] hover:text-[var(--text-2)] transition-colors cursor-pointer"
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Results count */}
+        <div className="px-5 pb-2">
+          <span className="text-[11px] font-semibold text-[var(--text-4)] uppercase tracking-wider">
+            {loading ? "Loading..." : `${pages.length} page${pages.length !== 1 ? "s" : ""}`}
+          </span>
+        </div>
+
+        {/* Page list */}
+        <div className="flex-1 overflow-y-auto px-3 pb-3">
+          {pages.map((page) => {
+            const cfg = getTypeConfig(page.type);
+            const Icon = cfg.icon;
+            const isActive = selectedSlug === page.slug;
+
+            return (
+              <button
+                key={page.slug}
+                onClick={() => loadDetail(page.slug)}
+                className={`w-full text-left px-3 py-2.5 rounded-lg mb-0.5 transition-all cursor-pointer ${
+                  isActive
+                    ? "bg-[var(--primary-dim)] border border-[var(--primary)]/20"
+                    : "hover:bg-[var(--bg-hover)] border border-transparent"
+                }`}
+              >
+                <div className="flex items-start gap-2.5">
+                  <div
+                    className="w-7 h-7 rounded-md flex items-center justify-center shrink-0 mt-0.5"
+                    style={{ background: cfg.dimColor }}
+                  >
+                    <Icon className="w-3.5 h-3.5" style={{ color: cfg.color }} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-[550] text-[var(--text-1)] truncate">
+                      {page.title}
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span
+                        className="text-[11px] font-medium px-1.5 py-px rounded"
+                        style={{ color: cfg.color, background: cfg.dimColor }}
+                      >
+                        {cfg.label}
+                      </span>
+                      {page.tags.slice(0, 3).map((tag) => (
+                        <span
+                          key={tag}
+                          className="text-[11px] text-[var(--text-4)]"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+
+          {!loading && pages.length === 0 && (
+            <div className="text-center py-12">
+              <FileText className="w-10 h-10 mx-auto text-[var(--text-4)] opacity-40 mb-3" />
+              <p className="text-[14px] text-[var(--text-3)]">No pages found</p>
+              <p className="text-[12px] text-[var(--text-4)] mt-1">
+                {search ? "Try a different search term" : "Add sources to your wiki to get started"}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ─── Detail Panel ─── */}
+      {selectedSlug && (
+        <div className="flex-1 overflow-y-auto bg-[var(--bg-0)]">
+          {detailLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="text-[13px] text-[var(--text-3)]">Loading...</div>
+            </div>
+          ) : detail ? (
+            <div className="max-w-3xl mx-auto px-8 py-6">
+              {/* Back button (mobile-friendly) */}
+              <button
+                onClick={() => { setSelectedSlug(null); setDetail(null); }}
+                className="flex items-center gap-1.5 text-[13px] text-[var(--text-3)] hover:text-[var(--text-1)] mb-4 transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                Back to list
+              </button>
+
+              {/* Title */}
+              <h1 className="text-[22px] font-[650] tracking-tight text-[var(--text-1)] mb-3">
+                {detail.title}
+              </h1>
+
+              {/* Metadata chips */}
+              <div className="flex flex-wrap items-center gap-2 mb-5">
+                {/* Type chip */}
+                <TypeChip type={detail.type} />
+
+                {/* Tags */}
+                {detail.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] font-medium bg-[var(--bg-2)] text-[var(--text-3)]"
+                  >
+                    <Tag className="w-3 h-3" />
+                    {tag}
+                  </span>
+                ))}
+
+                {/* Date if present */}
+                {typeof detail.meta.date === "string" ? (
+                  <span className="text-[12px] text-[var(--text-4)]">
+                    {detail.meta.date}
+                  </span>
+                ) : null}
+
+                {/* Author if present */}
+                {typeof detail.meta.author === "string" ? (
+                  <span className="text-[12px] text-[var(--text-4)]">
+                    by {detail.meta.author}
+                  </span>
+                ) : null}
+              </div>
+
+              {/* Source file reference */}
+              {typeof detail.meta.source_file === "string" ? (
+                <div className="flex items-center gap-1.5 text-[12px] text-[var(--text-4)] mb-4 pb-4 border-b border-[var(--border)]">
+                  <FileText className="w-3 h-3" />
+                  Source: {detail.meta.source_file}
+                </div>
+              ) : null}
+
+              {/* Rendered body */}
+              <div className="wiki-content">
+                {renderMarkdown(detail.body, handleWikilinkClick)}
+              </div>
+
+              {/* Backlinks */}
+              {detail.backlinks.length > 0 && (
+                <div className="mt-8 pt-6 border-t border-[var(--border)]">
+                  <div className="flex items-center gap-1.5 text-[13px] font-[600] text-[var(--text-2)] mb-3">
+                    <Link2 className="w-4 h-4" />
+                    Linked from {detail.backlinks.length} page{detail.backlinks.length !== 1 ? "s" : ""}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {detail.backlinks.map((bl) => (
+                      <button
+                        key={bl.slug}
+                        onClick={() => loadDetail(bl.slug)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--surface-card)] border border-[var(--border)] rounded-lg text-[13px] text-[var(--primary)] hover:border-[var(--primary)] transition-colors cursor-pointer"
+                      >
+                        <Link2 className="w-3 h-3" />
+                        {bl.title}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
+      )}
+
+      {/* Empty state when no page selected and we have a wide view */}
+      {!selectedSlug && pages.length > 0 && (
+        <div className="hidden lg:flex flex-1 items-center justify-center bg-[var(--bg-1)]">
+          <div className="text-center">
+            <FileText className="w-12 h-12 mx-auto text-[var(--text-4)] opacity-30 mb-3" />
+            <p className="text-[14px] text-[var(--text-3)]">Select a page to view</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
