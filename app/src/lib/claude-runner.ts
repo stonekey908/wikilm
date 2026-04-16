@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { jobs, settings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { createMockStream, getMockResponse } from "@/lib/__mocks__/claude-mock";
+import { runOllamaJob, cancelOllamaJob, hasOllamaJob } from "@/lib/ollama-runner";
 
 export const isMockMode = process.env.MOCK_MODE === "true";
 
@@ -12,13 +13,49 @@ const MAX_CONCURRENT_JOBS = 3;
 const jobQueue: Array<{ jobId: number; options: JobOptions }> = [];
 
 /**
+ * Total in-flight jobs (Claude subprocesses + Ollama HTTP requests).
+ * Ollama controller count is resolved via hasOllamaJob() — but since we
+ * can't enumerate the Map from here, we track a running total separately.
+ */
+let inFlightOllamaCount = 0;
+
+/**
  * Try to start the next queued job if there's capacity.
  */
 function drainQueue() {
-  while (runningProcesses.size < MAX_CONCURRENT_JOBS && jobQueue.length > 0) {
+  while (
+    runningProcesses.size + inFlightOllamaCount < MAX_CONCURRENT_JOBS &&
+    jobQueue.length > 0
+  ) {
     const next = jobQueue.shift()!;
-    spawnJob(next.jobId, next.options);
+    startJobProcess(next.jobId, next.options);
   }
+}
+
+/**
+ * Dispatch a job to the right provider based on its resolved model setting.
+ * "ollama:<model>" -> Ollama HTTP; anything else -> Claude spawn.
+ */
+function startJobProcess(jobId: number, options: JobOptions): void {
+  const model = getModel(options.type);
+  if (model.startsWith("ollama:")) {
+    const modelName = model.slice("ollama:".length);
+    inFlightOllamaCount++;
+    runOllamaJob(
+      jobId,
+      {
+        prompt: options.prompt,
+        model: modelName,
+        onComplete: options.onComplete,
+      },
+      () => {
+        inFlightOllamaCount = Math.max(0, inFlightOllamaCount - 1);
+        drainQueue();
+      }
+    );
+    return;
+  }
+  spawnJob(jobId, options);
 }
 
 // Model configuration: DB settings > env vars > default (sonnet)
@@ -31,12 +68,19 @@ const ENV_MODELS: Record<string, string | undefined> = {
   synthesis: process.env.CLAUDE_MODEL_SYNTHESIS ?? process.env.CLAUDE_MODEL,
 };
 
-function getModelArgs(type: string): string[] {
-  // Check DB setting first
+/**
+ * Resolve the model setting for a given operation type.
+ * Returns raw value — may be a Claude alias (e.g. "sonnet") or an Ollama id
+ * ("ollama:qwen2.5-coder:7b"). Caller dispatches based on the prefix.
+ */
+function getModel(type: string): string {
   const key = `model_${type}`;
   const row = db.select().from(settings).where(eq(settings.key, key)).get();
-  const model = row?.value ?? ENV_MODELS[type] ?? "sonnet";
-  return ["--model", model];
+  return row?.value ?? ENV_MODELS[type] ?? "sonnet";
+}
+
+function getModelArgs(type: string): string[] {
+  return ["--model", getModel(type)];
 }
 
 // Track running processes by job ID
@@ -61,7 +105,7 @@ interface JobOptions {
  * Get the count of currently running jobs
  */
 export function getRunningJobCount(): number {
-  return runningProcesses.size;
+  return runningProcesses.size + inFlightOllamaCount;
 }
 
 /**
@@ -273,7 +317,7 @@ export async function startJob(options: JobOptions): Promise<number> {
   }
 
   // Create job record
-  const isQueued = runningProcesses.size >= MAX_CONCURRENT_JOBS;
+  const isQueued = runningProcesses.size + inFlightOllamaCount >= MAX_CONCURRENT_JOBS;
   const result = db
     .insert(jobs)
     .values({
@@ -291,7 +335,7 @@ export async function startJob(options: JobOptions): Promise<number> {
   if (isQueued) {
     jobQueue.push({ jobId, options });
   } else {
-    spawnJob(jobId, options);
+    startJobProcess(jobId, options);
   }
 
   return jobId;
@@ -372,8 +416,25 @@ export function cleanupOrphanedJobs(): void {
 /**
  * Cancel a running job. Tries in-memory process first, falls back to PID from DB.
  * Sends SIGTERM, then SIGKILL after 3s if the process is still alive.
+ * Also handles Ollama jobs via AbortController.
  */
 export function cancelJob(jobId: number): boolean {
+  // Ollama path first — no PID, just abort the fetch
+  if (hasOllamaJob(jobId)) {
+    return cancelOllamaJob(jobId);
+  }
+
+  // Queued job (neither spawned nor streaming yet) — drop from queue + mark cancelled
+  const queuedIdx = jobQueue.findIndex((q) => q.jobId === jobId);
+  if (queuedIdx !== -1) {
+    jobQueue.splice(queuedIdx, 1);
+    db.update(jobs)
+      .set({ status: "cancelled", completedAt: new Date().toISOString() })
+      .where(eq(jobs.id, jobId))
+      .run();
+    return true;
+  }
+
   const proc = runningProcesses.get(jobId);
 
   if (proc) {
