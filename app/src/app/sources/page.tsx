@@ -202,6 +202,29 @@ export default function SourcesPage() {
     setIsSearching(false);
   }, []);
 
+  /* ── Refresh sources helper ── */
+  const refreshSources = useCallback(async () => {
+    const d = await fetch("/api/sources").then((r) => r.json());
+    setSources(d.sources ?? []);
+  }, []);
+
+  /* ── Delete source ── */
+  const deleteSource = useCallback(async (id: number) => {
+    if (!confirm("Delete this source and its raw file?")) return;
+    const res = await fetch(`/api/sources/${id}`, { method: "DELETE" });
+    if (res.ok) refreshSources();
+  }, [refreshSources]);
+
+  /* ── Trigger ingest on pending source ── */
+  const triggerIngest = useCallback(async (id: number) => {
+    await fetch(`/api/sources/${id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "ingest" }),
+    });
+    refreshSources();
+  }, [refreshSources]);
+
   /* ── Upload handler ── */
   const uploadFiles = useCallback(async (files: FileList | File[]) => {
     const fd = new FormData();
@@ -210,12 +233,8 @@ export default function SourcesPage() {
       method: "POST",
       body: fd,
     });
-    if (res.ok) {
-      // Refresh sources
-      const d = await fetch("/api/sources").then((r) => r.json());
-      setSources(d.sources ?? []);
-    }
-  }, []);
+    if (res.ok) refreshSources();
+  }, [refreshSources]);
 
   /* ── Drag & drop ── */
   const handleDrop = useCallback(
@@ -384,8 +403,18 @@ export default function SourcesPage() {
             {sources.map((s) => (
               <div
                 key={s.id}
-                className="bg-[var(--surface-card)] border border-[var(--border)] rounded-lg px-4 py-3.5 transition-all hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-sm)]"
+                className="bg-[var(--surface-card)] border border-[var(--border)] rounded-lg px-4 py-3.5 transition-all hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-sm)] group relative"
               >
+                {/* Delete button */}
+                <button
+                  onClick={() => deleteSource(s.id)}
+                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-[var(--text-4)] hover:text-[var(--red)] transition-all p-1"
+                  title="Delete source"
+                >
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
+                    <path d="M4 4l8 8M12 4l-8 8" />
+                  </svg>
+                </button>
                 <div className="font-mono text-[10px] font-medium uppercase tracking-wide text-[var(--text-4)] mb-1.5 flex items-center gap-1.5">
                   <span
                     className="w-1.5 h-1.5 rounded-full"
@@ -421,8 +450,22 @@ export default function SourcesPage() {
                     <>Ingested &middot; {s.pageCount ?? 0} pages</>
                   )}
                   {s.status === "ingesting" && <>Ingesting...</>}
-                  {s.status === "pending" && <>Pending ingestion</>}
-                  {s.status === "failed" && <>Failed</>}
+                  {s.status === "pending" && (
+                    <button
+                      onClick={() => triggerIngest(s.id)}
+                      className="text-[var(--primary)] underline underline-offset-2 hover:text-[var(--primary-hover)] cursor-pointer"
+                    >
+                      Start ingestion
+                    </button>
+                  )}
+                  {s.status === "failed" && (
+                    <button
+                      onClick={() => triggerIngest(s.id)}
+                      className="text-[var(--red)] underline underline-offset-2 hover:text-[var(--text-2)] cursor-pointer"
+                    >
+                      Retry ingestion
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
