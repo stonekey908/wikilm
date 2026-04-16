@@ -19,6 +19,7 @@ const models = [
 const operations = [
   { key: "ingest", label: "Ingestion", desc: "Processing raw sources into wiki pages" },
   { key: "research", label: "Research", desc: "Web search for new sources" },
+  { key: "synthesis", label: "Synthesis", desc: "Auto-update the project overview after each ingest" },
   { key: "chat", label: "Chat", desc: "Conversational queries against your wiki" },
   { key: "query", label: "Query", desc: "Direct wiki lookups" },
   { key: "lint", label: "Lint", desc: "Wiki health checks and cleanup" },

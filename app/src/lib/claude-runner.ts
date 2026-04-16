@@ -28,6 +28,7 @@ const ENV_MODELS: Record<string, string | undefined> = {
   query: process.env.CLAUDE_MODEL_QUERY ?? process.env.CLAUDE_MODEL,
   lint: process.env.CLAUDE_MODEL_LINT ?? process.env.CLAUDE_MODEL,
   chat: process.env.CLAUDE_MODEL_CHAT ?? process.env.CLAUDE_MODEL,
+  synthesis: process.env.CLAUDE_MODEL_SYNTHESIS ?? process.env.CLAUDE_MODEL,
 };
 
 function getModelArgs(type: string): string[] {
@@ -51,7 +52,7 @@ interface JobOptions {
   prompt: string;
   projectCwd: string;
   projectId: number;
-  type: "ingest" | "query" | "lint" | "research";
+  type: "ingest" | "query" | "lint" | "research" | "synthesis";
   title: string;
   onComplete?: (status: "completed" | "failed") => void;
 }
@@ -441,4 +442,36 @@ function parseProgress(output: string): { current: number; total: number } | nul
     }
   }
   return null;
+}
+
+/**
+ * Trigger a synthesis update job. Called after successful ingest.
+ * Refines wiki/synthesis/project-overview.md based on current index + existing synthesis.
+ * Kept to ~500 words so chat can cheaply include it as context.
+ */
+export async function triggerSynthesisUpdate(projectCwd: string, projectId: number): Promise<number> {
+  const prompt = `Update the project-wide synthesis page at wiki/synthesis/project-overview.md.
+
+Process:
+1. Read wiki/index.md to see what pages exist
+2. If wiki/synthesis/project-overview.md exists, read it first — you are refining it, not rewriting from scratch
+3. Update the synthesis to reflect the current state of the wiki
+
+Constraints:
+- Maximum 500 words in the body (not counting frontmatter)
+- Must include YAML frontmatter: type: synthesis, tags, sources (list of referenced source pages)
+- Cover: main topics, key entities, major concepts, contradictions between sources, knowledge gaps
+- Link all mentions to their wiki pages using [[wikilinks]]
+- Write for someone who wants the "big picture" in under 2 minutes of reading
+- Preserve useful framing from the previous synthesis where still accurate
+
+After updating, also update wiki/index.md if this synthesis wasn't already listed, and append an entry to wiki/log.md.`;
+
+  return startJob({
+    prompt,
+    projectCwd,
+    projectId,
+    type: "synthesis",
+    title: "Update project synthesis",
+  });
 }
