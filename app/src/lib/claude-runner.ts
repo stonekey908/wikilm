@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from "child_process";
 import { db } from "@/db";
-import { jobs } from "@/db/schema";
+import { jobs, settings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { createMockStream, getMockResponse } from "@/lib/__mocks__/claude-mock";
 
@@ -8,18 +8,20 @@ export const isMockMode = process.env.MOCK_MODE === "true";
 
 const MAX_CONCURRENT_JOBS = 3;
 
-// Model configuration per operation type. Override via env vars:
-// CLAUDE_MODEL_INGEST, CLAUDE_MODEL_RESEARCH, CLAUDE_MODEL_QUERY, CLAUDE_MODEL_LINT, CLAUDE_MODEL_CHAT
-const DEFAULT_MODELS: Record<string, string> = {
-  ingest: process.env.CLAUDE_MODEL_INGEST ?? process.env.CLAUDE_MODEL ?? "sonnet",
-  research: process.env.CLAUDE_MODEL_RESEARCH ?? process.env.CLAUDE_MODEL ?? "sonnet",
-  query: process.env.CLAUDE_MODEL_QUERY ?? process.env.CLAUDE_MODEL ?? "sonnet",
-  lint: process.env.CLAUDE_MODEL_LINT ?? process.env.CLAUDE_MODEL ?? "sonnet",
-  chat: process.env.CLAUDE_MODEL_CHAT ?? process.env.CLAUDE_MODEL ?? "sonnet",
+// Model configuration: DB settings > env vars > default (sonnet)
+const ENV_MODELS: Record<string, string | undefined> = {
+  ingest: process.env.CLAUDE_MODEL_INGEST ?? process.env.CLAUDE_MODEL,
+  research: process.env.CLAUDE_MODEL_RESEARCH ?? process.env.CLAUDE_MODEL,
+  query: process.env.CLAUDE_MODEL_QUERY ?? process.env.CLAUDE_MODEL,
+  lint: process.env.CLAUDE_MODEL_LINT ?? process.env.CLAUDE_MODEL,
+  chat: process.env.CLAUDE_MODEL_CHAT ?? process.env.CLAUDE_MODEL,
 };
 
 function getModelArgs(type: string): string[] {
-  const model = DEFAULT_MODELS[type] ?? DEFAULT_MODELS.chat;
+  // Check DB setting first
+  const key = `model_${type}`;
+  const row = db.select().from(settings).where(eq(settings.key, key)).get();
+  const model = row?.value ?? ENV_MODELS[type] ?? "sonnet";
   return ["--model", model];
 }
 
