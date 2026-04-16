@@ -2,3 +2,13 @@
 *.swp
 *.swo
 *~
+
+# Database
+*.db
+*.db-wal
+*.db-shm
+
+# App
+app/node_modules/
+app/.next/
+app/.env.local
