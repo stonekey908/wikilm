@@ -36,6 +36,6 @@ Raft AI exemplifies the "culture of small" part of HSBC's "power of big, culture
 
 ## Related Concepts
 
-- [[Fintech Partnerships in Banking]]
-- [[Agentic AI]] — potential future evolution of process automation capabilities
+- [[fintech-partnerships-in-banking]] — Raft AI is a live exemplar of incumbents partnering with specialists for innovation velocity rather than building in-house
+- [[agentic-ai]] — potential future evolution of process automation capabilities
 - [[Automation in Trade Finance]]

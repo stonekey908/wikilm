@@ -29,6 +29,7 @@ const operations = [
   { key: "chat", label: "Chat", desc: "Conversational queries against your wiki" },
   { key: "query", label: "Query", desc: "Direct wiki lookups" },
   { key: "lint", label: "Lint", desc: "Wiki health checks and cleanup" },
+  { key: "fix", label: "Fix", desc: "Applying suggested fixes to lint findings" },
 ];
 
 export default function SettingsPage() {
@@ -180,7 +181,7 @@ export default function SettingsPage() {
           <div className="px-5 py-4 border-b border-[var(--border)]">
             <h2 className="text-[14px] font-[600] text-[var(--text-1)]">Theme</h2>
             <p className="text-[12px] text-[var(--text-3)] mt-0.5">
-              Choose how SecondBrain looks to you
+              Choose how WikiLM looks to you
             </p>
           </div>
           <div className="px-5 py-4">
@@ -220,7 +221,7 @@ export default function SettingsPage() {
           <div className="px-5 py-4 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-[13px] text-[var(--text-3)]">Application</span>
-              <span className="text-[13px] font-[500] text-[var(--text-1)]">SecondBrain</span>
+              <span className="text-[13px] font-[500] text-[var(--text-1)]">WikiLM</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-[13px] text-[var(--text-3)]">Version</span>

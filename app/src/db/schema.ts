@@ -80,6 +80,28 @@ export const settings = sqliteTable("settings", {
   value: text("value").notNull(),
 });
 
+export const lintFindings = sqliteTable("lint_findings", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  projectId: integer("project_id")
+    .notNull()
+    .references(() => projects.id),
+  jobId: integer("job_id"),
+  category: text("category").notNull(), // orphan, missing_concept, contradiction, stale_claim, missing_cross_ref, suggested_question
+  severity: text("severity").notNull().default("info"), // info, warn
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  targetPage: text("target_page"), // wiki/... path, or null for suggestions
+  suggestedAction: text("suggested_action"),
+  status: text("status").notNull().default("open"), // open, dismissed, resolved
+  dedupeKey: text("dedupe_key").notNull(),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+  updatedAt: text("updated_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
 export const jobs = sqliteTable("jobs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   projectId: integer("project_id")

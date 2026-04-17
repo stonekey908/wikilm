@@ -10,6 +10,7 @@ import {
   MessageSquare,
   Clock,
   Share2,
+  Beaker,
   Settings,
   Sun,
   Moon,
@@ -31,6 +32,7 @@ const navItems: NavItem[] = [
   { label: "Chat", href: "/chat", icon: MessageSquare },
   { label: "Jobs", href: "/jobs", icon: Clock, badgeKey: "runningJobs" },
   { label: "Graph", href: "/graph", icon: Share2 },
+  { label: "Lint", href: "/lint", icon: Beaker },
 ];
 
 const settingsItem = { label: "Settings", href: "/settings", icon: Settings };
@@ -98,7 +100,7 @@ export function Sidebar() {
           </svg>
         </div>
         <span className="text-sm font-[650] tracking-tight text-[var(--text-1)]">
-          SecondBrain
+          WikiLM
         </span>
       </div>
 

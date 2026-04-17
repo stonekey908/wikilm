@@ -4,6 +4,9 @@ type: log
 
 # Wiki Log
 
+## [2026-04-17] lint | Fix stale claim — PLMs vs RAG as competing paradigms
+Updated `wiki/sources/personal-ai-digital-twins-article.md` and `wiki/concepts/personal-language-models.md` to clarify that Personal Language Models and Retrieval-Augmented Generation are complementary approaches rather than competitors. PLMs provide continuous, personalized knowledge integration; RAG provides dynamic retrieval of external context at query time. Agentic systems (per Deloitte) use RAG as a core grounding layer — both techniques coexist in modern AI pipelines.
+
 ## [2026-04-15] ingest | Wiki initialized
 SecondBrain knowledge base created. Architecture: raw/ (read-only sources), wiki/ (LLM-maintained pages). Schema configured in .claude/CLAUDE.md. Ready for first source ingestion.
 
@@ -182,3 +185,95 @@ Knowledge gaps revealed:
 - Competitive threat landscape: are fintech-native trade finance platforms gaining market share?
 - How does "sustainable supply chain" focus translate into specific product features?
 - Can trade operations be modeled as [[digital-twin]] for real-time optimization and scenario simulation?
+
+## [2026-04-17] ingest | HSBC Global Trade Solutions — Products and Solutions (Official Product Page)
+Ingested: "Global Trade Solutions – Products and Solutions" from HSBC official product page (business.hsbc.com/en-gb/products-and-solutions/global-trade-solutions).
+
+Pages created (2):
+- **Source**: hsbc-gts-products-and-solutions
+- **Concept**: supply-chain-finance
+
+Pages updated (3):
+- **Concept**: trade-finance — Added cross-reference to [[supply-chain-finance]] and new source
+- **Entity**: global-trade-solutions — Expanded with full product suite (documentary credit, TradePay, working capital optimization, international trade growth, supply chain finance, sustainable trade finance) and six key customer challenges
+- **Entity**: hsbc — Added new source reference
+
+Key themes: HSBC positions GTS across six core solutions addressing customer pain points: market navigation, supply chain resilience, supplier verification, ESG transitions, working capital optimization, trade documentation burden. [[supply-chain-finance]] introduced as distinct solution area strengthening supplier partnerships across extended networks—differs from bilateral [[trade-finance]] by focusing on ecosystem-wide liquidity and multi-tier supplier coordination. Product suite emphasizes digital-first ([[hsbc-tradepay]]), sustainability (ESG-aligned financing), and network leverage (90% of global trade flows accessible). "World's largest trade bank" positioning supported by $850B annual trade facilitation, 5,000+ specialists, 50+ markets, 160 years of trade finance history.
+
+Cross-connections:
+- [[supply-chain-finance]] as specialized ecosystem-level financing extending bilateral [[trade-finance]] to multi-tier supplier networks
+- Digital platforms ([[hsbc-tradepay]], [[digital-trade-financing]]) enable [[agentic-ai]] applications: autonomous document processing, compliance checking, deal routing
+- Trade operations and supplier networks candidate for [[digital-twin]] modeling (real-time optimization, scenario simulation, supply chain resilience planning)
+- Six customer challenges align with broader enterprise digital transformation trends documented in [[deloitte-agentic-ai-banking]] and [[ieee-ai-digital-twins]]
+
+Knowledge gaps:
+- How are GTS digital platforms integrating AI for document automation and compliance?
+- Is supply chain finance expanding into tier-2/tier-3 suppliers or focused on immediate supplier tier?
+- What are ESG-aligned financing mechanisms (green bonds, sustainability-linked pricing, supply chain scope-3 carbon tracking)?
+
+## [2026-04-17] update | Synthesis — project-overview
+Updated wiki/synthesis/project-overview.md to reflect full current wiki state (10 sources, 24 entities, 25 concepts).
+
+Changes:
+- Added Cluster 5: Trade Finance & Digital Trade — covering [[hsbc]], [[vivek-ramachandran]], [[trade-finance]], [[digital-trade]], [[working-capital]] from hsbc-global-trade-solutions ingest
+- Added new cross-cluster connection: trade finance → agentic AI via [[governance-frameworks]] and [[regulatory-compliance]]
+- Updated knowledge gaps: added trade finance single-source caveat
+- Added `trade-finance` to frontmatter tags; added hsbc-global-trade-solutions to sources list
+- Tightened existing cluster descriptions to stay within 500-word body limit
+
+## [2026-04-17] update | Synthesis — project-overview (HSBC depth pass)
+Updated wiki/synthesis/project-overview.md to incorporate two new HSBC sources (12 sources, 51 entities, 33 concepts total).
+
+Changes:
+- Added hsbc-trade-transformation-gts and hsbc-gts-products-and-solutions to frontmatter sources list
+- Expanded Cluster 5 with: [[tom-elliott]] (COO), [[hsbc-tradepay]] ($6bn limit, sub-minute approvals), [[fintech-partnerships-in-banking]] strategy, [[raft-ai]] and [[dowsure-technologies]] as fintech partners, [[supply-chain-finance]] as distinct solution area, [[digital-trade-financing]] concept
+- Updated cross-cluster connection: fintech governance in Cluster 5 explicitly mirrors autonomous-decision-making tensions in Cluster 3
+- Updated knowledge gaps: removed "single-source cluster" caveat; added HSBC fintech partner outcomes as gap (one-sided coverage)
+- Tightened Cluster 2 and 4 descriptions to stay within 500-word body limit
+
+## [2026-04-17] lint | Cross-reference health fixes (8 findings)
+Applied wiki-health fixes from lint pass. All changes are cross-reference additions to existing pages; no content was invented without source backing.
+
+Pages updated (8):
+- **Concept**: supply-chain-finance — added [[digital-trade-financing]] and [[hsbc-tradepay]] to Related Concepts
+- **Concept**: world-models — added [[tokenization]] callout earlier (after core capability paragraph)
+- **Concept**: agentic-ai — added Agent Training Environments section with [[genie-3]] and [[sima-agents]]
+- **Entity**: hsbc-tradepay — added [[agentic-ai]] / [[autonomous-decision-making]] sentence in Strategic Significance
+- **Concept**: fintech-partnerships-in-banking — added Governance bullet to Risk Factors referencing [[governance-frameworks]] and [[regulatory-compliance]]
+- **Concept**: predictive-maintenance — added Relationship to Enterprise Scale section linking to [[enterprise-metaverse]]
+- **Entity**: raft-ai — tightened [[fintech-partnerships-in-banking]] wikilink in Related Concepts with context
+- **Entity**: dowsure-technologies — tightened [[fintech-partnerships-in-banking]] wikilink in Related Concepts with equity-investment context
+
+Pages created (1):
+- **Concept**: second-brain — new umbrella concept covering Zettelkasten, PKM, LLM-wiki, and personal AI; resolves orphan reference appearing in log and multiple sources
+
+## [2026-04-17] lint | Missing concept pages — 6 findings resolved
+Created 6 concept pages identified as missing from lint pass. All content derived from existing wiki sources; no content invented without source backing.
+
+Pages created (6):
+- **Concept**: reinforcement-learning — RL fundamentals, integration with [[world-models]] training pipelines, role in [[physical-ai]] and [[autonomous-vehicles]]
+- **Concept**: vision-language-models — multimodal AI architecture, role as data annotation layer in world model construction
+- **Concept**: sustainable-trade-finance — ESG-aligned trade products, sustainability-linked pricing, Scope-3 carbon tracking, strategic significance for [[global-trade-solutions]]
+- **Concept**: autonomous-vehicles — perception→prediction→planning→control pipeline, world models as simulation substrate, sim-to-real gap
+- **Concept**: robotics — embodied learning, synthetic data via [[world-models]], sim-to-real transfer, RL policy learning pipelines
+- **Concept**: ai-explainability — interpretability requirements in banking, technical approaches, tension with model capability, relationship to [[governance-frameworks]] and [[regulatory-compliance]]
+
+Index updated with all 6 new entries.
+
+## [2026-04-17] lint | Vendor/payment entity cross-reference fixes (findings 15–17)
+Applied wiki-health fixes for three orphan/stub findings. All changes add wikilinks to existing content; no content invented.
+
+Pages updated (6):
+- **Concept**: agentic-ai — added [[salesforce-agentforce]], [[amazon-bedrock]], [[mastercard]], [[paypal]] wikilinks in Tech Platform Integration and Current Applications sections
+- **Source**: deloitte-agentic-ai-banking — added [[salesforce-agentforce]], [[amazon-bedrock]], [[mastercard]], [[paypal]] wikilinks in Key Takeaways and Critical Insights
+- **Entity**: mastercard — added [[agentic-ai]] and [[paypal]] cross-reference in Significance section
+- **Entity**: paypal — added [[agentic-ai]] and [[mastercard]] cross-reference in Significance section
+
+## [2026-04-17] update | Synthesis — project-overview (products pass)
+Refined wiki/synthesis/project-overview.md after ingestion of hsbc-gts-products-and-solutions (12 sources, all entities and concepts current).
+
+Changes:
+- Cluster 5: replaced generic product list with six-customer-challenge framing from official product page
+- Added [[supply-chain-finance]] distinction: ecosystem-wide multi-tier liquidity vs. bilateral [[trade-finance]]
+- Explicitly named [[digital-trade-financing]] / [[hsbc-tradepay]] inline in Cluster 5
+- Knowledge gaps: added two new entries (GTS AI integration for document automation; ESG/sustainable trade finance mechanisms undefined)
