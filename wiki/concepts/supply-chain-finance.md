@@ -53,6 +53,7 @@ From [[hsbc]] GTS perspective:
 - [[trade-finance]] — Parent domain; transaction-level financing
 - [[working-capital]] — Core function within SCF
 - [[digital-trade]] — Digital platforms accelerating SCF adoption
+- [[digital-trade-financing]] — Digital execution layer enabling real-time SCF workflows; see also [[hsbc-tradepay]]
 - [[agentic-ai]] — Potential for automating supplier verification and financing decisions
 
 ## Sources

@@ -33,6 +33,6 @@ Small, specialized language models trained on individual user data rather than g
 ## Relationship to Other Concepts
 
 - **[[digital-twin]]** — PLMs are the core technology enabling personal digital twins
-- **[[retrieval-augmented-generation]]** — alternative approach (search-based vs. integrated knowledge)
+- **[[retrieval-augmented-generation]]** — complementary, not competing: RAG dynamically retrieves external context at query time; PLMs embed knowledge through continuous retraining. Modern agentic systems (per [[deloitte-agentic-ai-banking]]) use RAG as a core grounding layer — a PLM can serve as the personalized backbone while RAG supplies current external data
 - **[[llm-wiki-pattern]]** — complementary; wikis provide structured data, PLMs provide continuous learning
 - **[[knowledge-management]]** — PLMs as active knowledge management systems vs. passive storage

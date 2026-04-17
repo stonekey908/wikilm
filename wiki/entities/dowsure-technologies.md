@@ -32,6 +32,6 @@ Dowsure Technologies represents HSBC's commitment to "culture of small" innovati
 
 ## Related Concepts
 
-- [[Fintech Partnerships in Banking]]
+- [[fintech-partnerships-in-banking]] — Dowsure Technologies exemplifies incumbents partnering with fintech specialists for innovation velocity; HSBC's equity investment aligns incentives rather than using a pure commercial arrangement
 - [[Embedded Finance]]
 - [[Trade Finance Innovation]]

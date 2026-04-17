@@ -50,6 +50,7 @@ type: index
 - [[dowsure-technologies]] — Fintech company providing embedded financing capabilities to HSBC Global Trade Solutions
 
 ## Concepts
+- [[second-brain]] — Externalized knowledge systems from Zettelkasten to LLM wikis; umbrella concept for PKM and personal AI augmentation
 - [[llm-wiki-pattern]] — System where an LLM maintains a structured wiki from raw sources
 - [[retrieval-augmented-generation]] — Chunk-and-search approach contrasted with the wiki pattern; core technique for agentic AI
 - [[knowledge-compilation]] — Metaphor: raw research "compiled" into organized knowledge
@@ -80,6 +81,12 @@ type: index
 - [[supply-chain-finance]] — Integrated financial solutions optimizing liquidity across extended supplier networks; distinct from bilateral trade finance
 - [[fintech-partnerships-in-banking]] — Strategic approach where incumbent financial institutions accelerate innovation by partnering with specialized fintech firms
 - [[digital-trade-financing]] — Modernization of trade finance with digital-first design, automation, and real-time visibility; exemplified by HSBC TradePay
+- [[sustainable-trade-finance]] — ESG criteria embedded in trade finance products; sustainability-linked pricing, green bonds, Scope-3 supply chain carbon tracking
+- [[reinforcement-learning]] — Training paradigm where agents learn from environment interaction; core planning layer in physical AI and world model training pipelines
+- [[vision-language-models]] — Multimodal AI jointly processing images and text; critical data annotation infrastructure for world model training datasets
+- [[autonomous-vehicles]] — AV systems using perception→prediction→planning→control pipeline; primary application of world models and physical AI
+- [[robotics]] — Embodied AI for manipulation and locomotion; relies on world model synthetic data generation and sim-to-real transfer
+- [[ai-explainability]] — Interpretability of AI decision-making; regulatory requirement for agentic AI in banking and other regulated sectors
 
 ## Comparisons
 
