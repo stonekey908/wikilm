@@ -18,7 +18,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SecondBrain",
+  title: "WikiLM",
   description: "AI-powered knowledge base",
 };
 
