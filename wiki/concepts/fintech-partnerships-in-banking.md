@@ -59,6 +59,7 @@ Modern partnerships often expose capabilities via APIs, minimizing integration f
 - **Data Security:** Sharing data with external partners requires careful governance
 - **Integration Complexity:** Multi-vendor environments are harder to manage than monolithic systems
 - **Vendor Lock-in:** Over-reliance on specialized partners can create switching costs
+- **Governance:** Partnership governance mirrors [[governance-frameworks]] and [[regulatory-compliance]] challenges in [[agentic-ai]]: defining partner boundaries, auditing automated decisions, and maintaining clear accountability across org lines
 
 ## Connected Topics
 

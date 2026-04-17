@@ -59,7 +59,7 @@ const statConfig = [
 const quickActions = [
   { label: "Ingest source", icon: Download, href: "/sources", color: "var(--blue)" },
   { label: "Ask a question", icon: MessageSquare, href: "/chat", color: "var(--primary)" },
-  { label: "Run lint", icon: Beaker, href: "/jobs", color: "var(--orange)" },
+  { label: "Run lint", icon: Beaker, href: "/lint", color: "var(--orange)" },
   { label: "Research topic", icon: Search, href: "/chat", color: "var(--green)" },
 ];
 

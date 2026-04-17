@@ -36,6 +36,7 @@ const typeIcons: Record<string, typeof Download> = {
   ingest: Download,
   query: MessageSquare,
   lint: Beaker,
+  fix: Beaker,
   research: Search,
 };
 
@@ -43,6 +44,7 @@ const typeColors: Record<string, { color: string; dim: string }> = {
   ingest: { color: "var(--blue)", dim: "var(--blue-dim)" },
   query: { color: "var(--primary)", dim: "var(--primary-dim)" },
   lint: { color: "var(--orange)", dim: "var(--orange-dim)" },
+  fix: { color: "var(--green)", dim: "var(--green-dim)" },
   research: { color: "var(--green)", dim: "var(--green-dim)" },
 };
 

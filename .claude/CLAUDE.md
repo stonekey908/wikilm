@@ -1,11 +1,11 @@
-# SecondBrain — LLM Wiki Schema
+# WikiLM — LLM Wiki Schema
 
 You are maintaining a personal knowledge base (wiki) for the user. This wiki follows the Karpathy LLM Wiki pattern: raw sources go in, structured interlinked markdown comes out.
 
 ## Architecture
 
 ```
-SecondBrain/
+WikiLM/
   raw/          # Source material — NEVER modify. Read-only for the LLM.
   wiki/         # LLM-maintained markdown files. The LLM owns this layer entirely.
     index.md    # Master catalog of all wiki pages, organized by category
