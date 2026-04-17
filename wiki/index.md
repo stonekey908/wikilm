@@ -14,6 +14,7 @@ type: index
 - [[personal-ai-digital-twins-article]] — Personal.ai article on digital twins for individual knowledge management, personal language models, and cognitive augmentation
 - [[nvidia-world-models]] — NVIDIA glossary on world models: neural networks understanding physics and dynamics for prediction and simulation
 - [[genie-3-world-models]] — Google DeepMind announcement of Genie 3, a real-time world model generating interactive environments at 24fps with emergent environmental consistency
+- [[hsbc-global-trade-solutions]] — HSBC announcement of Global Trade Solutions rebranding, strategic pillars, and market positioning in trade finance and digital trade
 
 ## Entities
 - [[andrej-karpathy]] — OpenAI co-founder, Tesla former AI lead, creator of the LLM wiki pattern
@@ -38,6 +39,8 @@ type: index
 - [[google-deepmind]] — AI research organization within Alphabet/Google; develops world models and agentic AI systems
 - [[genie-3]] — Google DeepMind's real-time interactive world model; generates diverse procedural environments at 24fps with extended visual memory
 - [[sima-agents]] — Scalable Instructable Multiworld Agents from Google DeepMind; trained in Genie 3 environments for multi-step goal pursuit
+- [[hsbc]] — Global banking and financial services organization; world's leading trade bank facilitating $850B annual trade
+- [[vivek-ramachandran]] — Global Head of HSBC's Global Trade Solutions division
 
 ## Concepts
 - [[llm-wiki-pattern]] — System where an LLM maintains a structured wiki from raw sources
@@ -64,6 +67,9 @@ type: index
 - [[video-generation]] — Synthesis of video sequences from text, images, or control signals; core capability of modern world models
 - [[environmental-consistency]] — Ability to maintain coherent object and physics properties across extended sequences; achieved implicitly in Genie 3
 - [[real-time-generation]] — High-quality content generation at interactive latencies; enables live agent interaction and user-responsive systems
+- [[trade-finance]] — Financial products and services facilitating international trade; encompasses financing, payment guarantees, risk management, and network infrastructure
+- [[digital-trade]] — Digital technologies and platforms for safer, more efficient trade transaction execution, documentation, and connectivity
+- [[working-capital]] — Capital for day-to-day operations and supply chain financing; core function in trade finance and business growth enablement
 
 ## Comparisons
 
