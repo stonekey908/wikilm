@@ -182,3 +182,38 @@ Knowledge gaps revealed:
 - Competitive threat landscape: are fintech-native trade finance platforms gaining market share?
 - How does "sustainable supply chain" focus translate into specific product features?
 - Can trade operations be modeled as [[digital-twin]] for real-time optimization and scenario simulation?
+
+## [2026-04-17] ingest | HSBC Global Trade Solutions — Products and Solutions (Official Product Page)
+Ingested: "Global Trade Solutions – Products and Solutions" from HSBC official product page (business.hsbc.com/en-gb/products-and-solutions/global-trade-solutions).
+
+Pages created (2):
+- **Source**: hsbc-gts-products-and-solutions
+- **Concept**: supply-chain-finance
+
+Pages updated (3):
+- **Concept**: trade-finance — Added cross-reference to [[supply-chain-finance]] and new source
+- **Entity**: global-trade-solutions — Expanded with full product suite (documentary credit, TradePay, working capital optimization, international trade growth, supply chain finance, sustainable trade finance) and six key customer challenges
+- **Entity**: hsbc — Added new source reference
+
+Key themes: HSBC positions GTS across six core solutions addressing customer pain points: market navigation, supply chain resilience, supplier verification, ESG transitions, working capital optimization, trade documentation burden. [[supply-chain-finance]] introduced as distinct solution area strengthening supplier partnerships across extended networks—differs from bilateral [[trade-finance]] by focusing on ecosystem-wide liquidity and multi-tier supplier coordination. Product suite emphasizes digital-first ([[hsbc-tradepay]]), sustainability (ESG-aligned financing), and network leverage (90% of global trade flows accessible). "World's largest trade bank" positioning supported by $850B annual trade facilitation, 5,000+ specialists, 50+ markets, 160 years of trade finance history.
+
+Cross-connections:
+- [[supply-chain-finance]] as specialized ecosystem-level financing extending bilateral [[trade-finance]] to multi-tier supplier networks
+- Digital platforms ([[hsbc-tradepay]], [[digital-trade-financing]]) enable [[agentic-ai]] applications: autonomous document processing, compliance checking, deal routing
+- Trade operations and supplier networks candidate for [[digital-twin]] modeling (real-time optimization, scenario simulation, supply chain resilience planning)
+- Six customer challenges align with broader enterprise digital transformation trends documented in [[deloitte-agentic-ai-banking]] and [[ieee-ai-digital-twins]]
+
+Knowledge gaps:
+- How are GTS digital platforms integrating AI for document automation and compliance?
+- Is supply chain finance expanding into tier-2/tier-3 suppliers or focused on immediate supplier tier?
+- What are ESG-aligned financing mechanisms (green bonds, sustainability-linked pricing, supply chain scope-3 carbon tracking)?
+
+## [2026-04-17] update | Synthesis — project-overview
+Updated wiki/synthesis/project-overview.md to reflect full current wiki state (10 sources, 24 entities, 25 concepts).
+
+Changes:
+- Added Cluster 5: Trade Finance & Digital Trade — covering [[hsbc]], [[vivek-ramachandran]], [[trade-finance]], [[digital-trade]], [[working-capital]] from hsbc-global-trade-solutions ingest
+- Added new cross-cluster connection: trade finance → agentic AI via [[governance-frameworks]] and [[regulatory-compliance]]
+- Updated knowledge gaps: added trade finance single-source caveat
+- Added `trade-finance` to frontmatter tags; added hsbc-global-trade-solutions to sources list
+- Tightened existing cluster descriptions to stay within 500-word body limit
