@@ -156,3 +156,29 @@ Pages created (6):
 Key themes: Trade finance as $850B global market with HSBC as world's leading provider (90% global trade flow access); three strategic pillars (Global Connectors, Innovative Problem Solvers, Strategic Partners); digital trade infrastructure for safer, more efficient transactions; structured working capital solutions bridging supply chain financing gaps; Asian market growth projection ($4.3T → $7.1T intra-Asian exports by 2030); network effects (1.3M businesses across 50+ markets) as competitive differentiator.
 
 Cross-references: New domain distinct from existing wiki (agentic AI, digital twins, world models, personal knowledge management). Trade finance represents enterprise-scale network infrastructure and financial services innovation. Could connect to [[governance-frameworks]], [[regulatory-compliance]] in future synthesis if exploring cross-sector digital transformation patterns.
+
+## [2026-04-17] ingest | HSBC — Trade Transformation and Digital Modernization
+
+Ingested: "A fresh vision: Inside HSBC's trade transformation" from Global Trade Review, The Export Finance Issue 2025. Deep dive into HSBC's rebranding of Global Trade and Receivables Finance (GTRF) to Global Trade Solutions (GTS) and strategic digital modernization initiatives.
+
+Pages created (8):
+- **Source**: hsbc-trade-transformation-gts
+- **Entities**: tom-elliott, global-trade-solutions, hsbc-tradepay, raft-ai, dowsure-technologies
+- **Concepts**: fintech-partnerships-in-banking, digital-trade-financing
+
+Pages updated (1):
+- **Entity**: hsbc — expanded with 2025 digital transformation initiatives, Tom Elliott leadership, fintech partnership strategy, HSBC TradePay product details, five strategic focus areas
+
+Key themes: HSBC's GTS operates on "power of big, culture of small" principle — global scale + local agility enabled by strategic [[fintech-partnerships-in-banking]]. Rather than pure in-house development, GTS partners with [[Raft AI]] (process automation) and [[Dowsure Technologies]] (embedded financing). Multi-year platform replatforming across 22+ markets improving processing speed/accuracy. [[HSBC TradePay]] exemplifies [[digital-trade-financing]]: fully digital approval in under one minute, $6bn in credit limits, client feedback highlights "fintech-like experience." Five strategic pillars: talent development, commercializing digital investments, continuous innovation, sustainable supply chain, structured working capital.
+
+Cross-connections discovered:
+- **[[fintech-partnerships-in-banking]]** mirrors pattern documented in [[deloitte-agentic-ai-banking]]: incumbents leverage specialized fintech for innovation velocity
+- **[[digital-trade-financing]]** represents application of [[agentic-ai]] (autonomous approvals, compliance checking) and [[digital-twin]] (modeling trade operations) to trade finance domain
+- **[[governance-frameworks]]**, **[[regulatory-compliance]]** emerging as critical success factors in fintech integrations (HSBC must manage partner dependencies, data security, integration complexity)
+- Trade finance connects existing [[agentic-ai]] cluster to new financial-services domain; could inform future synthesis on cross-sector digital transformation patterns
+
+Knowledge gaps revealed:
+- How does HSBC measure fintech partnership ROI and success? (speed-to-market, client retention metrics?)
+- Competitive threat landscape: are fintech-native trade finance platforms gaining market share?
+- How does "sustainable supply chain" focus translate into specific product features?
+- Can trade operations be modeled as [[digital-twin]] for real-time optimization and scenario simulation?

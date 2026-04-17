@@ -37,8 +37,10 @@ Asian trade finance growth is particularly significant:
 
 - [[working-capital]] — Core function within trade finance
 - [[digital-trade]] — Emerging digital infrastructure for trade transactions
+- [[supply-chain-finance]] — Extended supply-chain optimization beyond bilateral transactions
 - [[hsbc]] — World's leading trade finance provider
 
 ## Sources
 
 - [[hsbc-global-trade-solutions]] — Overview of HSBC's trade finance positioning and GTS strategic pillars
+- [[hsbc-gts-products-and-solutions]] — HSBC's official product suite: documentary credit, TradePay, working capital optimization, sustainable trade finance
