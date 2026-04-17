@@ -16,7 +16,7 @@ tags: [agentic-ai, automation, banking, intelligent-systems, governance, risk-ma
 **Current State of Adoption**: While major tech platforms (Amazon, Google, Microsoft, Nvidia, Salesforce) are embedding agentic capabilities, actual banking deployments remain limited but emerging:
 - **BNY Mellon**: Using agents for coding and payment validation
 - **JPMorgan Chase**: Deployed LAW (Legal Agentic Workflows) achieving 92.9% accuracy on legal document queries
-- **Payment firms** (Mastercard, PayPal): Experimenting with agentic commerce
+- **Payment firms** ([[mastercard]], [[paypal]]): Experimenting with agentic commerce
 
 **Three Implementation Pathways**:
 1. **Smart Overlay**: Wrapping agents around existing processes without system overhauls (lowest risk, leverages current safeguards)
@@ -42,7 +42,7 @@ tags: [agentic-ai, automation, banking, intelligent-systems, governance, risk-ma
 - Risk expertise alongside technical capability
 - Strategic selectivity—starting with "high-impact, lower-risk use cases"
 
-**Third-Party Leverage**: Given constraints, vendor partnerships (Amazon Bedrock, Salesforce Agentforce, Google) offer practical near-term pathways.
+**Third-Party Leverage**: Given constraints, vendor partnerships ([[amazon-bedrock]], [[salesforce-agentforce]], Google) offer practical near-term pathways.
 
 ## Connections to Wiki
 

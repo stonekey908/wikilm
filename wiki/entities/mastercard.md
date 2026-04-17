@@ -16,4 +16,4 @@ Experimenting with **agentic commerce**—autonomous agents managing e-commerce 
 
 ## Significance
 
-As a payments network, Mastercard's agentic commerce exploration suggests the technology is moving beyond individual bank operations into the infrastructure layer—affecting ecosystem-wide flows and interactions.
+As a payments network, Mastercard's agentic commerce exploration suggests [[agentic-ai]] is moving beyond individual bank operations into the infrastructure layer—affecting ecosystem-wide flows and interactions. See also [[paypal]], which is pursuing parallel agentic commerce experiments at the consumer payments layer.

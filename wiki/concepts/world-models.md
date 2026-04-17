@@ -20,6 +20,8 @@ World models develop deep understanding of:
 
 This understanding is captured as a neural network that can **generate realistic simulations** of physical scenarios without explicit programming of physics rules.
 
+World models rely on [[tokenization]] as a core preprocessing layer, converting high-dimensional visual and sensor data into compact semantic units that enable efficient training on petabyte-scale datasets.
+
 ## How They're Built
 
 ### Data Requirements

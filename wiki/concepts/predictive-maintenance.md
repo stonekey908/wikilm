@@ -22,6 +22,10 @@ Per [[mckinsey-what-is-digital-twin-technology]]:
 
 Primarily in manufacturing, energy, aerospace, and any capital-intensive industry with expensive physical assets where downtime is costly.
 
+## Relationship to Enterprise Scale
+
+Predictive maintenance is the highest-ROI use case for individual [[digital-twin]] deployments. [[enterprise-metaverse]] extends this further — interconnecting twins across assets and organizations so failure prediction and maintenance schedules can be coordinated at network scale.
+
 ## Sources
 
 - [[mckinsey-what-is-digital-twin-technology]]

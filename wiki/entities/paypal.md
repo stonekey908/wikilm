@@ -16,4 +16,4 @@ Experimenting with **agentic commerce**—similar to Mastercard's efforts, explo
 
 ## Significance
 
-Like Mastercard, PayPal's agentic commerce exploration reflects the trend toward autonomous systems at the payments layer, not just internal banking operations.
+Like [[mastercard]], PayPal's agentic commerce exploration reflects the trend toward [[agentic-ai]] systems at the payments layer, not just internal banking operations. Together, these two networks signal that agentic automation is entering the transaction infrastructure—not just enterprise back-office workflows.

@@ -19,7 +19,7 @@ HSBC TradePay is the flagship digital product of [[Global Trade Solutions]], lau
 
 ## Strategic Significance
 
-HSBC TradePay exemplifies the operational philosophy of [[Global Trade Solutions]]: combining the power and resources of a global bank with the speed and UX quality of fintech startups. The sub-minute approval time is a competitive differentiator in a space where traditional approval processes measured in days or weeks.
+HSBC TradePay exemplifies the operational philosophy of [[Global Trade Solutions]]: combining the power and resources of a global bank with the speed and UX quality of fintech startups. The sub-minute approval time is a competitive differentiator in a space where traditional approval processes measured in days or weeks. TradePay's rapid approvals are enabled by [[agentic-ai]] systems handling document verification and compliance checking, alongside [[autonomous-decision-making]] for credit decisions.
 
 ## User Experience Innovation
 

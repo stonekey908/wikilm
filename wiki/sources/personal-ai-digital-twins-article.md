@@ -50,7 +50,7 @@ Unlike traditional digital twins (physical asset replicas), Personal.ai's approa
 
 Personal.ai's approach differs from traditional [[digital-twin]] in scope and subject:
 - **Enterprise digital twins** focus on physical/operational assets; personal twins focus on *individual knowledge*
-- **Contrasts with [[retrieval-augmented-generation]]** (chunk-and-search) by using continuous, integrated knowledge models
+- **Architecturally distinct from [[retrieval-augmented-generation]]** (chunk-and-search): PLMs use continuous, integrated knowledge models rather than dynamic retrieval — but the two approaches are complementary in practice; agentic systems (see [[deloitte-agentic-ai-banking]]) routinely layer RAG over LLMs for grounding, while PLMs provide the personalized backbone
 - Aligns with [[llm-wiki-pattern]] in attempting to organize knowledge for LLM consumption
 - Related to [[knowledge-management]] and [[second-brain]] methodologies
 - Uses [[personal-language-models]] as the core technology

@@ -39,11 +39,11 @@ Built on [[retrieval-augmented-generation]] (RAG) and large language models, age
 **Financial Services** ([[deloitte-agentic-ai-banking]]):
 - JPMorgan Chase's LAW (Legal Agentic Workflows) — 92.9% accuracy on legal queries
 - BNY Mellon — coding, payment validation
-- Mastercard, PayPal — agentic commerce experiments
+- [[mastercard]], [[paypal]] — agentic commerce experiments
 
 **Tech Platform Integration**:
-- Amazon Bedrock
-- Salesforce Agentforce
+- [[amazon-bedrock]]
+- [[salesforce-agentforce]]
 - Google Agents
 - Microsoft Copilot agents
 - Nvidia frameworks
@@ -72,6 +72,10 @@ Built on [[retrieval-augmented-generation]] (RAG) and large language models, age
 - Success requires combining technical capability with organizational [[governance-frameworks]]
 - Should start with "high-impact, lower-risk use cases" not full deployment
 - Human judgment remains non-negotiable at critical decision points
+
+## Agent Training Environments
+
+[[genie-3]] provides procedurally-generated environments for training agentic AI systems like [[sima-agents]], enabling scalable policy learning without real-world risk.
 
 ## Future Convergence
 
