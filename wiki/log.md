@@ -133,6 +133,9 @@ Critical insight: Genie 3 challenges the explicit-3D paradigm. Rather than build
 
 Cross-references: [[genie-3]] as practical realization of [[world-models]] at scale; [[real-time-generation]] as key enabler for interactive [[agentic-ai]] research; [[environmental-consistency]] as emergent property revealing how neural networks learn implicit spatial structure; [[google-deepmind]] competing with [[nvidia-cosmos]] in [[world-models]] space; synergies with [[digital-twin]] for interactive simulation; [[video-generation]] applications extend beyond [[nngroup-digital-twins-generative-ai]] to procedural world synthesis.
 
+## [2026-04-17] update | Synthesis — project-overview (review pass)
+Reviewed wiki/synthesis/project-overview.md against full current wiki state (9 sources, 22 entities, 23 concepts). No structural changes needed — all clusters, cross-connections, and knowledge gaps remain accurate. Added `updated: 2026-04-17` to frontmatter.
+
 ## [2026-04-16] update | Synthesis — project-overview (refinement)
 Refined wiki/synthesis/project-overview.md to reflect full current wiki state after Genie 3 ingestion.
 
@@ -141,3 +144,15 @@ Changes:
 - Expanded Cluster 4 to name all key concepts inline ([[tokenization]], [[video-generation]], [[environmental-consistency]], [[real-time-generation]], [[physical-ai]])
 - Updated knowledge gaps to remove resolved items; added new gaps (comparison pages, governance solutions, world-models ↔ digital-twins synthesis page)
 - Cross-cluster connections section tightened and made more precise
+
+## [2026-04-17] ingest | HSBC — Global Trade Solutions Launch
+Ingested: "HSBC Unveils Global Trade Solutions to Revolutionize Trade Connectivity" from The Global Treasurer, June 20, 2024. Fetched from theglobaltreasurer.com.
+
+Pages created (6):
+- **Source**: hsbc-global-trade-solutions
+- **Entities**: hsbc, vivek-ramachandran
+- **Concepts**: trade-finance, digital-trade, working-capital
+
+Key themes: Trade finance as $850B global market with HSBC as world's leading provider (90% global trade flow access); three strategic pillars (Global Connectors, Innovative Problem Solvers, Strategic Partners); digital trade infrastructure for safer, more efficient transactions; structured working capital solutions bridging supply chain financing gaps; Asian market growth projection ($4.3T → $7.1T intra-Asian exports by 2030); network effects (1.3M businesses across 50+ markets) as competitive differentiator.
+
+Cross-references: New domain distinct from existing wiki (agentic AI, digital twins, world models, personal knowledge management). Trade finance represents enterprise-scale network infrastructure and financial services innovation. Could connect to [[governance-frameworks]], [[regulatory-compliance]] in future synthesis if exploring cross-sector digital transformation patterns.

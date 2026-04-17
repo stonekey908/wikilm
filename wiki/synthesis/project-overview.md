@@ -1,5 +1,6 @@
 ---
 type: synthesis
+updated: "2026-04-17"
 tags: [knowledge-management, digital-twin, agentic-ai, world-models, physical-ai, llm-wiki-pattern]
 sources:
   - karpathy-second-brain-medium-article
