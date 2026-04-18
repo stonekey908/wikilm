@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Beaker,
   Play,
@@ -15,6 +16,7 @@ import {
   AlertTriangle,
   Clock,
   HelpCircle,
+  Search,
   Unlink,
 } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
@@ -112,6 +114,11 @@ const FIXABLE_CATEGORIES = new Set([
   "stale_claim",
 ]);
 
+// Findings in these categories open the /sources research flow instead of
+// an edit-wiki fix — the right answer for a gap is "find new material", not
+// "rewrite existing pages".
+const RESEARCHABLE_CATEGORIES = new Set(["suggested_question"]);
+
 function formatRelative(dateStr: string | null): string {
   if (!dateStr) return "—";
   const d = new Date(dateStr);
@@ -130,6 +137,7 @@ function wikiPageToHref(targetPage: string | null): string | null {
 }
 
 export default function LintPage() {
+  const router = useRouter();
   const [data, setData] = useState<FindingsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
@@ -533,6 +541,7 @@ export default function LintPage() {
                       const pendingDismiss = dismissing.has(f.id);
                       const isFixing = f.status === "fixing";
                       const rowFixable = FIXABLE_CATEGORIES.has(f.category);
+                      const rowResearchable = RESEARCHABLE_CATEGORIES.has(f.category);
                       return (
                         <div
                           key={f.id}
@@ -603,6 +612,20 @@ export default function LintPage() {
                               >
                                 <Wand2 className="w-3 h-3" />
                                 Fix
+                              </button>
+                            )}
+                            {rowResearchable && !isFixing && (
+                              <button
+                                onClick={() =>
+                                  router.push(
+                                    `/sources?tab=research&topic=${encodeURIComponent(f.title)}`
+                                  )
+                                }
+                                title="Research new sources to close this gap"
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-[500] text-[var(--text-3)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-1)]"
+                              >
+                                <Search className="w-3 h-3" />
+                                Research
                               </button>
                             )}
                             {!isFixing && (
