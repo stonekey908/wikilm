@@ -2,7 +2,37 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useTheme } from "@/components/theme-provider";
-import { Sun, Moon, Monitor, Zap, Cpu, Brain, Check, Server } from "lucide-react";
+import { useToast } from "@/components/toast-provider";
+import {
+  Sun,
+  Moon,
+  Monitor,
+  Zap,
+  Cpu,
+  Brain,
+  Check,
+  Server,
+  Archive,
+  Loader2,
+} from "lucide-react";
+
+interface BackupStatus {
+  lastBackupAt: string | null;
+  location: string;
+  lastDbFile: string | null;
+  lastWikiFile: string | null;
+}
+
+function formatRelative(iso: string | null): string {
+  if (!iso) return "Never";
+  const diffSec = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
+  if (diffSec < 60) return "just now";
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+  const days = Math.floor(diffSec / 86400);
+  if (days < 30) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
 
 interface OllamaModel {
   id: string; // "ollama:qwen2.5-coder:7b"
@@ -34,10 +64,20 @@ const operations = [
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
+  const { addToast } = useToast();
   const [modelSettings, setModelSettings] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<string | null>(null);
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
   const [ollamaAvailable, setOllamaAvailable] = useState(false);
+  const [backupStatus, setBackupStatus] = useState<BackupStatus | null>(null);
+  const [backupRunning, setBackupRunning] = useState(false);
+
+  const fetchBackupStatus = useCallback(() => {
+    fetch("/api/backup/status")
+      .then((r) => r.json())
+      .then((data: BackupStatus) => setBackupStatus(data))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetch("/api/settings")
@@ -59,7 +99,36 @@ export default function SettingsPage() {
         setOllamaModels(data.models ?? []);
       })
       .catch(() => {});
-  }, []);
+
+    fetchBackupStatus();
+  }, [fetchBackupStatus]);
+
+  const runBackup = useCallback(async () => {
+    if (backupRunning) return;
+    setBackupRunning(true);
+    try {
+      const res = await fetch("/api/backup/run", { method: "POST" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? "Backup failed");
+      }
+      const data = await res.json();
+      addToast({
+        type: "success",
+        title: "Backup complete",
+        description: `${data.files.db} · ${data.files.wiki}`,
+      });
+      fetchBackupStatus();
+    } catch (err) {
+      addToast({
+        type: "error",
+        title: "Backup failed",
+        description: err instanceof Error ? err.message : "Unknown error",
+      });
+    } finally {
+      setBackupRunning(false);
+    }
+  }, [backupRunning, addToast, fetchBackupStatus]);
 
   const setModel = useCallback(async (operation: string, model: string) => {
     setModelSettings((prev) => ({ ...prev, [operation]: model }));
@@ -204,6 +273,57 @@ export default function SettingsPage() {
                   </button>
                 );
               })}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Backup Section */}
+      <section className="mb-8">
+        <div className="bg-[var(--surface-card)] border border-[var(--border)] rounded-lg shadow-[var(--shadow-sm)]">
+          <div className="px-5 py-4 border-b border-[var(--border)]">
+            <h2 className="text-[14px] font-[600] text-[var(--text-1)]">Backup</h2>
+            <p className="text-[12px] text-[var(--text-3)] mt-0.5">
+              Snapshot the SQLite database and wiki content whenever you want. Keeps the latest 14 of each.
+            </p>
+          </div>
+          <div className="px-5 py-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="min-w-0">
+                <div className="text-[13px] text-[var(--text-2)]">
+                  Last backup:{" "}
+                  <span className="font-[550] text-[var(--text-1)]">
+                    {formatRelative(backupStatus?.lastBackupAt ?? null)}
+                  </span>
+                </div>
+                {backupStatus?.location && (
+                  <div className="text-[12px] text-[var(--text-4)] mt-1 font-mono break-all">
+                    {backupStatus.location}
+                  </div>
+                )}
+                {backupStatus?.lastDbFile && backupStatus?.lastWikiFile && (
+                  <div className="text-[11px] text-[var(--text-4)] mt-1 font-mono">
+                    {backupStatus.lastDbFile} · {backupStatus.lastWikiFile}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={runBackup}
+                disabled={backupRunning}
+                className="shrink-0 inline-flex items-center gap-2 px-3.5 py-2 rounded-md bg-[var(--primary)] text-white text-[13px] font-[550] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+              >
+                {backupRunning ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Backing up…
+                  </>
+                ) : (
+                  <>
+                    <Archive className="w-3.5 h-3.5" />
+                    Backup now
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
