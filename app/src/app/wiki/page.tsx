@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useProject } from "@/components/project-switcher";
 import { Breadcrumbs } from "@/components/breadcrumbs";
+import { ChildProjects } from "@/components/child-projects";
 import {
   Search,
   FileText,
@@ -743,6 +744,14 @@ export default function WikiPage() {
             Browse and search your knowledge base
           </p>
         </div>
+
+        {/* Children — shown when the active project is a parent. Component
+            self-hides when there are no children. */}
+        {activeProject && (
+          <div className="px-4 pb-1">
+            <ChildProjects parentId={activeProject.id} />
+          </div>
+        )}
 
         {/* Pinned synthesis card — always-on quick access to the project overview */}
         {synthesisPage && (
