@@ -27,6 +27,7 @@ interface WikiPageMeta {
   tags: string[];
   slug: string;
   filePath: string;
+  updatedAt?: string;
 }
 
 interface WikiPageDetail {
@@ -319,8 +320,35 @@ export default function WikiPage() {
   const [trail, setTrail] = useState<{ slug: string; title: string }[]>([]);
   const [activeHeading, setActiveHeading] = useState<string | null>(null);
   const [tocExpanded, setTocExpanded] = useState(true);
-  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+  // Initial state: all sections collapsed. Rehydrated from localStorage on mount.
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
+    () => new Set(ALL_TYPES)
+  );
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Restore collapsed state on mount, persist on every change.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("wikilm-wiki-collapsed");
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) setCollapsedSections(new Set(arr));
+      }
+    } catch {
+      // localStorage unavailable or malformed — keep default (all collapsed)
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "wikilm-wiki-collapsed",
+        JSON.stringify(Array.from(collapsedSections))
+      );
+    } catch {
+      // storage quota or private mode — silently skip
+    }
+  }, [collapsedSections]);
 
   function toggleSection(type: string) {
     setCollapsedSections((prev) => {
@@ -329,6 +357,14 @@ export default function WikiPage() {
       else next.add(type);
       return next;
     });
+  }
+
+  function expandAll() {
+    setCollapsedSections(new Set());
+  }
+
+  function collapseAll() {
+    setCollapsedSections(new Set(ALL_TYPES));
   }
 
   // Close dropdown on outside click
@@ -476,6 +512,17 @@ export default function WikiPage() {
 
   const allTags = Array.from(new Set(pages.flatMap((p) => p.tags))).sort();
 
+  const synthesisPage = pages.find((p) => p.slug === "synthesis/project-overview");
+
+  function formatRelative(iso?: string): string {
+    if (!iso) return "";
+    const diffSec = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
+    if (diffSec < 60) return "just now";
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+    return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  }
+
   return (
     <div className="flex h-full">
       {/* ─── List Panel ─── */}
@@ -493,6 +540,38 @@ export default function WikiPage() {
             Browse and search your knowledge base
           </p>
         </div>
+
+        {/* Pinned synthesis card — always-on quick access to the project overview */}
+        {synthesisPage && (
+          <div className="px-4 pb-3">
+            <button
+              onClick={() => loadDetail(synthesisPage.slug)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-all cursor-pointer text-left ${
+                selectedSlug === synthesisPage.slug
+                  ? "border-[var(--chart-4)] bg-[var(--primary-dim)]"
+                  : "border-[var(--border)] bg-[var(--surface-card)] hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-sm)]"
+              }`}
+            >
+              <div
+                className="w-8 h-8 rounded-md flex items-center justify-center shrink-0"
+                style={{ backgroundColor: "rgba(139,92,246,0.1)" }}
+              >
+                <Layers className="w-4 h-4" style={{ color: "var(--chart-4)" }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-[13px] font-[600] text-[var(--text-1)]">
+                  Project synthesis
+                </div>
+                <div className="text-[11px] text-[var(--text-4)] mt-0.5">
+                  {synthesisPage.updatedAt
+                    ? `Updated ${formatRelative(synthesisPage.updatedAt)}`
+                    : "Always-up-to-date overview"}
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-[var(--text-4)] shrink-0" />
+            </button>
+          </div>
+        )}
 
         {/* Search + Filter */}
         <div className="px-4 pb-3 flex gap-2">
@@ -614,11 +693,30 @@ export default function WikiPage() {
           </div>
         )}
 
-        {/* Results count */}
-        <div className="px-5 pt-3 pb-2">
+        {/* Results count + bulk toggles (grouped mode only) */}
+        <div className="px-5 pt-3 pb-2 flex items-center justify-between gap-2">
           <span className="text-[11px] font-semibold text-[var(--text-4)] uppercase tracking-wider">
             {loading ? "Loading..." : `${pages.length} page${pages.length !== 1 ? "s" : ""}`}
           </span>
+          {!loading && !search && !typeFilter && pages.length > 0 && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={expandAll}
+                className="text-[11px] font-[500] text-[var(--text-3)] hover:text-[var(--text-1)] px-1.5 py-0.5 rounded hover:bg-[var(--bg-hover)] transition-colors"
+                title="Expand all sections"
+              >
+                Expand all
+              </button>
+              <span className="text-[var(--text-4)] text-[11px]">·</span>
+              <button
+                onClick={collapseAll}
+                className="text-[11px] font-[500] text-[var(--text-3)] hover:text-[var(--text-1)] px-1.5 py-0.5 rounded hover:bg-[var(--bg-hover)] transition-colors"
+                title="Collapse all sections"
+              >
+                Collapse all
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Page list */}
