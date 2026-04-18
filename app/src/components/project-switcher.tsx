@@ -169,7 +169,14 @@ export function ProjectSwitcher() {
                   className="w-[7px] h-[7px] rounded-full shrink-0"
                   style={{ background: project.color }}
                 />
-                <span className="truncate">{project.name}</span>
+                <div className="flex flex-col min-w-0 flex-1 text-left">
+                  <span className="truncate">{project.name}</span>
+                  {project.slug.includes("/") && (
+                    <span className="text-[11px] text-[var(--text-4)] truncate">
+                      {project.slug}
+                    </span>
+                  )}
+                </div>
               </button>
               <button
                 onClick={(e) => handleDelete(project, e)}

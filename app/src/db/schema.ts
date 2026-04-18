@@ -1,4 +1,5 @@
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 
 export const projects = sqliteTable("projects", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -8,6 +9,7 @@ export const projects = sqliteTable("projects", {
   color: text("color").notNull().default("#0d9488"),
   sourceCount: integer("source_count").notNull().default(0),
   pageCount: integer("page_count").notNull().default(0),
+  parentId: integer("parent_id").references((): AnySQLiteColumn => projects.id),
   createdAt: text("created_at")
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
