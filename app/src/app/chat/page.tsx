@@ -70,7 +70,7 @@ function renderMarkdown(md: string): string {
       .toLowerCase()
       .replace(/\s+/g, "-")
       .replace(/[^a-z0-9-]/g, "");
-    return `<a href="/wiki?page=${slug}" class="wikilink">${page}</a>`;
+    return `<a href="/wiki?slug=${slug}" class="wikilink">${page}</a>`;
   });
 
   // Unordered lists (lines starting with - or *)

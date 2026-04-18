@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { jobs, lintFindings } from "@/db/schema";
 import { and, eq, inArray, ne } from "drizzle-orm";
-import { startJob } from "@/lib/claude-runner";
+import { startJob, triggerSynthesisUpdate } from "@/lib/claude-runner";
 
 export const FIXABLE_CATEGORIES = new Set([
   "orphan",
@@ -383,6 +383,15 @@ export async function startFixJob(options: {
           .set({ status: "open", updatedAt: new Date().toISOString() })
           .where(inArray(lintFindings.id, toRevert))
           .run();
+      }
+
+      // If any findings were actually resolved, the wiki changed — refresh
+      // the project synthesis. Coalescing in triggerSynthesisUpdate ensures
+      // rapid fix bursts produce at most one follow-up run.
+      if (toDelete.length > 0) {
+        triggerSynthesisUpdate(options.projectCwd, options.projectId).catch(
+          (err) => console.error("[fix] failed to trigger synthesis:", err)
+        );
       }
     },
   });
