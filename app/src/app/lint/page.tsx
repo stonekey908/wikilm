@@ -20,6 +20,7 @@ import {
   Unlink,
 } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
+import { formatJobError } from "@/lib/error-codes";
 
 interface Finding {
   id: number;
@@ -194,11 +195,19 @@ export default function LintPage() {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error ?? "Failed to start lint job");
       }
-      addToast({
-        type: "info",
-        title: "Lint started",
-        description: "Auditing the wiki — findings will appear as they're discovered.",
-      });
+      const data = await res.json();
+      // If the job failed pre-flight (provider unreachable etc.), surface
+      // the classified error instead of pretending the run started.
+      if (data.status === "failed") {
+        const msg = formatJobError(data.errorCode, data.error);
+        addToast({ type: "error", ...msg });
+      } else {
+        addToast({
+          type: "info",
+          title: "Lint started",
+          description: "Auditing the wiki — findings will appear as they're discovered.",
+        });
+      }
       fetchFindings();
     } catch (err) {
       addToast({
@@ -253,6 +262,13 @@ export default function LintPage() {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error ?? "Failed to start fix");
       }
+      const data = await res.json();
+      if (data.status === "failed") {
+        const msg = formatJobError(data.errorCode, data.error);
+        addToast({ type: "error", ...msg });
+        fetchFindings();
+        return;
+      }
       addToast({
         type: "info",
         title: "Fix started",
@@ -287,7 +303,19 @@ export default function LintPage() {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error ?? "Failed to start fix");
       }
-      const json = (await res.json()) as { count: number };
+      const json = (await res.json()) as {
+        count: number;
+        status?: string;
+        error?: string | null;
+        errorCode?: string | null;
+      };
+      if (json.status === "failed") {
+        const msg = formatJobError(json.errorCode, json.error);
+        addToast({ type: "error", ...msg });
+        setSelected(new Set());
+        fetchFindings();
+        return;
+      }
       addToast({
         type: "info",
         title: `Fixing ${json.count} findings`,
