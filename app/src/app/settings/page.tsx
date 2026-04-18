@@ -20,7 +20,7 @@ interface BackupStatus {
   lastBackupAt: string | null;
   location: string;
   lastDbFile: string | null;
-  lastWikiFile: string | null;
+  lastContentFile: string | null;
 }
 
 function formatRelative(iso: string | null): string {
@@ -116,7 +116,7 @@ export default function SettingsPage() {
       addToast({
         type: "success",
         title: "Backup complete",
-        description: `${data.files.db} · ${data.files.wiki}`,
+        description: `${data.files.db} · ${data.files.content}`,
       });
       fetchBackupStatus();
     } catch (err) {
@@ -301,9 +301,9 @@ export default function SettingsPage() {
                     {backupStatus.location}
                   </div>
                 )}
-                {backupStatus?.lastDbFile && backupStatus?.lastWikiFile && (
+                {backupStatus?.lastDbFile && backupStatus?.lastContentFile && (
                   <div className="text-[11px] text-[var(--text-4)] mt-1 font-mono">
-                    {backupStatus.lastDbFile} · {backupStatus.lastWikiFile}
+                    {backupStatus.lastDbFile} · {backupStatus.lastContentFile}
                   </div>
                 )}
               </div>
