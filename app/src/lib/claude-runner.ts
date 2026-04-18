@@ -40,6 +40,7 @@ function drainQueue() {
  */
 function startJobProcess(jobId: number, options: JobOptions): void {
   const model = getModel(options.type);
+  console.log(`[job:${jobId}] type=${options.type} model=${model}`);
   if (model.startsWith("ollama:")) {
     const modelName = model.slice("ollama:".length);
     inFlightOllamaCount++;
@@ -155,6 +156,9 @@ export function streamClaude({ prompt, projectCwd, type }: StreamOptions): Reada
 
   const encoder = new TextEncoder();
   const model = getModel(type ?? "chat");
+  // Audit line — makes it trivial to confirm which provider drove any
+  // given stream via the dev server log.
+  console.log(`[stream] type=${type ?? "chat"} model=${model}`);
 
   // Ollama doesn't plug into this SSE envelope yet — surface a clean error
   // instead of letting the user wonder why nothing happened.
