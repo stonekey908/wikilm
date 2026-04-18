@@ -40,6 +40,12 @@ interface OllamaModel {
   contextWindow: number;
 }
 
+interface GeminiModel {
+  id: string; // "gemini:gemini-3-pro"
+  name: string;
+  label: string;
+}
+
 const themeOptions = [
   { value: "light" as const, label: "Light", icon: Sun },
   { value: "dark" as const, label: "Dark", icon: Moon },
@@ -69,6 +75,8 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState<string | null>(null);
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
   const [ollamaAvailable, setOllamaAvailable] = useState(false);
+  const [geminiModels, setGeminiModels] = useState<GeminiModel[]>([]);
+  const [geminiAvailable, setGeminiAvailable] = useState(false);
   const [backupStatus, setBackupStatus] = useState<BackupStatus | null>(null);
   const [backupRunning, setBackupRunning] = useState(false);
 
@@ -97,6 +105,15 @@ export default function SettingsPage() {
       .then((data: { available: boolean; models: OllamaModel[] }) => {
         setOllamaAvailable(data.available);
         setOllamaModels(data.models ?? []);
+      })
+      .catch(() => {});
+
+    // Detect Gemini CLI in parallel
+    fetch("/api/gemini/models")
+      .then((r) => r.json())
+      .then((data: { available: boolean; models: GeminiModel[] }) => {
+        setGeminiAvailable(data.available);
+        setGeminiModels(data.models ?? []);
       })
       .catch(() => {});
 
@@ -171,6 +188,7 @@ export default function SettingsPage() {
             {operations.map((op) => {
               const selected = modelSettings[op.key] ?? "sonnet";
               const isOllamaSelected = selected.startsWith("ollama:");
+              const isGeminiSelected = selected.startsWith("gemini:");
               return (
                 <div key={op.key} className="px-5 py-4">
                   <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -180,7 +198,7 @@ export default function SettingsPage() {
                     </div>
                     <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">
                       {models.map((m) => {
-                        const isSelected = !isOllamaSelected && selected === m.value;
+                        const isSelected = !isOllamaSelected && !isGeminiSelected && selected === m.value;
                         const Icon = m.icon;
                         return (
                           <button
@@ -227,6 +245,34 @@ export default function SettingsPage() {
                           <Server className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none" style={{ color: isOllamaSelected ? "var(--primary)" : "var(--text-3)" }} />
                         </div>
                       )}
+
+                      {/* Gemini dropdown — only if gemini CLI is installed.
+                          Great for research/web-grounding thanks to native
+                          Google Search integration. */}
+                      {geminiAvailable && geminiModels.length > 0 && (
+                        <div className="relative">
+                          <select
+                            value={isGeminiSelected ? selected : ""}
+                            onChange={(e) => {
+                              if (e.target.value) setModel(op.key, e.target.value);
+                            }}
+                            className={`flex items-center gap-1.5 pl-7 pr-7 py-1.5 rounded-md border text-[12px] font-[500] transition-all duration-150 cursor-pointer appearance-none ${
+                              isGeminiSelected
+                                ? "border-[var(--primary)] bg-[var(--primary-dim)] text-[var(--primary)]"
+                                : "border-[var(--border)] bg-[var(--bg-2)] text-[var(--text-3)] hover:border-[var(--border-strong)] hover:text-[var(--text-2)]"
+                            }`}
+                            title="Gemini CLI model"
+                          >
+                            <option value="">Gemini...</option>
+                            {geminiModels.map((m) => (
+                              <option key={m.id} value={m.id}>
+                                {m.label}
+                              </option>
+                            ))}
+                          </select>
+                          <Brain className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none" style={{ color: isGeminiSelected ? "var(--primary)" : "var(--text-3)" }} />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -237,6 +283,14 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-2 text-[11px] text-[var(--text-4)]">
                   <Server className="w-3 h-3" />
                   Start Ollama (<code className="font-mono">ollama serve</code>) to use local models
+                </div>
+              </div>
+            )}
+            {!geminiAvailable && (
+              <div className="px-5 py-3 border-t border-[var(--border)] bg-[var(--bg-1)]">
+                <div className="flex items-center gap-2 text-[11px] text-[var(--text-4)]">
+                  <Brain className="w-3 h-3" />
+                  Install Gemini CLI (<code className="font-mono">npm i -g @google/gemini-cli</code>) for Google Search-grounded research
                 </div>
               </div>
             )}
