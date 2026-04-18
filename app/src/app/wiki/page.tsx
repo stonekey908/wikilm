@@ -21,6 +21,9 @@ import {
   ChevronDown,
   ChevronRight,
   X,
+  Loader2,
+  RefreshCw,
+  ShieldCheck,
 } from "lucide-react";
 
 /* ─── Types ─── */
@@ -422,6 +425,11 @@ export default function WikiPage() {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
     () => new Set(ALL_TYPES)
   );
+  // Parent-action button state — debounces repeated clicks while a run is
+  // queued. Independent of the actual job status (which we don't poll here);
+  // the coalescing on the server side guarantees at most 2 runs per burst.
+  const [parentSyncInFlight, setParentSyncInFlight] = useState(false);
+  const [parentLintInFlight, setParentLintInFlight] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Restore collapsed state on mount, persist on every change.
@@ -716,6 +724,49 @@ export default function WikiPage() {
   const allTags = Array.from(new Set(pages.flatMap((p) => p.tags))).sort();
 
   const synthesisPage = pages.find((p) => p.slug === "synthesis/project-overview");
+  // True when the active project has at least one direct child. Drives the
+  // parent-action row (Run parent synthesis / Run parent lint).
+  const isParentProject =
+    activeProject != null &&
+    projects.some((p) => p.parentId === activeProject.id);
+
+  const runParentSynthesis = useCallback(async () => {
+    if (!activeProject || parentSyncInFlight) return;
+    setParentSyncInFlight(true);
+    try {
+      const res = await fetch(
+        `/api/projects/${activeProject.id}/synthesis/parent-run`,
+        { method: "POST" }
+      );
+      if (!res.ok) {
+        console.error("parent synthesis failed:", await res.text());
+      }
+    } catch (err) {
+      console.error("parent synthesis error:", err);
+    } finally {
+      // Short debounce so the user can't hammer the button and also isn't
+      // left wondering what happened — the server coalesces anyway.
+      setTimeout(() => setParentSyncInFlight(false), 2000);
+    }
+  }, [activeProject, parentSyncInFlight]);
+
+  const runParentLint = useCallback(async () => {
+    if (!activeProject || parentLintInFlight) return;
+    setParentLintInFlight(true);
+    try {
+      const res = await fetch(
+        `/api/lint/parent-run/${activeProject.id}`,
+        { method: "POST" }
+      );
+      if (!res.ok) {
+        console.error("parent lint failed:", await res.text());
+      }
+    } catch (err) {
+      console.error("parent lint error:", err);
+    } finally {
+      setTimeout(() => setParentLintInFlight(false), 2000);
+    }
+  }, [activeProject, parentLintInFlight]);
 
   function formatRelative(iso?: string): string {
     if (!iso) return "";
@@ -781,6 +832,51 @@ export default function WikiPage() {
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-[var(--text-4)] shrink-0" />
+            </button>
+          </div>
+        )}
+
+        {/* Parent actions — only when the active project has children. Gives
+            users on-demand access to parent-level synthesis (summary of
+            children's syntheses) and parent-level lint (promotion candidates,
+            recurring themes, cross-child gaps). */}
+        {isParentProject && (
+          <div className="px-4 pb-3 flex flex-wrap gap-2">
+            <button
+              onClick={runParentSynthesis}
+              disabled={parentSyncInFlight}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-card)] text-[12px] font-[550] text-[var(--text-2)] hover:border-[var(--border-strong)] hover:text-[var(--text-1)] disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+              title="Consolidate children's syntheses into this project's overview"
+            >
+              {parentSyncInFlight ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Queueing…
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Run parent synthesis
+                </>
+              )}
+            </button>
+            <button
+              onClick={runParentLint}
+              disabled={parentLintInFlight}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-card)] text-[12px] font-[550] text-[var(--text-2)] hover:border-[var(--border-strong)] hover:text-[var(--text-1)] disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+              title="Surface promotion candidates, recurring themes, and cross-child gaps"
+            >
+              {parentLintInFlight ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Queueing…
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  Run parent lint
+                </>
+              )}
             </button>
           </div>
         )}

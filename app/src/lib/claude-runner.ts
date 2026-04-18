@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { createMockStream, getMockResponse } from "@/lib/__mocks__/claude-mock";
 import { runOllamaJob, cancelOllamaJob, hasOllamaJob } from "@/lib/ollama-runner";
 import { runGeminiJob, cancelGeminiJob, hasGeminiJob, isGeminiAvailable } from "@/lib/gemini-runner";
+import { getProject, projectRoot } from "@/lib/projects";
 
 export const isMockMode = process.env.MOCK_MODE === "true";
 
@@ -680,6 +681,17 @@ Constraints:
 
 After updating, also update wiki/index.md if this synthesis wasn't already listed, and append an entry to wiki/log.md.`;
 
+/**
+ * Read a boolean setting — defaults to false when the row is absent or
+ * the stored value isn't a recognised truthy string ("true" / "1").
+ */
+function getBooleanSetting(key: string): boolean {
+  const row = db.select().from(settings).where(eq(settings.key, key)).get();
+  if (!row) return false;
+  const v = row.value.toLowerCase();
+  return v === "true" || v === "1";
+}
+
 function scheduleSynthesisJob(projectCwd: string, projectId: number): Promise<number> {
   synthesisInFlight = true;
   synthesisPending = false;
@@ -689,13 +701,34 @@ function scheduleSynthesisJob(projectCwd: string, projectId: number): Promise<nu
     projectId,
     type: "synthesis",
     title: "Update project synthesis",
-    onComplete: () => {
+    onComplete: (status) => {
       synthesisInFlight = false;
       // If any ingest finished during this run, fire exactly one more pass
       if (synthesisPending && lastProjectCwd && lastProjectId !== null) {
         scheduleSynthesisJob(lastProjectCwd, lastProjectId).catch((err) => {
           console.error("[synthesis] follow-up run failed:", err);
         });
+      }
+      // Auto-sync parent synthesis — only when the child synthesis actually
+      // succeeded, the setting is enabled, and this project has a parent.
+      // The parent trigger coalesces independently, so multiple children
+      // finishing in a burst won't cause N parent runs.
+      if (status === "completed" && getBooleanSetting("auto_sync_parent_synthesis")) {
+        try {
+          const self = getProject(projectId);
+          if (self?.parentId != null) {
+            const parent = getProject(self.parentId);
+            if (parent) {
+              triggerParentSynthesisUpdate(projectRoot(parent), parent.id).catch(
+                (err) => {
+                  console.error("[synthesis] parent auto-sync failed:", err);
+                }
+              );
+            }
+          }
+        } catch (err) {
+          console.error("[synthesis] parent auto-sync lookup failed:", err);
+        }
       }
     },
   });
@@ -722,4 +755,92 @@ export async function triggerSynthesisUpdate(
     return null;
   }
   return scheduleSynthesisJob(projectCwd, projectId);
+}
+
+// ─── Parent synthesis coalescing ───────────────────────────────────────────
+// Mirrors the child-synthesis coalescing above, but with its own in-flight /
+// pending pair so the two trigger paths don't interfere. Parent synthesis
+// reads each direct child's `wiki/synthesis/project-overview.md` plus the
+// parent's own current overview (if any) and produces a consolidated
+// summary-of-summaries. It does NOT read children's raw pages.
+let parentSynthesisInFlight = false;
+let parentSynthesisPending = false;
+let lastParentProjectCwd: string | null = null;
+let lastParentProjectId: number | null = null;
+
+const PARENT_SYNTHESIS_PROMPT = `Update the PARENT-level synthesis page at wiki/synthesis/project-overview.md.
+
+You are synthesizing across child projects — NOT this project's own raw sources. Read ONLY the following:
+1. This project's existing wiki/synthesis/project-overview.md, if it exists (you are refining it, not rewriting from scratch).
+2. Each direct child project's wiki/synthesis/project-overview.md. Children live at ../projects/<child-slug>/wiki/synthesis/project-overview.md relative to this project's wiki/, OR if this project is the root (id=1), children live at ./projects/<child-slug>/wiki/synthesis/project-overview.md. Read whichever path exists.
+
+Do NOT read children's raw/ directories. Do NOT read children's source/entity/concept pages. Children's syntheses are your only input — this is a "summary of summaries".
+
+Produce a consolidated parent-level overview that covers:
+- Cross-cutting themes that appear in 2+ children's syntheses
+- Patterns, frameworks, or methods recurring across children
+- Contradictions between children's conclusions
+- Gaps surfaced across children (topics implied but never developed in any child)
+- The overall narrative arc — how the children fit together into a bigger picture
+
+Constraints:
+- Maximum 600 words in the body (not counting frontmatter)
+- Must include YAML frontmatter: type: synthesis, tags, sources (list the children's synthesis page paths you read, e.g. [projects/child-a/wiki/synthesis/project-overview.md])
+- Use [[wikilinks]] for cross-references to child project pages using the cross-project syntax [[child-slug/page-name]]
+- Write for someone who wants the "big picture across the whole project tree" in 2-3 minutes of reading
+- Preserve useful framing from the previous parent synthesis where still accurate
+
+After updating, also update wiki/index.md if this synthesis wasn't already listed, and append an entry to wiki/log.md with operation "update" noting this was a parent-level refresh.`;
+
+function scheduleParentSynthesisJob(
+  projectCwd: string,
+  projectId: number
+): Promise<number> {
+  parentSynthesisInFlight = true;
+  parentSynthesisPending = false;
+  return startJob({
+    prompt: PARENT_SYNTHESIS_PROMPT,
+    projectCwd,
+    projectId,
+    type: "synthesis",
+    title: "Update parent synthesis",
+    onComplete: () => {
+      parentSynthesisInFlight = false;
+      if (
+        parentSynthesisPending &&
+        lastParentProjectCwd &&
+        lastParentProjectId !== null
+      ) {
+        scheduleParentSynthesisJob(
+          lastParentProjectCwd,
+          lastParentProjectId
+        ).catch((err) => {
+          console.error("[parent-synthesis] follow-up run failed:", err);
+        });
+      }
+    },
+  });
+}
+
+/**
+ * Trigger a parent-level synthesis update. Reads children's syntheses only
+ * (not their raw pages) and writes to the parent's own
+ * wiki/synthesis/project-overview.md. Coalesces rapid-fire triggers the same
+ * way triggerSynthesisUpdate does — at most one in-flight and one pending.
+ *
+ * Returns the jobId of the newly scheduled synthesis, or null if the caller
+ * was coalesced into an already-in-flight run.
+ */
+export async function triggerParentSynthesisUpdate(
+  projectCwd: string,
+  projectId: number
+): Promise<number | null> {
+  lastParentProjectCwd = projectCwd;
+  lastParentProjectId = projectId;
+
+  if (parentSynthesisInFlight) {
+    parentSynthesisPending = true;
+    return null;
+  }
+  return scheduleParentSynthesisJob(projectCwd, projectId);
 }
