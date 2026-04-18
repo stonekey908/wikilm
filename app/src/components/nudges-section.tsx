@@ -138,6 +138,9 @@ export function NudgesSection() {
       });
       if (!res.ok) throw new Error("Dismiss failed");
       setHidden((prev) => new Set(prev).add(nudge.id));
+      // Reconcile in the background — if the server state diverged (e.g.
+      // another tab acted on a different nudge), the list updates.
+      void fetchNudges();
     } catch {
       addToast({ type: "error", title: "Couldn't dismiss nudge" });
     } finally {
@@ -192,6 +195,7 @@ export function NudgesSection() {
         description: `Moved to ${out.parentSlug ?? nudge.projectSlug}`,
       });
       setHidden((prev) => new Set(prev).add(nudge.id));
+      void fetchNudges();
     } catch (e) {
       addToast({
         type: "error",
@@ -239,6 +243,7 @@ export function NudgesSection() {
       });
       setHidden((prev) => new Set(prev).add(nudge.id));
       setConceptModal(null);
+      void fetchNudges();
     } catch (e) {
       addToast({
         type: "error",
