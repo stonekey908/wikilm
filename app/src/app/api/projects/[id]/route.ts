@@ -4,6 +4,7 @@ import { projects } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import fs from "fs";
 import path from "path";
+import { hasChildren } from "@/lib/projects";
 
 export async function GET(
   _request: NextRequest,
@@ -67,6 +68,15 @@ export async function DELETE(
 
   if (!project) {
     return Response.json({ error: "Project not found" }, { status: 404 });
+  }
+
+  if (hasChildren(projectId)) {
+    return Response.json(
+      {
+        error: "Cannot delete a project that has children. Delete or move children first.",
+      },
+      { status: 409 }
+    );
   }
 
   // Delete project directory
