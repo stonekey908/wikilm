@@ -12,3 +12,6 @@
 app/node_modules/
 app/.next/
 app/.env.local
+
+# Backups — local-only by default. Opt in manually if you want offsite copies.
+backups/
