@@ -179,14 +179,17 @@ This is a general-purpose knowledge base. Topics are handled via tags in frontma
 
 ## Current Phase
 
-Wiki UX + smart chat + multi-provider shipped. All 7 Linear tickets complete and merged to main. App now has: auto-updating synthesis, smart chat routing (reads index + synthesis first), breadcrumbs + related pages, TOC, quick URL input, Ollama provider support, SVG graph visualization. Next phase is open — no active tickets.
+Lint + Fix + Gemini + UX polish shipped. 17 tickets closed this session (STO-1730 through STO-1757 minus STO-1743 and STO-1750). App renamed SecondBrain → WikiLM (Linear project + GitHub repo + app metadata). Only remaining active ticket: **STO-1743 (MCP server)** — flagged "Do NOT implement without a design session first", 6 open questions listed in the ticket. Backlog also has STO-1750 (research streaming investigation, Low).
 
 ## Known Issues
 
 - Wiki pages are filesystem-based (not DB-backed) — search is server-side file reads
-- Research results from web search depend on Claude's web grounding quality — URLs are sometimes approximate
+- Research results from web search depend on the chosen provider's grounding quality — URLs are sometimes approximate
 - `wiki_pages` DB table exists but is not synced with filesystem wiki — API reads from disk directly
 - Synthesis pending flag is in-memory only — if server restarts during a synthesis burst, follow-up is lost (next ingest re-triggers; not a data-loss issue, just a staleness window)
+- Research results don't stream as found — Claude's tool-use pattern emits all `RESULT:` lines in the final text phase (STO-1750 tracks investigation)
+- Ollama streaming for research/chat still unsupported — `streamClaude` emits a "not supported yet" error for `ollama:*` models
+- Local directory is still `~/SecondBrain/` and DB file is still `secondbrain.db` — deferred per user preference ("leave it as long as everything else is ok")
 
 ## Known Gotchas
 
@@ -194,25 +197,60 @@ Wiki UX + smart chat + multi-provider shipped. All 7 Linear tickets complete and
 - **Hot-reload doesn't pick up claude-runner.ts changes** → module cached by Next.js → fix: restart dev server after changing claude-runner.ts
 - **Jobs beyond MAX_CONCURRENT (3) silently failed** → `startJob` threw error caught by caller → fix: implemented job queue with auto-drain
 - **Rapid ingest bursts would queue N synthesis jobs** → each onComplete fires trigger independently → fix: coalescing flags in claude-runner.ts (synthesisInFlight + synthesisPending) collapse to at most 2 runs per burst
-- **Model setting value format** → bare aliases ("sonnet") = Claude; "ollama:<model>" prefix = Ollama HTTP path. `startJobProcess` dispatches based on prefix.
+- **Model setting value format** → bare aliases ("sonnet") = Claude; "ollama:<model>" prefix = Ollama HTTP; "gemini:<model>" prefix = Gemini CLI. `startJobProcess` + `streamClaude` both dispatch based on prefix.
+- **Gemini model IDs must be preview endpoints** → `gemini-3-flash`/`gemini-3-pro` 404 against the live API → fix: use `gemini-3-flash-preview` and `gemini-3.1-pro-preview`
+- **Gemini CLI needs `-y` (yolo) flag** → without it the CLI prompts for tool approval and hangs since we have no stdin → fix: always pass `-y -o text` in spawn args
+- **streamClaude was hardcoded to claude** → picking Gemini for research did nothing silently → fix: `streamClaude` now branches on model prefix and emits structured errors when the stream provider isn't supported (Ollama)
+- **Research results cleared on tab close** → sessionStorage is per-tab → fix: migrated `sb_research_query` + `sb_research_results` to localStorage
+- **Backup only grabbed top-level wiki/** → `projects/<slug>/wiki/` was silently excluded → fix: tar now includes both `wiki/` and `projects/`; archive renamed `content-<ts>.tar.gz`
+- **`gh repo rename` updates both GitHub and the local remote** → so after renaming you don't need a separate `git remote set-url`
 
 ## Last Session
 
 ```
-**Date:** 2026-04-16
+**Date:** 2026-04-18
 **Who:** Claude session
 **What was done:**
-- STO-1726: auto-updating synthesis page (triggers after each ingest, 500-word cap)
-- STO-1728: smart chat routing — wraps chat prompt to read index.md + synthesis first, then only relevant pages (NotebookLM-style hierarchical retrieval)
-- STO-1723: quick add URL input in sources library (paste URL, creates web source, starts ingest)
-- STO-1722: breadcrumb trail in detail pane + related pages panel (forward wikilinks + backlinks) in list pane
-- STO-1724: collapsible table of contents for wiki pages with 3+ headings, IntersectionObserver for active section
-- STO-1729: Ollama provider support — detectOllamaModels() + runOllamaJob(); Settings UI shows per-operation Claude/Ollama picker; AbortController-based cancel
-- STO-1725: SVG graph visualization — deterministic circular layout grouped by type, pan/zoom/hover-highlight, click to navigate
-- Coalescing fix: synthesisInFlight + synthesisPending flags prevent N redundant synthesis runs during rapid ingest bursts (follow-up guarantees final state is captured)
+
+Major features (shipped before this session started):
+- Lint feature — /lint page, lint_findings DB table, categorised findings with dismiss
+- Fix feature — per-row Fix, per-category Fix all, bulk Fix selected via checkboxes
+- Settings: Fix operation with its own model picker
+- Rename SecondBrain → WikiLM (Linear project + GitHub repo + package.json + metadata + sidebar)
+
+This session's tickets (all Done on main):
+- STO-1730: chat wikilinks deep-link (?page= → ?slug=)
+- STO-1731: synthesis auto-triggers after successful fix jobs
+- STO-1732: project counts computed on-the-fly in /api/projects
+- STO-1733: wiki list grouped by type when unfiltered
+- STO-1734: graph force-directed layout (Fruchterman-Reingold, pure JS)
+- STO-1739: wiki sections collapsed by default + expand/collapse all + localStorage persist
+- STO-1740: programmatic markdown upload endpoint (POST /api/sources/upload-md) + frontmatter title on file upload
+- STO-1741: export chat responses as .md or .docx (pure-JS via `docx` package)
+- STO-1742: manual backup via Settings button (sqlite3 .dump + tar)
+- STO-1744: pinned Project synthesis card at top of /wiki
+- STO-1745: actionable knowledge gaps — Research buttons on /lint suggested_question findings + inline buttons on synthesis "Knowledge Gaps" lists
+- STO-1746: Gemini CLI as third provider (gemini-runner.ts + /api/gemini/models + Settings dropdown)
+- STO-1747: graceful failure framework (jobs.errorCode column + preflightProvider + formatJobError helper + classified /jobs display)
+- STO-1748: research Load more pagination with excludeUrls + client dedup
+- STO-1749: research pane replaced fake progress bar with honest spinner + live count
+- STO-1751: research sort toggle (Relevance default, Original)
+- STO-1752: backup archive now includes projects/ (not just top-level wiki/); renamed content-<ts>.tar.gz
+- STO-1755: streamClaude dispatches to Gemini (was hardcoded to claude)
+- STO-1756: unified Settings model pickers as three equal-width dropdowns (Claude/Ollama/Gemini)
+- STO-1757: research state in localStorage + Clear all button
+- Fix: Gemini model IDs corrected to gemini-3.1-pro-preview + gemini-3-flash-preview
+- Chore: console.log provider dispatch in streamClaude + startJobProcess for audit
+
+Also filed but not yet actioned:
+- STO-1743: WikiLM MCP server — "Do NOT implement without a design session first", 6 open questions
+- STO-1750: investigate streaming research results as found (Low priority, revisit after Gemini)
+
 **What's next:**
-- No active tickets — backlog open
-- Possible future work: Ollama streaming for chat (sub-ticket), force-directed graph upgrade, DB-backed wiki_pages sync, synthesis requeue-on-restart
-**Branch:** merged to main
+- STO-1743 MCP server design session — work through the 6 open questions (project selection, auth, multi-project mapping, write confirmations, read latency, ingest feedback) before any code.
+- STO-1750 streaming investigation (Low) if it becomes annoying in practice.
+- User may want a follow-up on streamClaude to emit a structured errorCode for Ollama (currently emits raw text).
+
+**Branch:** merged to main after every ticket; `chore/session-end-2026-04-18` holds these handoff updates.
 **Blockers:** None
 ```
