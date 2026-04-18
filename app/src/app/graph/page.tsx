@@ -3,19 +3,28 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Share2, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
+import { useProject } from "@/components/project-switcher";
+import { Breadcrumbs } from "@/components/breadcrumbs";
 
 interface GraphNode {
+  id: string;
   slug: string;
   title: string;
   type: string;
+  projectId: number;
+  projectSlug: string;
 }
 
 interface GraphEdge {
-  from: string;
-  to: string;
+  from: string; // node id
+  to: string; // node id
+  crossProject: boolean;
 }
 
-// Type colors match wiki page TYPE_CONFIG
+type Scope = "project" | "subtree";
+
+// Type colors match wiki page TYPE_CONFIG — used in "This project" scope
+// where every node shares a project, so the type palette communicates more.
 const TYPE_COLORS: Record<string, string> = {
   source: "var(--blue)",
   entity: "var(--orange)",
@@ -34,7 +43,7 @@ const TYPE_COLORS: Record<string, string> = {
 //   - same-type repulsion is mildly dampened → soft clusters by type
 // Simulation runs synchronously in a useMemo up to MAX_ITER steps with a
 // cooling schedule; final positions are static. Deterministic seed (ring
-// by slug order) makes layout stable across reloads.
+// by id order) makes layout stable across reloads.
 const MAX_ITER = 300;
 const NODE_PAD = 12;
 
@@ -42,7 +51,8 @@ function computeLayout(
   nodes: GraphNode[],
   edges: GraphEdge[],
   width: number,
-  height: number
+  height: number,
+  clusterKey: (n: GraphNode) => string
 ): Map<string, { x: number; y: number }> {
   const positions = new Map<string, { x: number; y: number }>();
   if (nodes.length === 0) return positions;
@@ -55,46 +65,46 @@ function computeLayout(
   const kRep = k * k;
   const kAttrInv = 1 / k;
 
-  // Deterministic seed: ring by slug ordering — same nodes + edges produce
+  // Deterministic seed: ring by id ordering — same nodes + edges produce
   // the same final layout on every reload.
   const seeded = new Map<
     string,
-    { x: number; y: number; type: string }
+    { x: number; y: number; cluster: string }
   >();
   const initRadius = Math.min(width, height) * 0.3;
   nodes.forEach((n, i) => {
     const angle = (i / nodes.length) * Math.PI * 2;
-    seeded.set(n.slug, {
+    seeded.set(n.id, {
       x: cx + initRadius * Math.cos(angle),
       y: cy + initRadius * Math.sin(angle),
-      type: n.type,
+      cluster: clusterKey(n),
     });
   });
 
-  const slugs = nodes.map((n) => n.slug);
+  const ids = nodes.map((n) => n.id);
   let temperature = Math.min(width, height) * 0.1;
   const cooling = temperature / (MAX_ITER + 1);
 
   for (let iter = 0; iter < MAX_ITER; iter++) {
     const forces = new Map<string, { fx: number; fy: number }>();
-    for (const s of slugs) forces.set(s, { fx: 0, fy: 0 });
+    for (const s of ids) forces.set(s, { fx: 0, fy: 0 });
 
     // Repulsive forces between every pair
-    for (let i = 0; i < slugs.length; i++) {
-      const a = seeded.get(slugs[i])!;
-      for (let j = i + 1; j < slugs.length; j++) {
-        const b = seeded.get(slugs[j])!;
+    for (let i = 0; i < ids.length; i++) {
+      const a = seeded.get(ids[i])!;
+      for (let j = i + 1; j < ids.length; j++) {
+        const b = seeded.get(ids[j])!;
         const dx = a.x - b.x;
         const dy = a.y - b.y;
         const dist = Math.hypot(dx, dy);
         if (dist < 0.01) continue; // degenerate pair — next iter will split
-        // Same-type nodes repel ~15% less so they cluster gently by type
-        const sameType = a.type === b.type ? 0.85 : 1;
-        const mag = (kRep / dist) * sameType;
+        // Same-cluster nodes repel ~15% less so they cluster gently.
+        const sameCluster = a.cluster === b.cluster ? 0.85 : 1;
+        const mag = (kRep / dist) * sameCluster;
         const fx = (dx / dist) * mag;
         const fy = (dy / dist) * mag;
-        const fa = forces.get(slugs[i])!;
-        const fb = forces.get(slugs[j])!;
+        const fa = forces.get(ids[i])!;
+        const fb = forces.get(ids[j])!;
         fa.fx += fx;
         fa.fy += fy;
         fb.fx -= fx;
@@ -121,14 +131,14 @@ function computeLayout(
 
     // Weak center gravity so isolated clusters don't drift off-screen
     const centerK = 0.015;
-    for (const s of slugs) {
+    for (const s of ids) {
       const p = seeded.get(s)!;
       forces.get(s)!.fx -= (p.x - cx) * centerK;
       forces.get(s)!.fy -= (p.y - cy) * centerK;
     }
 
     // Apply capped displacement + clamp to canvas
-    for (const s of slugs) {
+    for (const s of ids) {
       const p = seeded.get(s)!;
       const f = forces.get(s)!;
       const fmag = Math.hypot(f.fx, f.fy) || 1;
@@ -142,18 +152,21 @@ function computeLayout(
     temperature = Math.max(0.1, temperature - cooling);
   }
 
-  for (const [slug, p] of seeded) {
-    positions.set(slug, { x: p.x, y: p.y });
+  for (const [id, p] of seeded) {
+    positions.set(id, { x: p.x, y: p.y });
   }
   return positions;
 }
 
 export default function GraphPage() {
   const router = useRouter();
+  const { activeProject, projects, setActiveProject } = useProject();
+  const activeProjectId = activeProject?.id ?? 1;
   const [nodes, setNodes] = useState<GraphNode[]>([]);
   const [edges, setEdges] = useState<GraphEdge[]>([]);
   const [loading, setLoading] = useState(true);
-  const [hoveredSlug, setHoveredSlug] = useState<string | null>(null);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [scope, setScope] = useState<Scope>("project");
 
   // Pan + zoom transform
   const [zoom, setZoom] = useState(1);
@@ -165,16 +178,36 @@ export default function GraphPage() {
   const [size, setSize] = useState({ w: 1000, h: 700 });
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Does the active project have any children? Controls whether we show the
+  // scope toggle at all (flat projects don't need it).
+  const hasChildren = useMemo(
+    () => projects.some((p) => p.parentId === activeProjectId),
+    [projects, activeProjectId]
+  );
+
+  // Coerce to "project" whenever the active project has no children — the
+  // toggle is hidden in that case, so an orphaned "subtree" selection (e.g.
+  // user toggled on a nested project, then switched to a flat one) would
+  // otherwise send a bogus scope param. Derived, not a post-render effect.
+  const effectiveScope: Scope = hasChildren ? scope : "project";
+
   useEffect(() => {
-    fetch("/api/wiki/graph")
+    let cancelled = false;
+    fetch(`/api/wiki/graph?projectId=${activeProjectId}&scope=${effectiveScope}`)
       .then((r) => r.json())
       .then((data: { nodes: GraphNode[]; edges: GraphEdge[] }) => {
+        if (cancelled) return;
         setNodes(data.nodes ?? []);
         setEdges(data.edges ?? []);
       })
       .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeProjectId, effectiveScope]);
 
   // Observe container size so layout adapts
   useEffect(() => {
@@ -188,21 +221,52 @@ export default function GraphPage() {
     return () => ro.disconnect();
   }, []);
 
-  const positions = useMemo(
-    () => computeLayout(nodes, edges, size.w, size.h),
-    [nodes, edges, size.w, size.h]
+  // Map projectId -> color lookup for subtree-mode node coloring and legend.
+  const projectColor = useMemo(() => {
+    const m = new Map<number, string>();
+    for (const p of projects) m.set(p.id, p.color);
+    return m;
+  }, [projects]);
+
+  const projectName = useMemo(() => {
+    const m = new Map<number, string>();
+    for (const p of projects) m.set(p.id, p.name);
+    return m;
+  }, [projects]);
+
+  // In subtree mode, cluster by project (so same-project nodes attract); in
+  // project mode, cluster by type (preserves the existing behavior).
+  const clusterKey = useMemo(
+    () =>
+      effectiveScope === "subtree"
+        ? (n: GraphNode) => String(n.projectId)
+        : (n: GraphNode) => n.type,
+    [effectiveScope]
   );
 
+  const positions = useMemo(
+    () => computeLayout(nodes, edges, size.w, size.h, clusterKey),
+    [nodes, edges, size.w, size.h, clusterKey]
+  );
+
+  // Which projects actually have nodes in the current graph? Drives the
+  // per-project legend in subtree mode.
+  const visibleProjectIds = useMemo(() => {
+    const seen = new Set<number>();
+    for (const n of nodes) seen.add(n.projectId);
+    return Array.from(seen);
+  }, [nodes]);
+
   // Highlighted set: the hovered node + its neighbors
-  const highlightedSlugs = useMemo(() => {
-    if (!hoveredSlug) return new Set<string>();
-    const set = new Set<string>([hoveredSlug]);
+  const highlightedIds = useMemo(() => {
+    if (!hoveredId) return new Set<string>();
+    const set = new Set<string>([hoveredId]);
     for (const e of edges) {
-      if (e.from === hoveredSlug) set.add(e.to);
-      if (e.to === hoveredSlug) set.add(e.from);
+      if (e.from === hoveredId) set.add(e.to);
+      if (e.to === hoveredId) set.add(e.from);
     }
     return set;
-  }, [hoveredSlug, edges]);
+  }, [hoveredId, edges]);
 
   function handleMouseDown(e: React.MouseEvent) {
     panRef.current = {
@@ -233,20 +297,91 @@ export default function GraphPage() {
     setZoom(1);
   }
 
+  // Navigate into the wiki for a given node. In subtree mode the clicked
+  // node may belong to a descendant project — flip the active project first
+  // so /wiki opens in the right context.
+  function navigateToNode(n: GraphNode) {
+    if (n.projectId !== activeProjectId) {
+      const destProject = projects.find((p) => p.id === n.projectId);
+      if (destProject) setActiveProject(destProject);
+    }
+    router.push(`/wiki?slug=${encodeURIComponent(n.slug)}`);
+  }
+
+  function colorForNode(n: GraphNode): string {
+    if (effectiveScope === "subtree") {
+      return projectColor.get(n.projectId) ?? TYPE_COLORS.unknown;
+    }
+    return TYPE_COLORS[n.type] ?? TYPE_COLORS.unknown;
+  }
+
   const nodeRadius = 6;
+  // In project mode the legend maps type -> color. In subtree mode it maps
+  // project -> color; cross-project edges get a second swatch below.
+  const legendEntries: { key: string; color: string; label: string }[] =
+    effectiveScope === "subtree"
+      ? visibleProjectIds.map((id) => ({
+          key: `proj-${id}`,
+          color: projectColor.get(id) ?? TYPE_COLORS.unknown,
+          label: projectName.get(id) ?? `project ${id}`,
+        }))
+      : Object.entries(TYPE_COLORS)
+          .filter(([type]) => nodes.some((n) => n.type === type))
+          .map(([type, color]) => ({ key: type, color, label: type }));
 
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
       <div className="px-8 pt-6 pb-3 border-b border-[var(--border)] flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-[22px] font-[650] text-[var(--text-1)] tracking-tight leading-tight">
-            Graph
-          </h1>
+        <div className="min-w-0">
+          <Breadcrumbs project={activeProject} />
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-[22px] font-[650] text-[var(--text-1)] tracking-tight leading-tight">
+              Graph
+            </h1>
+            {hasChildren && (
+              <div
+                className="inline-flex items-center rounded-md border border-[var(--border)] bg-[var(--bg-1)] p-0.5 text-[12px]"
+                role="tablist"
+                aria-label="Graph scope"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={scope === "project"}
+                  onClick={() => setScope("project")}
+                  className={`px-2.5 py-1 rounded-sm transition-colors cursor-pointer ${
+                    scope === "project"
+                      ? "bg-[var(--bg-2)] text-[var(--text-1)] font-[550]"
+                      : "text-[var(--text-3)] hover:text-[var(--text-1)]"
+                  }`}
+                >
+                  This project
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={scope === "subtree"}
+                  onClick={() => setScope("subtree")}
+                  className={`px-2.5 py-1 rounded-sm transition-colors cursor-pointer ${
+                    scope === "subtree"
+                      ? "bg-[var(--bg-2)] text-[var(--text-1)] font-[550]"
+                      : "text-[var(--text-3)] hover:text-[var(--text-1)]"
+                  }`}
+                >
+                  Whole subtree
+                </button>
+              </div>
+            )}
+          </div>
           <p className="text-sm text-[var(--text-3)] mt-1">
             {loading
               ? "Loading..."
-              : `${nodes.length} nodes, ${edges.length} connections`}
+              : `${nodes.length} nodes, ${edges.length} connections${
+                  effectiveScope === "subtree" && visibleProjectIds.length > 1
+                    ? ` · ${visibleProjectIds.length} projects`
+                    : ""
+                }`}
           </p>
         </div>
         <div className="flex items-center gap-1 shrink-0">
@@ -318,9 +453,17 @@ export default function GraphPage() {
                 const to = positions.get(e.to);
                 if (!from || !to) return null;
                 const isHighlighted =
-                  hoveredSlug &&
-                  (e.from === hoveredSlug || e.to === hoveredSlug);
-                const isDimmed = hoveredSlug && !isHighlighted;
+                  hoveredId && (e.from === hoveredId || e.to === hoveredId);
+                const isDimmed = hoveredId && !isHighlighted;
+                // Cross-project edges in subtree mode: thicker + accent color
+                // so the bridges between clusters pop. In project scope this
+                // never applies because every edge is same-project.
+                const baseWidth = e.crossProject ? 1.6 : 0.8;
+                const highlightWidth = e.crossProject ? 2.4 : 1.5;
+                const baseStroke = e.crossProject
+                  ? "var(--primary)"
+                  : "var(--border-strong)";
+                const highlightStroke = "var(--primary)";
                 return (
                   <line
                     key={`${e.from}->${e.to}`}
@@ -328,30 +471,38 @@ export default function GraphPage() {
                     y1={from.y}
                     x2={to.x}
                     y2={to.y}
-                    stroke={isHighlighted ? "var(--primary)" : "var(--border-strong)"}
-                    strokeWidth={isHighlighted ? 1.5 : 0.8}
-                    opacity={isDimmed ? 0.1 : isHighlighted ? 0.8 : 0.35}
+                    stroke={isHighlighted ? highlightStroke : baseStroke}
+                    strokeWidth={isHighlighted ? highlightWidth : baseWidth}
+                    opacity={
+                      isDimmed
+                        ? 0.1
+                        : isHighlighted
+                          ? 0.85
+                          : e.crossProject
+                            ? 0.6
+                            : 0.35
+                    }
                   />
                 );
               })}
 
               {/* Nodes */}
               {nodes.map((n) => {
-                const p = positions.get(n.slug);
+                const p = positions.get(n.id);
                 if (!p) return null;
-                const color = TYPE_COLORS[n.type] ?? TYPE_COLORS.unknown;
-                const isHovered = hoveredSlug === n.slug;
-                const isHighlighted = highlightedSlugs.has(n.slug);
-                const isDimmed = hoveredSlug && !isHighlighted;
+                const color = colorForNode(n);
+                const isHovered = hoveredId === n.id;
+                const isHighlighted = highlightedIds.has(n.id);
+                const isDimmed = hoveredId && !isHighlighted;
                 return (
                   <g
-                    key={n.slug}
+                    key={n.id}
                     className="cursor-pointer"
-                    onMouseEnter={() => setHoveredSlug(n.slug)}
-                    onMouseLeave={() => setHoveredSlug(null)}
+                    onMouseEnter={() => setHoveredId(n.id)}
+                    onMouseLeave={() => setHoveredId(null)}
                     onClick={(ev) => {
                       ev.stopPropagation();
-                      router.push(`/wiki?slug=${encodeURIComponent(n.slug)}`);
+                      navigateToNode(n);
                     }}
                     style={{ opacity: isDimmed ? 0.2 : 1 }}
                   >
@@ -386,28 +537,65 @@ export default function GraphPage() {
               })}
             </g>
 
-            {/* Legend (fixed, not affected by pan/zoom) */}
-            <g transform={`translate(16, ${size.h - 16 - Object.keys(TYPE_COLORS).length * 18})`}>
-              {Object.entries(TYPE_COLORS)
-                .filter(([type]) => nodes.some((n) => n.type === type))
-                .map(([type, color], i) => (
-                  <g key={type} transform={`translate(0, ${i * 18})`}>
-                    <circle cx={6} cy={6} r={5} fill={color} />
-                    <text
-                      x={18}
-                      y={10}
-                      style={{
-                        fontSize: "11px",
-                        fill: "var(--text-3)",
-                        fontWeight: 500,
-                        textTransform: "capitalize",
-                      }}
+            {/* Legend (fixed, not affected by pan/zoom). Includes a
+                "cross-project" row at the bottom when subtree mode has
+                multiple projects visible. */}
+            {(() => {
+              const showCrossProjectSwatch =
+                effectiveScope === "subtree" && visibleProjectIds.length > 1;
+              const rowCount =
+                legendEntries.length + (showCrossProjectSwatch ? 1 : 0);
+              if (rowCount === 0) return null;
+              const rowHeight = 18;
+              const y = size.h - 16 - rowCount * rowHeight;
+              return (
+                <g transform={`translate(16, ${y})`}>
+                  {legendEntries.map((entry, i) => (
+                    <g key={entry.key} transform={`translate(0, ${i * rowHeight})`}>
+                      <circle cx={6} cy={6} r={5} fill={entry.color} />
+                      <text
+                        x={18}
+                        y={10}
+                        style={{
+                          fontSize: "11px",
+                          fill: "var(--text-3)",
+                          fontWeight: 500,
+                          textTransform:
+                            effectiveScope === "subtree" ? "none" : "capitalize",
+                        }}
+                      >
+                        {entry.label}
+                      </text>
+                    </g>
+                  ))}
+                  {showCrossProjectSwatch && (
+                    <g
+                      transform={`translate(0, ${legendEntries.length * rowHeight})`}
                     >
-                      {type}
-                    </text>
-                  </g>
-                ))}
-            </g>
+                      <line
+                        x1={1}
+                        y1={6}
+                        x2={11}
+                        y2={6}
+                        stroke="var(--primary)"
+                        strokeWidth={1.8}
+                      />
+                      <text
+                        x={18}
+                        y={10}
+                        style={{
+                          fontSize: "11px",
+                          fill: "var(--text-3)",
+                          fontWeight: 500,
+                        }}
+                      >
+                        cross-project link
+                      </text>
+                    </g>
+                  )}
+                </g>
+              );
+            })()}
           </svg>
         )}
       </div>

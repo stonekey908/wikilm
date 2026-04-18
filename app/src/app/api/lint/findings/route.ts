@@ -7,20 +7,28 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const projectId = Number(url.searchParams.get("projectId") ?? 1);
   const status = url.searchParams.get("status") ?? "active";
+  // scope: "project" (default, back-compat) | "parent" | "all"
+  const scopeParam = url.searchParams.get("scope") ?? "project";
+  const scope: "project" | "parent" | "all" =
+    scopeParam === "parent" || scopeParam === "all" ? scopeParam : "project";
 
-  // "active" = open + fixing (the default for the /lint page)
-  const where =
+  // Build status predicate (same as before — active means open+fixing).
+  const statusPredicate =
     status === "all"
-      ? eq(lintFindings.projectId, projectId)
+      ? undefined
       : status === "active"
-        ? and(
-            eq(lintFindings.projectId, projectId),
-            inArray(lintFindings.status, ["open", "fixing"])
-          )
-        : and(
-            eq(lintFindings.projectId, projectId),
-            eq(lintFindings.status, status)
-          );
+        ? inArray(lintFindings.status, ["open", "fixing"])
+        : eq(lintFindings.status, status);
+
+  // Scope predicate — "all" skips filtering.
+  const scopePredicate = scope === "all" ? undefined : eq(lintFindings.scope, scope);
+
+  const predicates = [
+    eq(lintFindings.projectId, projectId),
+    ...(statusPredicate ? [statusPredicate] : []),
+    ...(scopePredicate ? [scopePredicate] : []),
+  ];
+  const where = predicates.length === 1 ? predicates[0] : and(...predicates);
 
   const findings = db
     .select()

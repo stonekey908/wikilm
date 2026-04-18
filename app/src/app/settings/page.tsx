@@ -79,6 +79,10 @@ export default function SettingsPage() {
   const [geminiAvailable, setGeminiAvailable] = useState(false);
   const [backupStatus, setBackupStatus] = useState<BackupStatus | null>(null);
   const [backupRunning, setBackupRunning] = useState(false);
+  // auto_sync_parent_synthesis — when true, a child project's completed
+  // synthesis auto-triggers its parent's parent-synthesis (coalesced).
+  const [autoSyncParent, setAutoSyncParent] = useState(false);
+  const [autoSyncSaving, setAutoSyncSaving] = useState(false);
 
   const fetchBackupStatus = useCallback(() => {
     fetch("/api/backup/status")
@@ -96,6 +100,8 @@ export default function SettingsPage() {
           models[op.key] = data[`model_${op.key}`] ?? "sonnet";
         }
         setModelSettings(models);
+        // boolean settings are stored as "true" / "false" strings
+        setAutoSyncParent(data.auto_sync_parent_synthesis === "true");
       })
       .catch(() => {});
 
@@ -146,6 +152,24 @@ export default function SettingsPage() {
       setBackupRunning(false);
     }
   }, [backupRunning, addToast, fetchBackupStatus]);
+
+  const toggleAutoSyncParent = useCallback(async () => {
+    const next = !autoSyncParent;
+    setAutoSyncParent(next);
+    setAutoSyncSaving(true);
+    try {
+      await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ auto_sync_parent_synthesis: String(next) }),
+      });
+    } catch {
+      // revert on failure so the UI doesn't lie about persisted state
+      setAutoSyncParent(!next);
+    } finally {
+      setTimeout(() => setAutoSyncSaving(false), 600);
+    }
+  }, [autoSyncParent]);
 
   const setModel = useCallback(async (operation: string, model: string) => {
     setModelSettings((prev) => ({ ...prev, [operation]: model }));
@@ -352,6 +376,50 @@ export default function SettingsPage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      </section>
+
+      {/* Parent Project Sync Section */}
+      <section className="mb-8">
+        <div className="bg-[var(--surface-card)] border border-[var(--border)] rounded-lg shadow-[var(--shadow-sm)]">
+          <div className="px-5 py-4 border-b border-[var(--border)]">
+            <h2 className="text-[14px] font-[600] text-[var(--text-1)]">Project Nesting</h2>
+            <p className="text-[12px] text-[var(--text-3)] mt-0.5">
+              Behavior for projects that have children
+            </p>
+          </div>
+          <div className="px-5 py-4">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div className="min-w-0">
+                <div className="text-[13px] font-[600] text-[var(--text-1)]">
+                  Auto-sync parent syntheses
+                </div>
+                <div className="text-[12px] text-[var(--text-3)] mt-0.5 max-w-[480px]">
+                  When a child project&apos;s synthesis completes, automatically
+                  re-run the parent&apos;s synthesis. Coalesced to avoid bursts.
+                  Default off — you can still run it on demand from a parent
+                  project&apos;s wiki.
+                </div>
+              </div>
+              <button
+                onClick={toggleAutoSyncParent}
+                disabled={autoSyncSaving}
+                role="switch"
+                aria-checked={autoSyncParent}
+                className={`shrink-0 relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer disabled:opacity-60 ${
+                  autoSyncParent
+                    ? "bg-[var(--primary)]"
+                    : "bg-[var(--bg-2)] border border-[var(--border)]"
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm ${
+                    autoSyncParent ? "translate-x-6" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
           </div>
         </div>
       </section>

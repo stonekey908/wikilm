@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import { useProject } from "@/components/project-switcher";
+import { NudgesSection } from "@/components/nudges-section";
 import {
   BookOpen,
   FileText,
@@ -85,12 +87,14 @@ function statusIcon(status: string) {
 }
 
 export default function DashboardPage() {
+  const { activeProject } = useProject();
+  const activeProjectId = activeProject?.id ?? 1;
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch("/api/dashboard");
+      const res = await fetch(`/api/dashboard?projectId=${activeProjectId}`);
       if (res.ok) {
         setData(await res.json());
       }
@@ -99,7 +103,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeProjectId]);
 
   useEffect(() => {
     fetchData();
@@ -162,6 +166,9 @@ export default function DashboardPage() {
           ))}
         </div>
       </div>
+
+      {/* Nudges — parent-scoped lint findings with actions. Hidden when empty. */}
+      <NudgesSection />
 
       <div className="grid grid-cols-2 gap-6">
         {/* Recent Activity */}
