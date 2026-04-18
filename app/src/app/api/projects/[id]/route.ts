@@ -3,8 +3,7 @@ import { db } from "@/db";
 import { projects } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import fs from "fs";
-import path from "path";
-import { hasChildren } from "@/lib/projects";
+import { hasChildren, projectRoot } from "@/lib/projects";
 
 export async function GET(
   _request: NextRequest,
@@ -79,10 +78,13 @@ export async function DELETE(
     );
   }
 
-  // Delete project directory
-  const projectRoot = path.join(process.cwd(), "..", "projects", project.slug);
-  if (fs.existsSync(projectRoot)) {
-    fs.rmSync(projectRoot, { recursive: true, force: true });
+  // Delete project directory. Skip for id=1 — its content lives at the repo root
+  // (see projectRoot()), so using the service would rm -rf the whole repo.
+  if (project.id !== 1) {
+    const dir = projectRoot(project);
+    if (fs.existsSync(dir)) {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   }
 
   // Delete from DB
