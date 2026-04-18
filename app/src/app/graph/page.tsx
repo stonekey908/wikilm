@@ -27,10 +27,20 @@ const TYPE_COLORS: Record<string, string> = {
   unknown: "var(--text-4)",
 };
 
-// Deterministic layout: group by type, place each group on a ring segment
-// so related nodes cluster visually. Not physics — but readable for 50+ nodes.
+// Force-directed layout (Fruchterman-Reingold-ish):
+//   - all nodes repel each other (Coulomb-like)
+//   - edges attract their endpoints (Hooke-like)
+//   - small gravity toward center keeps the graph on screen
+//   - same-type repulsion is mildly dampened → soft clusters by type
+// Simulation runs synchronously in a useMemo up to MAX_ITER steps with a
+// cooling schedule; final positions are static. Deterministic seed (ring
+// by slug order) makes layout stable across reloads.
+const MAX_ITER = 300;
+const NODE_PAD = 12;
+
 function computeLayout(
   nodes: GraphNode[],
+  edges: GraphEdge[],
   width: number,
   height: number
 ): Map<string, { x: number; y: number }> {
@@ -39,40 +49,102 @@ function computeLayout(
 
   const cx = width / 2;
   const cy = height / 2;
-  const radius = Math.min(width, height) * 0.38;
+  const area = width * height;
+  // Ideal edge length: spreads nodes to fill the canvas roughly evenly.
+  const k = Math.sqrt(area / nodes.length) * 0.85;
+  const kRep = k * k;
+  const kAttrInv = 1 / k;
 
-  // Group nodes by type
-  const byType = new Map<string, GraphNode[]>();
-  for (const n of nodes) {
-    const list = byType.get(n.type) ?? [];
-    list.push(n);
-    byType.set(n.type, list);
-  }
-
-  // Sort types to keep layout stable across renders
-  const types = Array.from(byType.keys()).sort();
-  const totalNodes = nodes.length;
-  let angleOffset = -Math.PI / 2; // start at top
-
-  for (const type of types) {
-    const group = byType.get(type)!;
-    const share = group.length / totalNodes;
-    const arcLength = share * Math.PI * 2;
-    const step = arcLength / Math.max(group.length, 1);
-    // Sort group by title so visual order is stable
-    group.sort((a, b) => a.title.localeCompare(b.title));
-    group.forEach((node, i) => {
-      const angle = angleOffset + step * (i + 0.5);
-      // Slight radial jitter by type to reduce overlap when groups are small
-      const r = radius + ((type.charCodeAt(0) % 5) - 2) * 8;
-      positions.set(node.slug, {
-        x: cx + r * Math.cos(angle),
-        y: cy + r * Math.sin(angle),
-      });
+  // Deterministic seed: ring by slug ordering — same nodes + edges produce
+  // the same final layout on every reload.
+  const seeded = new Map<
+    string,
+    { x: number; y: number; type: string }
+  >();
+  const initRadius = Math.min(width, height) * 0.3;
+  nodes.forEach((n, i) => {
+    const angle = (i / nodes.length) * Math.PI * 2;
+    seeded.set(n.slug, {
+      x: cx + initRadius * Math.cos(angle),
+      y: cy + initRadius * Math.sin(angle),
+      type: n.type,
     });
-    angleOffset += arcLength;
+  });
+
+  const slugs = nodes.map((n) => n.slug);
+  let temperature = Math.min(width, height) * 0.1;
+  const cooling = temperature / (MAX_ITER + 1);
+
+  for (let iter = 0; iter < MAX_ITER; iter++) {
+    const forces = new Map<string, { fx: number; fy: number }>();
+    for (const s of slugs) forces.set(s, { fx: 0, fy: 0 });
+
+    // Repulsive forces between every pair
+    for (let i = 0; i < slugs.length; i++) {
+      const a = seeded.get(slugs[i])!;
+      for (let j = i + 1; j < slugs.length; j++) {
+        const b = seeded.get(slugs[j])!;
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < 0.01) continue; // degenerate pair — next iter will split
+        // Same-type nodes repel ~15% less so they cluster gently by type
+        const sameType = a.type === b.type ? 0.85 : 1;
+        const mag = (kRep / dist) * sameType;
+        const fx = (dx / dist) * mag;
+        const fy = (dy / dist) * mag;
+        const fa = forces.get(slugs[i])!;
+        const fb = forces.get(slugs[j])!;
+        fa.fx += fx;
+        fa.fy += fy;
+        fb.fx -= fx;
+        fb.fy -= fy;
+      }
+    }
+
+    // Attractive forces along edges
+    for (const e of edges) {
+      const a = seeded.get(e.from);
+      const b = seeded.get(e.to);
+      if (!a || !b) continue;
+      const dx = a.x - b.x;
+      const dy = a.y - b.y;
+      const dist = Math.hypot(dx, dy) || 0.01;
+      const mag = dist * dist * kAttrInv;
+      const fx = (dx / dist) * mag;
+      const fy = (dy / dist) * mag;
+      forces.get(e.from)!.fx -= fx;
+      forces.get(e.from)!.fy -= fy;
+      forces.get(e.to)!.fx += fx;
+      forces.get(e.to)!.fy += fy;
+    }
+
+    // Weak center gravity so isolated clusters don't drift off-screen
+    const centerK = 0.015;
+    for (const s of slugs) {
+      const p = seeded.get(s)!;
+      forces.get(s)!.fx -= (p.x - cx) * centerK;
+      forces.get(s)!.fy -= (p.y - cy) * centerK;
+    }
+
+    // Apply capped displacement + clamp to canvas
+    for (const s of slugs) {
+      const p = seeded.get(s)!;
+      const f = forces.get(s)!;
+      const fmag = Math.hypot(f.fx, f.fy) || 1;
+      const capped = Math.min(fmag, temperature);
+      p.x += (f.fx / fmag) * capped;
+      p.y += (f.fy / fmag) * capped;
+      p.x = Math.max(NODE_PAD, Math.min(width - NODE_PAD, p.x));
+      p.y = Math.max(NODE_PAD, Math.min(height - NODE_PAD, p.y));
+    }
+
+    temperature = Math.max(0.1, temperature - cooling);
   }
 
+  for (const [slug, p] of seeded) {
+    positions.set(slug, { x: p.x, y: p.y });
+  }
   return positions;
 }
 
@@ -117,8 +189,8 @@ export default function GraphPage() {
   }, []);
 
   const positions = useMemo(
-    () => computeLayout(nodes, size.w, size.h),
-    [nodes, size.w, size.h]
+    () => computeLayout(nodes, edges, size.w, size.h),
+    [nodes, edges, size.w, size.h]
   );
 
   // Highlighted set: the hovered node + its neighbors
