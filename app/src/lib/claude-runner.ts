@@ -131,7 +131,15 @@ export function getRunningJobCount(): number {
 
 /**
  * Stream mode — returns a ReadableStream of SSE data.
- * Used for real-time chat responses.
+ * Used for real-time chat + research responses.
+ *
+ * Dispatches based on the operation's configured model:
+ *   "gemini:<model>" → `gemini` CLI subprocess
+ *   "ollama:<model>" → surfaced error (HTTP flow doesn't fit our SSE envelope)
+ *   anything else   → `claude` CLI subprocess (default)
+ *
+ * The controller enqueues `{ type: "content"|"error"|"done" }` frames in the
+ * same shape regardless of provider, so clients don't branch on backend.
  */
 export function streamClaude({ prompt, projectCwd, type }: StreamOptions): ReadableStream {
   if (isMockMode) {
@@ -146,14 +154,50 @@ export function streamClaude({ prompt, projectCwd, type }: StreamOptions): Reada
   }
 
   const encoder = new TextEncoder();
+  const model = getModel(type ?? "chat");
+
+  // Ollama doesn't plug into this SSE envelope yet — surface a clean error
+  // instead of letting the user wonder why nothing happened.
+  if (model.startsWith("ollama:")) {
+    return new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({
+              type: "error",
+              text: "Ollama streaming isn't supported for research/chat yet. Pick Claude or Gemini for this operation.",
+            })}\n\n`
+          )
+        );
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done", code: 1 })}\n\n`));
+        controller.close();
+      },
+    });
+  }
+
+  // Gemini: spawn the gemini CLI with its equivalent flags.
+  // Claude: keep the existing spawn/flags.
+  const isGemini = model.startsWith("gemini:");
+  const cmd = isGemini ? "gemini" : "claude";
+  const args = isGemini
+    ? ["-p", prompt, "-m", model.slice("gemini:".length), "-y", "-o", "text"]
+    : [
+        "-p",
+        prompt,
+        ...getModelArgs(type ?? "chat"),
+        "--allowedTools",
+        "Write",
+        "Edit",
+        "Read",
+        "WebSearch",
+        "WebFetch",
+        "Bash(ls:*)",
+        "Bash(mkdir:*)",
+      ];
 
   return new ReadableStream({
     start(controller) {
-      const proc = spawn("claude", [
-        "-p", prompt,
-        ...getModelArgs(type ?? "chat"),
-        "--allowedTools", "Write", "Edit", "Read", "WebSearch", "WebFetch", "Bash(ls:*)", "Bash(mkdir:*)",
-      ], {
+      const proc = spawn(cmd, args, {
         cwd: projectCwd,
         stdio: ["ignore", "pipe", "pipe"],
         env: { ...process.env },
@@ -183,7 +227,6 @@ export function streamClaude({ prompt, projectCwd, type }: StreamOptions): Reada
       });
 
       proc.on("close", (code) => {
-        // Flush remaining buffer
         if (buffer.trim()) {
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify({ type: "content", text: buffer })}\n\n`)
