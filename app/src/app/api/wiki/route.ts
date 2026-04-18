@@ -8,6 +8,7 @@ interface WikiPageMeta {
   tags: string[];
   slug: string;
   filePath: string;
+  updatedAt: string;
 }
 
 function parseFrontmatter(content: string): { meta: Record<string, unknown>; body: string } {
@@ -102,12 +103,14 @@ export async function GET(request: NextRequest) {
       if (!searchable.includes(search)) continue;
     }
 
+    const stat = fs.statSync(filePath);
     pages.push({
       title,
       type: pageType,
       tags,
       slug,
       filePath: path.relative(wikiDir, filePath),
+      updatedAt: stat.mtime.toISOString(),
     });
   }
 
