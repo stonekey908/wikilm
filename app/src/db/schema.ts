@@ -113,6 +113,10 @@ export const jobs = sqliteTable("jobs", {
   pid: integer("pid"),
   output: text("output"),
   error: text("error"),
+  // Structured failure taxonomy — raw `error` stays for diagnostics; UI branches on this.
+  // null = generic/unclassified failure. Values: provider_unavailable, model_not_found,
+  // auth_failed, rate_limited, timeout, unknown
+  errorCode: text("error_code"),
   progress: text("progress"), // JSON: { current: number, total: number }
   startedAt: text("started_at"),
   completedAt: text("completed_at"),
