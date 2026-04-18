@@ -97,28 +97,49 @@ export function parseLintOutput(output: string): RawFinding[] {
   return results;
 }
 
+export type LintScope = "project" | "parent";
+
 /**
  * Persist lint findings for a project.
  * - Respects prior dismissed/resolved findings (keyed by dedupe_key): never re-opens them.
  * - Clears stale "open" findings before inserting the new run's results.
+ * - Scope is either "project" (default, per-project lint) or "parent"
+ *   (parent-level lint — promotion candidates, recurring themes, gaps).
+ *   Scopes are cleaned and inserted independently so a parent run doesn't
+ *   wipe the project-level findings, and vice versa.
+ * - `allowedCategories` gates which categories count — lets the parent
+ *   writer accept promotion_candidate/recurring_theme/parent_gap without
+ *   those leaking into project-scoped runs.
  */
 export function persistLintFindings(
   projectId: number,
   jobId: number,
-  raw: RawFinding[]
+  raw: RawFinding[],
+  opts: { scope?: LintScope; allowedCategories?: readonly string[] } = {}
 ): { inserted: number; skipped: number } {
+  const scope: LintScope = opts.scope ?? "project";
+  const allowed = opts.allowedCategories ?? LINT_CATEGORIES;
+
   const nonOpen = db
     .select({ dedupeKey: lintFindings.dedupeKey })
     .from(lintFindings)
     .where(
-      and(eq(lintFindings.projectId, projectId), ne(lintFindings.status, "open"))
+      and(
+        eq(lintFindings.projectId, projectId),
+        eq(lintFindings.scope, scope),
+        ne(lintFindings.status, "open")
+      )
     )
     .all();
   const suppressed = new Set(nonOpen.map((r) => r.dedupeKey));
 
   db.delete(lintFindings)
     .where(
-      and(eq(lintFindings.projectId, projectId), eq(lintFindings.status, "open"))
+      and(
+        eq(lintFindings.projectId, projectId),
+        eq(lintFindings.scope, scope),
+        eq(lintFindings.status, "open")
+      )
     )
     .run();
 
@@ -127,7 +148,7 @@ export function persistLintFindings(
   const seenThisRun = new Set<string>();
 
   for (const f of raw) {
-    if (!LINT_CATEGORIES.includes(f.category as LintCategory)) {
+    if (!allowed.includes(f.category)) {
       skipped++;
       continue;
     }
@@ -145,6 +166,7 @@ export function persistLintFindings(
       .values({
         projectId,
         jobId,
+        scope,
         category: f.category,
         severity: f.severity === "warn" ? "warn" : "info",
         title: f.title.slice(0, 200),

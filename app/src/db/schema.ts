@@ -88,7 +88,11 @@ export const lintFindings = sqliteTable("lint_findings", {
     .notNull()
     .references(() => projects.id),
   jobId: integer("job_id"),
-  category: text("category").notNull(), // orphan, missing_concept, contradiction, stale_claim, missing_cross_ref, suggested_question
+  // "project" — regular per-project lint finding (default, back-compat).
+  // "parent"  — parent-level lint finding (promotion candidates, recurring
+  //             themes, cross-child gaps). Scoped to a parent project.
+  scope: text("scope").notNull().default("project"),
+  category: text("category").notNull(), // orphan, missing_concept, contradiction, stale_claim, missing_cross_ref, suggested_question, promotion_candidate, recurring_theme, parent_gap
   severity: text("severity").notNull().default("info"), // info, warn
   title: text("title").notNull(),
   description: text("description").notNull(),
