@@ -19,7 +19,18 @@ const LINT_CATEGORIES = [
   "suggested_question",
 ] as const;
 
+// Parent-level lint emits a different category set — these don't apply to
+// single-project lint runs and vice versa. Keeping them separate avoids the
+// project lint prompt accidentally filing a "promotion_candidate" without
+// the parent's cross-child context.
+const PARENT_LINT_CATEGORIES = [
+  "promotion_candidate",
+  "recurring_theme",
+  "parent_gap",
+] as const;
+
 type LintCategory = (typeof LINT_CATEGORIES)[number];
+type ParentLintCategory = (typeof PARENT_LINT_CATEGORIES)[number];
 
 interface RawFinding {
   category: string;
@@ -215,8 +226,92 @@ export async function startLintJob(options: {
   return jobId;
 }
 
-export { LINT_CATEGORIES };
-export type { LintCategory };
+export { LINT_CATEGORIES, PARENT_LINT_CATEGORIES };
+export type { LintCategory, ParentLintCategory };
+
+// ─── Parent lint ──────────────────────────────────────────────────────────
+// Parent lint looks across children's syntheses (not raw pages) to surface
+// cross-cutting patterns — pages that could be promoted, themes appearing
+// in multiple children, and gaps implied by children but not filled at the
+// parent level. Findings are persisted with scope="parent" so they live
+// alongside but apart from per-project findings.
+
+const PARENT_LINT_PROMPT = `Audit a PARENT project and its direct children to surface cross-cutting issues. Output findings as machine-readable lines, not prose.
+
+Inputs (read-only):
+- This project's wiki/synthesis/project-overview.md (if any).
+- Each direct child project's wiki/synthesis/project-overview.md. Children live at ../projects/<child-slug>/wiki/synthesis/project-overview.md relative to this project's wiki/, OR if this project is the root, at ./projects/<child-slug>/wiki/synthesis/project-overview.md.
+- Each direct child project's wiki/index.md, so you know what pages each child contains.
+
+Do NOT read children's raw/ directories. Do NOT open individual child source/entity/concept pages — only their syntheses and index files.
+
+For each issue, emit a single line in exactly this format (one finding per line):
+FINDING:{"category":"<category>","severity":"info|warn","title":"<short title>","description":"<1-2 sentence explanation>","target_page":"<wiki path or null>","suggested_action":"<what to do about it>","dedupe_key":"<stable id>"}
+
+Categories (use exactly these values):
+- promotion_candidate — a page in a child that looks cross-cutting enough to exist at the parent level (generic phrasing, not child-specific; applies to multiple siblings). target_page should be "<childSlug>:<pageSlug>" and suggested_action should explain why and where it could move.
+- recurring_theme — a theme, pattern, or method appearing in 2+ children's syntheses. target_page is null; description should name the theme and the child slugs.
+- parent_gap — a topic implied by 2+ children but with no concept/synthesis page at the parent level. target_page is null; suggested_action should name the concept that could be written at the parent.
+
+Severity:
+- warn — recurring_theme with high overlap (3+ children) or clearly missing structure
+- info — everything else
+
+dedupe_key — a stable identifier so the same issue isn't re-reported. Format examples:
+- promotion_candidate:<childSlug>:<pageSlug>
+- recurring_theme:<theme-slug>
+- parent_gap:<concept-slug>
+
+Process:
+1. Read this project's wiki/index.md and wiki/synthesis/project-overview.md.
+2. For each direct child, read their wiki/synthesis/project-overview.md and wiki/index.md.
+3. Compare across children to find recurring themes, promotion candidates, and gaps.
+4. Emit each finding as you discover it. Do not repeat findings.
+
+Do NOT write any files. Do NOT modify any wiki.
+
+When finished, output exactly: LINT_DONE`;
+
+export function getParentLintPrompt(): string {
+  return PARENT_LINT_PROMPT;
+}
+
+/**
+ * Kick off a parent-level lint job. On completion, parses FINDING: lines
+ * and persists them with scope="parent", gated to PARENT_LINT_CATEGORIES
+ * so the project lint categories can't accidentally land here.
+ */
+export async function startParentLintJob(options: {
+  projectCwd: string;
+  projectId: number;
+}): Promise<number> {
+  const ref: { jobId: number } = { jobId: 0 };
+
+  const jobId = await startJob({
+    prompt: PARENT_LINT_PROMPT,
+    projectCwd: options.projectCwd,
+    projectId: options.projectId,
+    type: "lint",
+    title: "Parent-level wiki health check",
+    onComplete: (status) => {
+      if (status !== "completed" || !ref.jobId) return;
+      const row = db
+        .select({ output: jobs.output })
+        .from(jobs)
+        .where(eq(jobs.id, ref.jobId))
+        .get();
+      if (!row?.output) return;
+      const raw = parseLintOutput(row.output);
+      persistLintFindings(options.projectId, ref.jobId, raw, {
+        scope: "parent",
+        allowedCategories: PARENT_LINT_CATEGORIES,
+      });
+    },
+  });
+
+  ref.jobId = jobId;
+  return jobId;
+}
 
 // ─── Fix jobs ─────────────────────────────────────────────────────────────
 
