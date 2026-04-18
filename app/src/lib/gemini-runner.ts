@@ -32,13 +32,12 @@ export interface GeminiModel {
   label: string; // short UI label
 }
 
-// Short list of current Gemini models. Kept small on purpose — the user
-// picks a specific one; the CLI rejects invalid ids and we surface that
-// through the normal error channel.
+// Short list of current Gemini preview models — names verified against the
+// live Gemini API. Invalid ids come back as 404 "Requested entity was not
+// found"; we surface those through the normal stdout/error path.
 const GEMINI_MODELS: GeminiModel[] = [
-  { id: "gemini:gemini-3-pro", name: "gemini-3-pro", label: "Pro" },
-  { id: "gemini:gemini-3-flash", name: "gemini-3-flash", label: "Flash" },
-  { id: "gemini:gemini-3-flash-lite", name: "gemini-3-flash-lite", label: "Flash Lite" },
+  { id: "gemini:gemini-3.1-pro-preview", name: "gemini-3.1-pro-preview", label: "Pro" },
+  { id: "gemini:gemini-3-flash-preview", name: "gemini-3-flash-preview", label: "Flash" },
 ];
 
 let cachedDetection: { available: boolean; version: string | null } | null = null;
