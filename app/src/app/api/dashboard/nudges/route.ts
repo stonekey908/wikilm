@@ -1,4 +1,3 @@
-import { NextRequest } from "next/server";
 import { db } from "@/db";
 import { lintFindings, projects } from "@/db/schema";
 import { and, desc, eq } from "drizzle-orm";
@@ -31,7 +30,7 @@ export interface NudgesResponse {
   gap: DashboardNudge[];
 }
 
-export async function GET(_request: NextRequest) {
+export async function GET() {
   const rows = db
     .select({
       id: lintFindings.id,

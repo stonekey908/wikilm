@@ -164,6 +164,10 @@ export function ProjectSwitcher() {
   const [moveError, setMoveError] = useState<string | null>(null);
   const [moveBusy, setMoveBusy] = useState(false);
   const [menuOpenFor, setMenuOpenFor] = useState<number | null>(null);
+  // Pending nudge counts keyed by project id. Populated by a single fetch
+  // on mount + whenever the flat projects list changes — cheap (sqlite
+  // count) and doesn't need to live-poll.
+  const [nudgeCounts, setNudgeCounts] = useState<Record<number, number>>({});
   const ref = useRef<HTMLDivElement>(null);
 
   // Fetch the tree. Refetches whenever the flat projects list changes so
@@ -174,6 +178,21 @@ export function ProjectSwitcher() {
       .then((r) => r.json())
       .then((d) => {
         if (!cancelled) setTree(d.tree ?? []);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [projects]);
+
+  // Fetch pending parent-scope nudge counts. Same trigger as the tree fetch
+  // so new/deleted/moved projects cause a refresh.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/projects/nudge-counts")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!cancelled) setNudgeCounts(d.counts ?? {});
       })
       .catch(() => {});
     return () => {
@@ -350,6 +369,14 @@ export function ProjectSwitcher() {
               style={{ background: node.color }}
             />
             <span className="truncate text-left flex-1">{node.name}</span>
+            {nudgeCounts[node.id] > 0 && (
+              <span
+                className="shrink-0 inline-flex items-center justify-center min-w-[16px] h-[16px] px-1 rounded-full text-[10px] font-semibold bg-[var(--primary-dim)] text-[var(--primary)]"
+                title={`${nudgeCounts[node.id]} pending nudge${nudgeCounts[node.id] === 1 ? "" : "s"}`}
+              >
+                {nudgeCounts[node.id]}
+              </span>
+            )}
           </button>
           {node.id !== 1 && (
             <div className="relative shrink-0">
