@@ -14,7 +14,8 @@ export async function GET() {
         "last_backup_at",
         "last_backup_path",
         "last_backup_db_file",
-        "last_backup_wiki_file",
+        "last_backup_content_file",
+        "last_backup_wiki_file", // legacy — keep reading for pre-STO-1752 rows
       ])
     )
     .all();
@@ -25,6 +26,9 @@ export async function GET() {
     lastBackupAt: map.get("last_backup_at") ?? null,
     location: map.get("last_backup_path") ?? DEFAULT_BACKUP_DIR,
     lastDbFile: map.get("last_backup_db_file") ?? null,
-    lastWikiFile: map.get("last_backup_wiki_file") ?? null,
+    lastContentFile:
+      map.get("last_backup_content_file") ??
+      map.get("last_backup_wiki_file") ??
+      null,
   });
 }

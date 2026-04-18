@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
 
@@ -116,6 +116,7 @@ export default function SourcesPage() {
   });
   const [isSearching, setIsSearching] = useState(false);
   const [maxResults, setMaxResults] = useState(8);
+  const [sortMode, setSortMode] = useState<"relevance" | "original">("relevance");
   const [quickUrl, setQuickUrl] = useState("");
   const [addingUrl, setAddingUrl] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -425,6 +426,14 @@ export default function SourcesPage() {
   const approvedCount = results.filter((r) => r.status === "approved").length;
   const foundCount = results.length;
 
+  /* Display-time sort — keeps `results` in insertion order for dedup +
+     load-more logic, but renders them sorted when the user asks for it. */
+  const displayedResults = useMemo(() => {
+    if (sortMode === "original") return results;
+    // stable sort by relevance desc; ties keep insertion order
+    return [...results].sort((a, b) => b.relevance - a.relevance);
+  }, [results, sortMode]);
+
   /* ── Relevance badge class ── */
   const relClass = (pct: number) => {
     if (pct >= 90) return "bg-[var(--green-dim)] text-[var(--green)]";
@@ -715,14 +724,41 @@ export default function SourcesPage() {
             </button>
           </div>
 
-          {/* Results label */}
-          <div className="text-xs font-semibold text-[var(--text-4)] uppercase tracking-wide mb-3">
-            Discovered Sources
+          {/* Results label + sort toggle */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-xs font-semibold text-[var(--text-4)] uppercase tracking-wide">
+              Discovered Sources
+            </div>
+            {results.length > 1 && (
+              <div className="flex items-center gap-1 text-[11px]">
+                <span className="text-[var(--text-4)]">Sort</span>
+                <button
+                  onClick={() => setSortMode("relevance")}
+                  className={`px-2 py-0.5 rounded transition-colors ${
+                    sortMode === "relevance"
+                      ? "bg-[var(--primary-dim)] text-[var(--primary)] font-[550]"
+                      : "text-[var(--text-3)] hover:text-[var(--text-1)]"
+                  }`}
+                >
+                  Relevance
+                </button>
+                <button
+                  onClick={() => setSortMode("original")}
+                  className={`px-2 py-0.5 rounded transition-colors ${
+                    sortMode === "original"
+                      ? "bg-[var(--primary-dim)] text-[var(--primary)] font-[550]"
+                      : "text-[var(--text-3)] hover:text-[var(--text-1)]"
+                  }`}
+                >
+                  Original
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Result cards */}
           <div className="flex flex-col gap-2">
-            {results.map((r) => (
+            {displayedResults.map((r) => (
               <div
                 key={r.id}
                 className={`bg-[var(--surface-card)] border rounded-lg px-[18px] py-4 transition-all hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-sm)] ${
