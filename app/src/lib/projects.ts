@@ -136,7 +136,7 @@ export function createProjectDirectories(slug: string): void {
 
   fs.writeFileSync(
     path.join(wiki, "index.md"),
-    `# Wiki Index\n\n## Sources\n\n## Entities\n\n## Concepts\n\n## Comparisons\n\n## Synthesis\n\n## Queries\n`
+    `# Wiki Index\n\n> Tip: to link across projects, use \`[[project-slug/page-name]]\`.\n\n## Sources\n\n## Entities\n\n## Concepts\n\n## Comparisons\n\n## Synthesis\n\n## Queries\n`
   );
   fs.writeFileSync(path.join(wiki, "log.md"), `# Wiki Log\n`);
 }
