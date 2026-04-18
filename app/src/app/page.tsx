@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useProject } from "@/components/project-switcher";
+import { NudgesSection } from "@/components/nudges-section";
 import {
   BookOpen,
   FileText,
@@ -165,6 +166,9 @@ export default function DashboardPage() {
           ))}
         </div>
       </div>
+
+      {/* Nudges — parent-scoped lint findings with actions. Hidden when empty. */}
+      <NudgesSection />
 
       <div className="grid grid-cols-2 gap-6">
         {/* Recent Activity */}
