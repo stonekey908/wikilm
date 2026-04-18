@@ -104,13 +104,17 @@ export default function SourcesPage() {
   const [tab, setTab] = useState<"library" | "research">("library");
   const [sources, setSources] = useState<Source[]>([]);
   const [dragOver, setDragOver] = useState(false);
+  // Research state lives in localStorage — survives tab close, reload,
+  // and project switches. User explicitly asked for this; the keys aren't
+  // scoped by project so a run is visible regardless of which project is
+  // selected in the sidebar.
   const [researchQuery, setResearchQuery] = useState(() => {
-    if (typeof window !== "undefined") return sessionStorage.getItem("sb_research_query") ?? "";
+    if (typeof window !== "undefined") return localStorage.getItem("sb_research_query") ?? "";
     return "";
   });
   const [results, setResults] = useState<ResearchResult[]>(() => {
     if (typeof window !== "undefined") {
-      try { return JSON.parse(sessionStorage.getItem("sb_research_results") ?? "[]"); } catch { return []; }
+      try { return JSON.parse(localStorage.getItem("sb_research_results") ?? "[]"); } catch { return []; }
     }
     return [];
   });
@@ -123,13 +127,24 @@ export default function SourcesPage() {
   const abortRef = useRef<AbortController | null>(null);
   const nextResultId = useRef(0);
 
-  // Persist research state to sessionStorage
+  // Persist research state to localStorage on every change.
   useEffect(() => {
-    sessionStorage.setItem("sb_research_results", JSON.stringify(results));
+    localStorage.setItem("sb_research_results", JSON.stringify(results));
   }, [results]);
   useEffect(() => {
-    sessionStorage.setItem("sb_research_query", researchQuery);
+    localStorage.setItem("sb_research_query", researchQuery);
   }, [researchQuery]);
+
+  const clearResearch = useCallback(() => {
+    setResults([]);
+    setResearchQuery("");
+    try {
+      localStorage.removeItem("sb_research_results");
+      localStorage.removeItem("sb_research_query");
+    } catch {
+      // quota / private mode — in-memory clear still happened
+    }
+  }, []);
 
   /* ── Fetch sources (poll while any are ingesting) ── */
   useEffect(() => {
@@ -724,36 +739,48 @@ export default function SourcesPage() {
             </button>
           </div>
 
-          {/* Results label + sort toggle */}
+          {/* Results label + sort toggle + clear all */}
           <div className="flex items-center justify-between mb-3">
             <div className="text-xs font-semibold text-[var(--text-4)] uppercase tracking-wide">
               Discovered Sources
             </div>
-            {results.length > 1 && (
-              <div className="flex items-center gap-1 text-[11px]">
-                <span className="text-[var(--text-4)]">Sort</span>
+            <div className="flex items-center gap-3 text-[11px]">
+              {results.length > 1 && (
+                <div className="flex items-center gap-1">
+                  <span className="text-[var(--text-4)]">Sort</span>
+                  <button
+                    onClick={() => setSortMode("relevance")}
+                    className={`px-2 py-0.5 rounded transition-colors ${
+                      sortMode === "relevance"
+                        ? "bg-[var(--primary-dim)] text-[var(--primary)] font-[550]"
+                        : "text-[var(--text-3)] hover:text-[var(--text-1)]"
+                    }`}
+                  >
+                    Relevance
+                  </button>
+                  <button
+                    onClick={() => setSortMode("original")}
+                    className={`px-2 py-0.5 rounded transition-colors ${
+                      sortMode === "original"
+                        ? "bg-[var(--primary-dim)] text-[var(--primary)] font-[550]"
+                        : "text-[var(--text-3)] hover:text-[var(--text-1)]"
+                    }`}
+                  >
+                    Original
+                  </button>
+                </div>
+              )}
+              {results.length > 0 && (
                 <button
-                  onClick={() => setSortMode("relevance")}
-                  className={`px-2 py-0.5 rounded transition-colors ${
-                    sortMode === "relevance"
-                      ? "bg-[var(--primary-dim)] text-[var(--primary)] font-[550]"
-                      : "text-[var(--text-3)] hover:text-[var(--text-1)]"
-                  }`}
+                  onClick={clearResearch}
+                  disabled={isSearching}
+                  className="text-[var(--text-3)] hover:text-[var(--red)] transition-colors px-2 py-0.5 rounded hover:bg-[var(--bg-hover)] disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Clear all research results and the saved query"
                 >
-                  Relevance
+                  Clear all
                 </button>
-                <button
-                  onClick={() => setSortMode("original")}
-                  className={`px-2 py-0.5 rounded transition-colors ${
-                    sortMode === "original"
-                      ? "bg-[var(--primary-dim)] text-[var(--primary)] font-[550]"
-                      : "text-[var(--text-3)] hover:text-[var(--text-1)]"
-                  }`}
-                >
-                  Original
-                </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           {/* Result cards */}
