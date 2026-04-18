@@ -16,6 +16,22 @@ function inferType(filename: string): string {
   return "note";
 }
 
+/**
+ * Pull `title:` from YAML frontmatter, if present.
+ * Returns null if the file doesn't start with a frontmatter block.
+ */
+function extractFrontmatterTitle(content: string): string | null {
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!match) return null;
+  for (const line of match[1].split("\n")) {
+    const m = line.match(/^title:\s*(.+?)\s*$/);
+    if (m) {
+      return m[1].replace(/^["']|["']$/g, "").trim() || null;
+    }
+  }
+  return null;
+}
+
 export async function POST(request: NextRequest) {
   const formData = await request.formData();
   const files = formData.getAll("files");
@@ -38,7 +54,14 @@ export async function POST(request: NextRequest) {
     await writeFile(filePath, buffer);
 
     const type = inferType(filename);
-    const title = path.basename(filename, path.extname(filename)).replace(/_/g, " ");
+    const ext = path.extname(filename).toLowerCase();
+    let title = path.basename(filename, path.extname(filename)).replace(/_/g, " ");
+    // Prefer the frontmatter title for markdown uploads — gives nicer labels
+    // than a sanitised filename (e.g. "Digital twin patterns" vs "digital_twin_patterns").
+    if (ext === ".md") {
+      const fmTitle = extractFrontmatterTitle(buffer.toString("utf-8"));
+      if (fmTitle) title = fmTitle;
+    }
 
     const result = db
       .insert(sources)
