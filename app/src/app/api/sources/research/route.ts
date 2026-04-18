@@ -14,8 +14,16 @@ export async function POST(request: NextRequest) {
   }
 
   const maxResults = body.maxResults ?? 8;
+  const excludeUrls: string[] = Array.isArray(body.excludeUrls)
+    ? body.excludeUrls.filter((u: unknown): u is string => typeof u === "string")
+    : [];
 
-  const prompt = `Search the web for sources about: ${topic}
+  const excludeBlock =
+    excludeUrls.length > 0
+      ? `\n\nALREADY SUGGESTED — do NOT return any of these URLs:\n${excludeUrls.map((u) => `- ${u}`).join("\n")}`
+      : "";
+
+  const prompt = `Search the web for sources about: ${topic}${excludeBlock}
 
 Output each result as one line: RESULT:{"title":"...","url":"...","domain":"...","author":"...","type":"Paper|Blog|Article|Survey","summary":"...","relevance":85,"tags":["tag1","tag2"]}
 
