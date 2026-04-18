@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useProject } from "@/components/project-switcher";
+import { Breadcrumbs } from "@/components/breadcrumbs";
 import {
   Search,
   FileText,
@@ -583,6 +584,7 @@ export default function WikiPage() {
       >
         {/* Header */}
         <div className="px-5 pt-5 pb-4">
+          <Breadcrumbs project={activeProject} />
           <h1 className="text-[22px] font-[650] tracking-tight text-[var(--text-1)]">
             Wiki
           </h1>

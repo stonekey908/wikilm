@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Share2, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
 import { useProject } from "@/components/project-switcher";
+import { Breadcrumbs } from "@/components/breadcrumbs";
 
 interface GraphNode {
   slug: string;
@@ -243,6 +244,7 @@ export default function GraphPage() {
       {/* Header */}
       <div className="px-8 pt-6 pb-3 border-b border-[var(--border)] flex items-start justify-between gap-4">
         <div>
+          <Breadcrumbs project={activeProject} />
           <h1 className="text-[22px] font-[650] text-[var(--text-1)] tracking-tight leading-tight">
             Graph
           </h1>
