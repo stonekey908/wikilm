@@ -20,6 +20,7 @@ const PROJECT_ROOT = path.join(process.cwd(), "..");
 const BACKUP_DIR = path.join(PROJECT_ROOT, "backups");
 const DB_PATH = path.join(PROJECT_ROOT, "secondbrain.db");
 const WIKI_DIR = path.join(PROJECT_ROOT, "wiki");
+const PROJECTS_DIR = path.join(PROJECT_ROOT, "projects");
 const KEEP_COUNT = 14;
 
 function timestamp(): string {
@@ -59,9 +60,12 @@ export async function POST() {
 
     const ts = timestamp();
     const dbFile = `db-${ts}.sql`;
-    const wikiFile = `wiki-${ts}.tar.gz`;
+    // Archive covers everything the user might have created — default
+    // project's wiki at the top level AND any per-project wikis under
+    // projects/<slug>/. Name changed from wiki- to content- to reflect this.
+    const contentFile = `content-${ts}.tar.gz`;
     const dbPath = path.join(BACKUP_DIR, dbFile);
-    const wikiPath = path.join(BACKUP_DIR, wikiFile);
+    const contentPath = path.join(BACKUP_DIR, contentFile);
 
     // DB dump — sqlite3 .dump is deterministic and plain-text
     execSync(`sqlite3 ${JSON.stringify(DB_PATH)} .dump > ${JSON.stringify(dbPath)}`, {
@@ -69,29 +73,40 @@ export async function POST() {
       stdio: "pipe",
     });
 
-    // Wiki archive — relative path inside PROJECT_ROOT so the tar is clean
-    if (fs.existsSync(WIKI_DIR)) {
-      execSync(`tar -czf ${JSON.stringify(wikiPath)} -C ${JSON.stringify(PROJECT_ROOT)} wiki`, {
-        shell: "/bin/bash",
-        stdio: "pipe",
-      });
+    // Content archive — include whichever of {wiki, projects} exist.
+    // Fresh installs may have neither; multi-project users have both.
+    const includes = ["wiki", "projects"].filter((sub) =>
+      fs.existsSync(path.join(PROJECT_ROOT, sub))
+    );
+    if (includes.length > 0) {
+      execSync(
+        `tar -czf ${JSON.stringify(contentPath)} -C ${JSON.stringify(PROJECT_ROOT)} ${includes.join(" ")}`,
+        { shell: "/bin/bash", stdio: "pipe" }
+      );
     }
 
     pruneOldest("db-", ".sql");
+    // Prune both the new content-* archives and any legacy wiki-* ones
+    // from pre-STO-1752 so users who upgrade see retention stay at 14.
+    pruneOldest("content-", ".tar.gz");
     pruneOldest("wiki-", ".tar.gz");
 
     const now = new Date().toISOString();
     upsertSetting("last_backup_at", now);
     upsertSetting("last_backup_path", BACKUP_DIR);
     upsertSetting("last_backup_db_file", dbFile);
-    upsertSetting("last_backup_wiki_file", wikiFile);
+    // Key renamed from `last_backup_wiki_file` → `last_backup_content_file`
+    // since the archive now covers wiki + projects. Both kept in sync below.
+    upsertSetting("last_backup_content_file", contentFile);
+    upsertSetting("last_backup_wiki_file", contentFile); // legacy alias
 
     return Response.json(
       {
         ok: true,
         timestamp: now,
         location: BACKUP_DIR,
-        files: { db: dbFile, wiki: wikiFile },
+        files: { db: dbFile, content: contentFile },
+        included: includes,
       },
       { status: 201 }
     );
