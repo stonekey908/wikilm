@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import fs from "fs";
 import path from "path";
+import { getProject, wikiDir } from "@/lib/projects";
 
 function parseFrontmatter(content: string): { meta: Record<string, unknown>; body: string } {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
@@ -87,21 +88,29 @@ function escapeRegex(str: string): string {
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const wikiDir = path.join(process.cwd(), "..", "wiki");
+  const searchParams = request.nextUrl.searchParams;
+  const projectIdParam = searchParams.get("projectId");
+  const projectId = projectIdParam ? Number(projectIdParam) : NaN;
+  const project =
+    (Number.isFinite(projectId) ? getProject(projectId) : null) ?? getProject(1);
+  if (!project) {
+    return Response.json({ error: "Page not found" }, { status: 404 });
+  }
+  const wikiPath = wikiDir(project);
 
   // The slug could be a nested path like "sources/some-page"
   // Try the slug directly, then try with subdirectories
-  let filePath = path.join(wikiDir, `${slug}.md`);
+  let filePath = path.join(wikiPath, `${slug}.md`);
 
   if (!fs.existsSync(filePath)) {
     // Try to find it by searching all files
-    const files = getAllMdFiles(wikiDir);
+    const files = getAllMdFiles(wikiPath);
     const match = files.find((f) => {
-      const relative = path.relative(wikiDir, f).replace(/\.md$/, "").replace(/\\/g, "/");
+      const relative = path.relative(wikiPath, f).replace(/\.md$/, "").replace(/\\/g, "/");
       return relative === slug;
     });
     if (match) {
@@ -123,7 +132,7 @@ export async function GET(
       .replace(/\b\w/g, (c) => c.toUpperCase());
   })();
 
-  const backlinks = findBacklinks(wikiDir, slug);
+  const backlinks = findBacklinks(wikiPath, slug);
 
   return Response.json({
     slug,

@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { formatJobError } from "@/lib/error-codes";
+import { useProject } from "@/components/project-switcher";
+import { Breadcrumbs } from "@/components/breadcrumbs";
 import {
   Download,
   MessageSquare,
@@ -99,6 +101,7 @@ function formatTime(dateStr: string | null): string {
 }
 
 export default function JobsPage() {
+  const { activeProject } = useProject();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -157,6 +160,7 @@ export default function JobsPage() {
 
   return (
     <div className="p-8 max-w-[960px]">
+      <Breadcrumbs project={activeProject} />
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-[22px] font-[650] text-[var(--text-1)] tracking-tight leading-tight">

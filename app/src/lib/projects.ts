@@ -59,6 +59,51 @@ export function hasChildren(id: number): boolean {
   return (row?.n ?? 0) > 0;
 }
 
+export interface ProjectNode {
+  id: number;
+  name: string;
+  slug: string;
+  color: string;
+  parentId: number | null;
+  children: ProjectNode[];
+}
+
+/**
+ * Build a fully-rooted tree of every project in the database. Children are
+ * sorted alphabetically within each level. Orphans (rows whose parent_id
+ * points at a missing row) are promoted to root so they stay reachable.
+ */
+export function buildTree(): ProjectNode[] {
+  const all = db.select().from(projects).all();
+  const byId = new Map<number, ProjectNode>();
+  all.forEach((p) => {
+    byId.set(p.id, {
+      id: p.id,
+      name: p.name,
+      slug: p.slug,
+      color: p.color,
+      parentId: p.parentId,
+      children: [],
+    });
+  });
+  const roots: ProjectNode[] = [];
+  for (const node of byId.values()) {
+    if (node.parentId == null) {
+      roots.push(node);
+    } else {
+      const parent = byId.get(node.parentId);
+      if (parent) parent.children.push(node);
+      else roots.push(node); // orphan — promote to root
+    }
+  }
+  const sortRec = (nodes: ProjectNode[]) => {
+    nodes.sort((a, b) => a.name.localeCompare(b.name));
+    nodes.forEach((n) => sortRec(n.children));
+  };
+  sortRec(roots);
+  return roots;
+}
+
 /** List all descendants (prefix match on slug). Includes nested children. */
 export function listDescendants(project: Pick<Project, "slug">): Project[] {
   return db

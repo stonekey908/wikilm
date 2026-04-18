@@ -1,11 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import { db } from "@/db";
 import { jobs } from "@/db/schema";
 import { desc, inArray } from "drizzle-orm";
-
-const WIKI_DIR = path.join(process.cwd(), "..", "wiki");
+import { getProject, wikiDir } from "@/lib/projects";
 
 interface WikiStats {
   sources: number;
@@ -34,18 +33,18 @@ function countMarkdownFiles(dir: string): number {
   return count;
 }
 
-function getStats(): WikiStats {
+function getStats(wikiPath: string): WikiStats {
   return {
-    sources: countMarkdownFiles(path.join(WIKI_DIR, "sources")),
+    sources: countMarkdownFiles(path.join(wikiPath, "sources")),
     wikiPages:
-      countMarkdownFiles(WIKI_DIR) - 2, // subtract index.md and log.md
-    entities: countMarkdownFiles(path.join(WIKI_DIR, "entities")),
-    concepts: countMarkdownFiles(path.join(WIKI_DIR, "concepts")),
+      countMarkdownFiles(wikiPath) - 2, // subtract index.md and log.md
+    entities: countMarkdownFiles(path.join(wikiPath, "entities")),
+    concepts: countMarkdownFiles(path.join(wikiPath, "concepts")),
   };
 }
 
-function parseLogEntries(limit: number): LogEntry[] {
-  const logPath = path.join(WIKI_DIR, "log.md");
+function parseLogEntries(wikiPath: string, limit: number): LogEntry[] {
+  const logPath = path.join(wikiPath, "log.md");
   if (!fs.existsSync(logPath)) return [];
 
   const content = fs.readFileSync(logPath, "utf-8");
@@ -81,9 +80,18 @@ function parseLogEntries(limit: number): LogEntry[] {
   return entries.reverse().slice(0, limit);
 }
 
-export async function GET() {
-  const stats = getStats();
-  const recentActivity = parseLogEntries(10);
+export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams;
+  const projectIdParam = searchParams.get("projectId");
+  const projectId = projectIdParam ? Number(projectIdParam) : NaN;
+  const project =
+    (Number.isFinite(projectId) ? getProject(projectId) : null) ?? getProject(1);
+  const wikiPath = project
+    ? wikiDir(project)
+    : path.join(process.cwd(), "..", "wiki");
+
+  const stats = getStats(wikiPath);
+  const recentActivity = parseLogEntries(wikiPath, 10);
 
   const activeJobs = db
     .select()
