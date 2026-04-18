@@ -1,5 +1,7 @@
+import { NextRequest } from "next/server";
 import fs from "fs";
 import path from "path";
+import { getProject, wikiDir } from "@/lib/projects";
 
 interface GraphNode {
   slug: string;
@@ -54,9 +56,17 @@ function titleFromMeta(meta: Record<string, unknown>, body: string, slug: string
   return parts[parts.length - 1].replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export async function GET() {
-  const wikiDir = path.join(process.cwd(), "..", "wiki");
-  const files = getAllMdFiles(wikiDir);
+export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams;
+  const projectIdParam = searchParams.get("projectId");
+  const projectId = projectIdParam ? Number(projectIdParam) : NaN;
+  const project =
+    (Number.isFinite(projectId) ? getProject(projectId) : null) ?? getProject(1);
+  if (!project) {
+    return Response.json({ nodes: [], edges: [] });
+  }
+  const wikiPath = wikiDir(project);
+  const files = getAllMdFiles(wikiPath);
 
   // First pass: collect all nodes with their slug-end for link resolution
   const nodes: GraphNode[] = [];
@@ -65,7 +75,7 @@ export async function GET() {
   for (const filePath of files) {
     const content = fs.readFileSync(filePath, "utf-8");
     const { meta, body } = parseFrontmatter(content);
-    const slug = slugFromPath(filePath, wikiDir);
+    const slug = slugFromPath(filePath, wikiPath);
     const pageType = (meta.type as string) || "unknown";
     const title = titleFromMeta(meta, body, slug);
     nodes.push({ slug, title, type: pageType });
