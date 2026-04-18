@@ -1,5 +1,8 @@
 import { NextRequest } from "next/server";
 import path from "path";
+import { db } from "@/db";
+import { jobs } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { startFixJob } from "@/lib/lint";
 
 export async function POST(
@@ -23,7 +26,20 @@ export async function POST(
       projectCwd,
       projectId,
     });
-    return Response.json({ jobId }, { status: 201 });
+    const job = db
+      .select({ status: jobs.status, error: jobs.error, errorCode: jobs.errorCode })
+      .from(jobs)
+      .where(eq(jobs.id, jobId))
+      .get();
+    return Response.json(
+      {
+        jobId,
+        status: job?.status ?? "unknown",
+        error: job?.error ?? null,
+        errorCode: job?.errorCode ?? null,
+      },
+      { status: 201 }
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to start fix job";
     return Response.json({ error: message }, { status: 400 });
