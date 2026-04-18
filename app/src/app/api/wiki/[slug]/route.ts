@@ -1,6 +1,9 @@
 import { NextRequest } from "next/server";
 import fs from "fs";
 import path from "path";
+import { db } from "@/db";
+import { projects } from "@/db/schema";
+import { getProject, wikiDir, type Project } from "@/lib/projects";
 
 function parseFrontmatter(content: string): { meta: Record<string, unknown>; body: string } {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
@@ -49,34 +52,88 @@ function getAllMdFiles(dir: string): string[] {
   return results;
 }
 
-function findBacklinks(wikiDir: string, targetSlug: string): { slug: string; title: string }[] {
-  const files = getAllMdFiles(wikiDir);
-  const backlinks: { slug: string; title: string }[] = [];
-  // Match [[slug]] or [[filename]] patterns — check the last segment of the slug
+interface Backlink {
+  slug: string;
+  title: string;
+  projectId: number;
+  projectSlug: string;
+}
+
+/**
+ * Scan a single project's wiki for references to the target page. Matches
+ * two forms:
+ *   1. Local: `[[<targetName>]]` — last segment of the slug, resolved by
+ *      the active project's pages. Preserved for backward compatibility.
+ *   2. Absolute: `[[<currentProject.slug>/<targetSlug>]]` — explicit
+ *      cross-project reference using the project's full slug path and the
+ *      target page slug. Any `/` beyond the project slug counts.
+ *
+ * `currentProject` is the project the target page lives in; `scanProject`
+ * is the project we're scanning files in (may be the same, may be a sibling,
+ * ancestor, or descendant).
+ */
+function findBacklinks(
+  scanProject: Project,
+  targetSlug: string,
+  currentProject: Project
+): Backlink[] {
+  const dir = wikiDir(scanProject);
+  const files = getAllMdFiles(dir);
+  const backlinks: Backlink[] = [];
   const targetName = targetSlug.split("/").pop() || targetSlug;
 
+  // Local-form pattern: [[target-name]] — only valid when scanning the
+  // same project as the target (otherwise a bare name is ambiguous).
+  const localPattern = new RegExp(
+    `\\[\\[${escapeRegex(targetName)}\\]\\]`,
+    "i"
+  );
+  // Absolute-form pattern: [[<projectSlug>/<...>/<targetName-or-targetSlug>]]
+  // Two shapes are accepted:
+  //   [[<projectSlug>/<targetSlug>]]   — full page slug path (incl. subdirs)
+  //   [[<projectSlug>/<targetName>]]   — last segment of the slug (common form)
+  // `[^\]]+` keeps the match bounded inside the brackets so it never
+  // greedily grabs past the closing `]]`.
+  const absoluteFullPattern = new RegExp(
+    `\\[\\[${escapeRegex(`${currentProject.slug}/${targetSlug}`)}\\]\\]`,
+    "i"
+  );
+  const absoluteNamePattern = new RegExp(
+    `\\[\\[${escapeRegex(`${currentProject.slug}/${targetName}`)}\\]\\]`,
+    "i"
+  );
+
+  const isSameProject = scanProject.id === currentProject.id;
+
   for (const filePath of files) {
-    const relative = path.relative(wikiDir, filePath).replace(/\.md$/, "").replace(/\\/g, "/");
-    if (relative === targetSlug) continue;
+    const relative = path.relative(dir, filePath).replace(/\.md$/, "").replace(/\\/g, "/");
+    // Skip the target file itself when scanning its own project.
+    if (isSameProject && relative === targetSlug) continue;
 
     const content = fs.readFileSync(filePath, "utf-8");
-    // Check for [[target-name]] reference (case-insensitive)
-    const wikilinkPattern = new RegExp(`\\[\\[${escapeRegex(targetName)}\\]\\]`, "i");
-    if (wikilinkPattern.test(content)) {
-      const { meta, body } = parseFrontmatter(content);
-      let title = (meta.title as string) || "";
-      if (!title) {
-        const headingMatch = body.match(/^#\s+(.+)$/m);
-        if (headingMatch) title = headingMatch[1];
-      }
-      if (!title) {
-        const parts = relative.split("/");
-        title = parts[parts.length - 1]
-          .replace(/-/g, " ")
-          .replace(/\b\w/g, (c) => c.toUpperCase());
-      }
-      backlinks.push({ slug: relative, title });
+    const hasLocal = isSameProject && localPattern.test(content);
+    const hasAbsolute =
+      absoluteFullPattern.test(content) || absoluteNamePattern.test(content);
+    if (!hasLocal && !hasAbsolute) continue;
+
+    const { meta, body } = parseFrontmatter(content);
+    let title = (meta.title as string) || "";
+    if (!title) {
+      const headingMatch = body.match(/^#\s+(.+)$/m);
+      if (headingMatch) title = headingMatch[1];
     }
+    if (!title) {
+      const parts = relative.split("/");
+      title = parts[parts.length - 1]
+        .replace(/-/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+    }
+    backlinks.push({
+      slug: relative,
+      title,
+      projectId: scanProject.id,
+      projectSlug: scanProject.slug,
+    });
   }
 
   return backlinks;
@@ -87,21 +144,29 @@ function escapeRegex(str: string): string {
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params;
-  const wikiDir = path.join(process.cwd(), "..", "wiki");
+  const searchParams = request.nextUrl.searchParams;
+  const projectIdParam = searchParams.get("projectId");
+  const projectId = projectIdParam ? Number(projectIdParam) : NaN;
+  const project =
+    (Number.isFinite(projectId) ? getProject(projectId) : null) ?? getProject(1);
+  if (!project) {
+    return Response.json({ error: "Page not found" }, { status: 404 });
+  }
+  const wikiPath = wikiDir(project);
 
   // The slug could be a nested path like "sources/some-page"
   // Try the slug directly, then try with subdirectories
-  let filePath = path.join(wikiDir, `${slug}.md`);
+  let filePath = path.join(wikiPath, `${slug}.md`);
 
   if (!fs.existsSync(filePath)) {
     // Try to find it by searching all files
-    const files = getAllMdFiles(wikiDir);
+    const files = getAllMdFiles(wikiPath);
     const match = files.find((f) => {
-      const relative = path.relative(wikiDir, f).replace(/\.md$/, "").replace(/\\/g, "/");
+      const relative = path.relative(wikiPath, f).replace(/\.md$/, "").replace(/\\/g, "/");
       return relative === slug;
     });
     if (match) {
@@ -123,7 +188,12 @@ export async function GET(
       .replace(/\b\w/g, (c) => c.toUpperCase());
   })();
 
-  const backlinks = findBacklinks(wikiDir, slug);
+  // Scan every project's wiki for references to this page — both local
+  // `[[target-name]]` (only within the owning project) and absolute
+  // `[[<currentProject.slug>/<targetSlug>]]` (any project, including self
+  // if someone wrote it explicitly).
+  const allProjects = db.select().from(projects).all();
+  const backlinks = allProjects.flatMap((p) => findBacklinks(p, slug, project));
 
   return Response.json({
     slug,

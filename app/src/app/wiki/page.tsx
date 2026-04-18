@@ -2,6 +2,9 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useProject } from "@/components/project-switcher";
+import { Breadcrumbs } from "@/components/breadcrumbs";
+import { ChildProjects } from "@/components/child-projects";
 import {
   Search,
   FileText,
@@ -12,11 +15,15 @@ import {
   HelpCircle,
   BookOpen,
   ArrowLeft,
+  ArrowUpRight,
   Tag,
   Link2,
   ChevronDown,
   ChevronRight,
   X,
+  Loader2,
+  RefreshCw,
+  ShieldCheck,
 } from "lucide-react";
 
 /* ─── Types ─── */
@@ -37,8 +44,18 @@ interface WikiPageDetail {
   tags: string[];
   meta: Record<string, unknown>;
   body: string;
-  backlinks: { slug: string; title: string }[];
+  backlinks: { slug: string; title: string; projectId: number; projectSlug: string }[];
 }
+
+/**
+ * Classification of a [[wikilink]] target string. Drives both the visual
+ * treatment (color, icon) and the click handler (local navigation vs.
+ * switch-active-project).
+ */
+type WikilinkResolved =
+  | { kind: "local"; pageSlug: string; label: string }
+  | { kind: "cross"; pageSlug: string; label: string; projectId: number; projectSlug: string; color: string }
+  | { kind: "broken"; label: string; attemptedProjectSlug: string };
 
 /* ─── Constants ─── */
 
@@ -111,7 +128,8 @@ function stripInlineMarkup(text: string): string {
 
 function renderMarkdown(
   body: string,
-  onLinkClick: (slug: string) => void,
+  onLinkClick: (target: string) => void,
+  resolveLink: (target: string) => WikilinkResolved,
   onResearchGap?: (topic: string) => void
 ): React.ReactNode[] {
   const lines = body.split("\n");
@@ -136,7 +154,7 @@ function renderMarkdown(
       >
         {listItems.map((item, i) => (
           <li key={i}>
-            {renderInline(item.text, onLinkClick)}
+            {renderInline(item.text, onLinkClick, resolveLink)}
             {item.inGaps && onResearchGap && (
               <button
                 onClick={() => onResearchGap(stripInlineMarkup(item.text))}
@@ -178,7 +196,7 @@ function renderMarkdown(
       const id = level <= 3 ? headingIds[headingIdx++]?.id : undefined;
       elements.push(
         <div key={i} id={id} className={sizes[level] || sizes[3]}>
-          {renderInline(text, onLinkClick)}
+          {renderInline(text, onLinkClick, resolveLink)}
         </div>
       );
       continue;
@@ -243,7 +261,7 @@ function renderMarkdown(
           key={i}
           className="border-l-2 border-[var(--primary)] pl-3 py-0.5 text-[14px] text-[var(--text-2)] italic my-2"
         >
-          {renderInline(text, onLinkClick)}
+          {renderInline(text, onLinkClick, resolveLink)}
         </blockquote>
       );
       continue;
@@ -252,7 +270,7 @@ function renderMarkdown(
     // Regular paragraph
     elements.push(
       <p key={i} className="text-[14px] leading-relaxed text-[var(--text-2)] my-1.5">
-        {renderInline(line, onLinkClick)}
+        {renderInline(line, onLinkClick, resolveLink)}
       </p>
     );
   }
@@ -261,7 +279,11 @@ function renderMarkdown(
   return elements;
 }
 
-function renderInline(text: string, onLinkClick: (slug: string) => void): React.ReactNode {
+function renderInline(
+  text: string,
+  onLinkClick: (target: string) => void,
+  resolveLink: (target: string) => WikilinkResolved
+): React.ReactNode {
   // Split on wikilinks, bold, italic, code, and regular links
   const parts: React.ReactNode[] = [];
   // Pattern: [[wikilink]], **bold**, *italic*, `code`, [text](url)
@@ -277,17 +299,52 @@ function renderInline(text: string, onLinkClick: (slug: string) => void): React.
     }
 
     if (match[2] !== undefined) {
-      // [[wikilink]]
+      // [[wikilink]] — classify and render with context-appropriate styling
       const linkTarget = match[2];
-      parts.push(
-        <button
-          key={`wl-${match.index}`}
-          onClick={() => onLinkClick(linkTarget)}
-          className="text-[var(--primary)] hover:text-[var(--primary-hover)] font-medium underline decoration-[var(--primary)]/30 underline-offset-2 cursor-pointer transition-colors"
-        >
-          {linkTarget}
-        </button>
-      );
+      const resolved = resolveLink(linkTarget);
+
+      if (resolved.kind === "broken") {
+        // Target project doesn't exist — render as plain, muted text so the
+        // user can see the intent without a clickable false-promise.
+        parts.push(
+          <span
+            key={`wl-${match.index}`}
+            className="text-[var(--text-4)] italic underline decoration-dotted decoration-[var(--text-4)]/40 underline-offset-2"
+            title={`Project "${resolved.attemptedProjectSlug}" not found`}
+          >
+            {resolved.label}
+          </span>
+        );
+      } else if (resolved.kind === "cross") {
+        // Cross-project link — tint with the destination project's color
+        // and add an arrow icon to signal "this leaves the current project."
+        parts.push(
+          <button
+            key={`wl-${match.index}`}
+            onClick={() => onLinkClick(linkTarget)}
+            style={{ color: resolved.color }}
+            className="inline-flex items-baseline gap-0.5 font-medium underline decoration-current/30 underline-offset-2 cursor-pointer transition-colors hover:decoration-current/70"
+            title={`In project: ${resolved.projectSlug}`}
+          >
+            <span>{resolved.label}</span>
+            <ArrowUpRight
+              className="w-3 h-3 self-center shrink-0"
+              aria-hidden="true"
+            />
+          </button>
+        );
+      } else {
+        // Local link — same behaviour as before.
+        parts.push(
+          <button
+            key={`wl-${match.index}`}
+            onClick={() => onLinkClick(linkTarget)}
+            className="text-[var(--primary)] hover:text-[var(--primary-hover)] font-medium underline decoration-[var(--primary)]/30 underline-offset-2 cursor-pointer transition-colors"
+          >
+            {resolved.label}
+          </button>
+        );
+      }
     } else if (match[3] !== undefined) {
       // **bold**
       parts.push(<strong key={`b-${match.index}`} className="font-[600] text-[var(--text-1)]">{match[3]}</strong>);
@@ -350,6 +407,8 @@ function TypeChip({ type }: { type: string }) {
 export default function WikiPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { activeProject, projects, setActiveProject } = useProject();
+  const activeProjectId = activeProject?.id ?? 1;
   const [pages, setPages] = useState<WikiPageMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -366,6 +425,11 @@ export default function WikiPage() {
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
     () => new Set(ALL_TYPES)
   );
+  // Parent-action button state — debounces repeated clicks while a run is
+  // queued. Independent of the actual job status (which we don't poll here);
+  // the coalescing on the server side guarantees at most 2 runs per burst.
+  const [parentSyncInFlight, setParentSyncInFlight] = useState(false);
+  const [parentLintInFlight, setParentLintInFlight] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Restore collapsed state on mount, persist on every change.
@@ -427,6 +491,7 @@ export default function WikiPage() {
       const params = new URLSearchParams();
       if (search) params.set("search", search);
       if (typeFilter) params.set("type", typeFilter);
+      params.set("projectId", String(activeProjectId));
       const res = await fetch(`/api/wiki?${params.toString()}`);
       const data = await res.json();
       setPages(data.pages);
@@ -435,7 +500,7 @@ export default function WikiPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, typeFilter]);
+  }, [search, typeFilter, activeProjectId]);
 
   useEffect(() => {
     const timer = setTimeout(fetchPages, search ? 300 : 0);
@@ -458,7 +523,11 @@ export default function WikiPage() {
     setSelectedSlug(slug);
     setDetailLoading(true);
     try {
-      const res = await fetch(`/api/wiki/${encodeURIComponent(slug)}`);
+      const params = new URLSearchParams();
+      params.set("projectId", String(activeProjectId));
+      const res = await fetch(
+        `/api/wiki/${encodeURIComponent(slug)}?${params.toString()}`
+      );
       if (res.ok) {
         const data: WikiPageDetail = await res.json();
         setDetail(data);
@@ -482,17 +551,117 @@ export default function WikiPage() {
     } finally {
       setDetailLoading(false);
     }
-  }, []);
+  }, [activeProjectId]);
 
-  // Handle wikilink navigation (from within page content)
+  /**
+   * Classify a raw `[[wikilink]]` target string against the known project
+   * list. A `/` in the target means the prefix (everything up to the LAST
+   * `/`) is a project slug (which itself may contain `/` for nested
+   * projects). Anything after the last `/` is the page slug within that
+   * project. Without a `/`, the link is local to the active project.
+   */
+  const resolveWikilink = useCallback(
+    (rawTarget: string): WikilinkResolved => {
+      const normalized = rawTarget.toLowerCase().replace(/\s+/g, "-");
+      const lastSlash = normalized.lastIndexOf("/");
+      if (lastSlash === -1) {
+        return { kind: "local", pageSlug: normalized, label: rawTarget };
+      }
+      const projectSlug = normalized.slice(0, lastSlash);
+      const pageSlug = normalized.slice(lastSlash + 1);
+      // Longest-prefix match: check for exact project-slug match, then
+      // progressively shorter prefixes (so `coding/codeview/page` finds
+      // project `coding/codeview` before project `coding`).
+      const project = projects.find((p) => p.slug === projectSlug);
+      if (!project) {
+        return {
+          kind: "broken",
+          label: rawTarget,
+          attemptedProjectSlug: projectSlug,
+        };
+      }
+      return {
+        kind: "cross",
+        pageSlug,
+        label: rawTarget,
+        projectId: project.id,
+        projectSlug: project.slug,
+        color: project.color,
+      };
+    },
+    [projects]
+  );
+
+  // Handle wikilink navigation (from within page content).
+  // Local targets resolve against the active project's pages; cross-project
+  // targets switch the active project first, then load the target page
+  // fresh with the new project context.
   function handleWikilinkClick(target: string) {
-    const normalizedTarget = target.toLowerCase().replace(/\s+/g, "-");
+    const resolved = resolveWikilink(target);
+    if (resolved.kind === "broken") return; // rendered non-clickable anyway
+    if (resolved.kind === "cross") {
+      const destProject = projects.find((p) => p.id === resolved.projectId);
+      if (!destProject) return;
+      // Only flip the active project if we're actually leaving it —
+      // avoids a redundant render + localStorage write otherwise.
+      if (destProject.id !== activeProject?.id) {
+        setActiveProject(destProject);
+      }
+      // Load directly against the destination project (don't wait for the
+      // activeProject state change to propagate through loadDetail's deps).
+      loadDetailForProject(resolved.pageSlug, destProject.id, "push");
+      return;
+    }
+    // Local: resolve against currently-loaded pages by last segment,
+    // same behaviour as before.
     const match = pages.find((p) => {
       const slugEnd = p.slug.split("/").pop()?.toLowerCase();
-      return slugEnd === normalizedTarget;
+      return slugEnd === resolved.pageSlug;
     });
-    loadDetail(match ? match.slug : normalizedTarget, "push");
+    loadDetail(match ? match.slug : resolved.pageSlug, "push");
   }
+
+  /**
+   * Load detail against an explicit projectId rather than the reactive
+   * `activeProjectId`. Used by cross-project wikilink navigation where
+   * we need the fetch to use the *new* project id before React has
+   * committed the setActiveProject change.
+   */
+  const loadDetailForProject = useCallback(
+    async (slug: string, projectId: number, mode: "start" | "push" | "jump" = "start") => {
+      setSelectedSlug(slug);
+      setDetailLoading(true);
+      try {
+        const params = new URLSearchParams();
+        params.set("projectId", String(projectId));
+        const res = await fetch(
+          `/api/wiki/${encodeURIComponent(slug)}?${params.toString()}`
+        );
+        if (res.ok) {
+          const data: WikiPageDetail = await res.json();
+          setDetail(data);
+          if (mode === "start") {
+            setTrail([{ slug: data.slug, title: data.title }]);
+          } else if (mode === "push") {
+            setTrail((prev) => {
+              if (prev.length > 0 && prev[prev.length - 1].slug === data.slug) return prev;
+              return [...prev, { slug: data.slug, title: data.title }];
+            });
+          } else if (mode === "jump") {
+            setTrail((prev) => {
+              const idx = prev.findIndex((t) => t.slug === data.slug);
+              return idx === -1 ? [{ slug: data.slug, title: data.title }] : prev.slice(0, idx + 1);
+            });
+          }
+        }
+      } catch {
+        // silently fail
+      } finally {
+        setDetailLoading(false);
+      }
+    },
+    []
+  );
 
   // Extract TOC headings (h1-h3 only). Show TOC when >= 3 headings.
   const tocHeadings = detail ? extractHeadings(detail.body) : [];
@@ -555,6 +724,49 @@ export default function WikiPage() {
   const allTags = Array.from(new Set(pages.flatMap((p) => p.tags))).sort();
 
   const synthesisPage = pages.find((p) => p.slug === "synthesis/project-overview");
+  // True when the active project has at least one direct child. Drives the
+  // parent-action row (Run parent synthesis / Run parent lint).
+  const isParentProject =
+    activeProject != null &&
+    projects.some((p) => p.parentId === activeProject.id);
+
+  const runParentSynthesis = useCallback(async () => {
+    if (!activeProject || parentSyncInFlight) return;
+    setParentSyncInFlight(true);
+    try {
+      const res = await fetch(
+        `/api/projects/${activeProject.id}/synthesis/parent-run`,
+        { method: "POST" }
+      );
+      if (!res.ok) {
+        console.error("parent synthesis failed:", await res.text());
+      }
+    } catch (err) {
+      console.error("parent synthesis error:", err);
+    } finally {
+      // Short debounce so the user can't hammer the button and also isn't
+      // left wondering what happened — the server coalesces anyway.
+      setTimeout(() => setParentSyncInFlight(false), 2000);
+    }
+  }, [activeProject, parentSyncInFlight]);
+
+  const runParentLint = useCallback(async () => {
+    if (!activeProject || parentLintInFlight) return;
+    setParentLintInFlight(true);
+    try {
+      const res = await fetch(
+        `/api/lint/parent-run/${activeProject.id}`,
+        { method: "POST" }
+      );
+      if (!res.ok) {
+        console.error("parent lint failed:", await res.text());
+      }
+    } catch (err) {
+      console.error("parent lint error:", err);
+    } finally {
+      setTimeout(() => setParentLintInFlight(false), 2000);
+    }
+  }, [activeProject, parentLintInFlight]);
 
   function formatRelative(iso?: string): string {
     if (!iso) return "";
@@ -575,6 +787,7 @@ export default function WikiPage() {
       >
         {/* Header */}
         <div className="px-5 pt-5 pb-4">
+          <Breadcrumbs project={activeProject} />
           <h1 className="text-[22px] font-[650] tracking-tight text-[var(--text-1)]">
             Wiki
           </h1>
@@ -582,6 +795,14 @@ export default function WikiPage() {
             Browse and search your knowledge base
           </p>
         </div>
+
+        {/* Children — shown when the active project is a parent. Component
+            self-hides when there are no children. */}
+        {activeProject && (
+          <div className="px-4 pb-1">
+            <ChildProjects parentId={activeProject.id} />
+          </div>
+        )}
 
         {/* Pinned synthesis card — always-on quick access to the project overview */}
         {synthesisPage && (
@@ -611,6 +832,51 @@ export default function WikiPage() {
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-[var(--text-4)] shrink-0" />
+            </button>
+          </div>
+        )}
+
+        {/* Parent actions — only when the active project has children. Gives
+            users on-demand access to parent-level synthesis (summary of
+            children's syntheses) and parent-level lint (promotion candidates,
+            recurring themes, cross-child gaps). */}
+        {isParentProject && (
+          <div className="px-4 pb-3 flex flex-wrap gap-2">
+            <button
+              onClick={runParentSynthesis}
+              disabled={parentSyncInFlight}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-card)] text-[12px] font-[550] text-[var(--text-2)] hover:border-[var(--border-strong)] hover:text-[var(--text-1)] disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+              title="Consolidate children's syntheses into this project's overview"
+            >
+              {parentSyncInFlight ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Queueing…
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Run parent synthesis
+                </>
+              )}
+            </button>
+            <button
+              onClick={runParentLint}
+              disabled={parentLintInFlight}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-[var(--border)] bg-[var(--surface-card)] text-[12px] font-[550] text-[var(--text-2)] hover:border-[var(--border-strong)] hover:text-[var(--text-1)] disabled:opacity-60 disabled:cursor-not-allowed transition-all"
+              title="Surface promotion candidates, recurring themes, and cross-child gaps"
+            >
+              {parentLintInFlight ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Queueing…
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  Run parent lint
+                </>
+              )}
             </button>
           </div>
         )}
@@ -719,18 +985,52 @@ export default function WikiPage() {
                   </button>
                 );
               })}
-              {detail.backlinks.map((bl) => (
-                <button
-                  key={`back-${bl.slug}`}
-                  onClick={() => loadDetail(bl.slug, "push")}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded text-left hover:bg-[var(--bg-hover)] transition-colors cursor-pointer text-[12px] text-[var(--text-2)]"
-                  title="Links to this page"
-                >
-                  <ArrowLeft className="w-3 h-3 text-[var(--text-4)] shrink-0" />
-                  <Link2 className="w-3 h-3 shrink-0 text-[var(--text-3)]" />
-                  <span className="truncate">{bl.title}</span>
-                </button>
-              ))}
+              {detail.backlinks.map((bl) => {
+                const isCross = bl.projectId !== activeProjectId;
+                const destProject = isCross
+                  ? projects.find((p) => p.id === bl.projectId)
+                  : null;
+                return (
+                  <button
+                    key={`back-${bl.projectId}-${bl.slug}`}
+                    onClick={() => {
+                      if (isCross && destProject) {
+                        if (destProject.id !== activeProject?.id) {
+                          setActiveProject(destProject);
+                        }
+                        loadDetailForProject(bl.slug, destProject.id, "push");
+                      } else {
+                        loadDetail(bl.slug, "push");
+                      }
+                    }}
+                    className="flex items-center gap-2 px-2 py-1.5 rounded text-left hover:bg-[var(--bg-hover)] transition-colors cursor-pointer text-[12px] text-[var(--text-2)]"
+                    title={
+                      isCross && destProject
+                        ? `Links to this page · in ${destProject.name}`
+                        : "Links to this page"
+                    }
+                  >
+                    <ArrowLeft className="w-3 h-3 text-[var(--text-4)] shrink-0" />
+                    <Link2
+                      className="w-3 h-3 shrink-0"
+                      style={{
+                        color:
+                          isCross && destProject
+                            ? destProject.color
+                            : "var(--text-3)",
+                      }}
+                    />
+                    <span className="truncate">{bl.title}</span>
+                    {isCross && (
+                      <ArrowUpRight
+                        className="w-3 h-3 shrink-0 ml-auto"
+                        style={{ color: destProject?.color ?? "var(--text-4)" }}
+                        aria-hidden="true"
+                      />
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -1013,6 +1313,7 @@ export default function WikiPage() {
                 {renderMarkdown(
                   detail.body,
                   handleWikilinkClick,
+                  resolveWikilink,
                   // Only synthesis pages get per-item Research buttons —
                   // other page types might legitimately have a "Gaps" heading
                   // that isn't meant to be actionable.
@@ -1033,16 +1334,42 @@ export default function WikiPage() {
                     Linked from {detail.backlinks.length} page{detail.backlinks.length !== 1 ? "s" : ""}
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {detail.backlinks.map((bl) => (
-                      <button
-                        key={bl.slug}
-                        onClick={() => loadDetail(bl.slug, "push")}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--surface-card)] border border-[var(--border)] rounded-lg text-[13px] text-[var(--primary)] hover:border-[var(--primary)] transition-colors cursor-pointer"
-                      >
-                        <Link2 className="w-3 h-3" />
-                        {bl.title}
-                      </button>
-                    ))}
+                    {detail.backlinks.map((bl) => {
+                      const isCross = bl.projectId !== activeProjectId;
+                      const destProject = isCross
+                        ? projects.find((p) => p.id === bl.projectId)
+                        : null;
+                      return (
+                        <button
+                          key={`${bl.projectId}-${bl.slug}`}
+                          onClick={() => {
+                            if (isCross && destProject) {
+                              if (destProject.id !== activeProject?.id) {
+                                setActiveProject(destProject);
+                              }
+                              loadDetailForProject(bl.slug, destProject.id, "push");
+                            } else {
+                              loadDetail(bl.slug, "push");
+                            }
+                          }}
+                          style={isCross && destProject ? { color: destProject.color } : undefined}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--surface-card)] border border-[var(--border)] rounded-lg text-[13px] hover:border-current transition-colors cursor-pointer ${
+                            isCross ? "" : "text-[var(--primary)] hover:border-[var(--primary)]"
+                          }`}
+                          title={
+                            isCross && destProject
+                              ? `In project: ${destProject.name}`
+                              : undefined
+                          }
+                        >
+                          <Link2 className="w-3 h-3" />
+                          <span>{bl.title}</span>
+                          {isCross && (
+                            <ArrowUpRight className="w-3 h-3" aria-hidden="true" />
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}

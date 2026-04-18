@@ -10,3 +10,6 @@ sqlite.pragma("journal_mode = WAL");
 sqlite.pragma("foreign_keys = ON");
 
 export const db = drizzle(sqlite, { schema });
+/** Raw better-sqlite3 instance — use for `.transaction(...)` (Drizzle's
+ * better-sqlite3 driver doesn't expose a wrapper). */
+export const sqliteDb = sqlite;

@@ -1,4 +1,5 @@
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import type { AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 
 export const projects = sqliteTable("projects", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -8,6 +9,7 @@ export const projects = sqliteTable("projects", {
   color: text("color").notNull().default("#0d9488"),
   sourceCount: integer("source_count").notNull().default(0),
   pageCount: integer("page_count").notNull().default(0),
+  parentId: integer("parent_id").references((): AnySQLiteColumn => projects.id),
   createdAt: text("created_at")
     .notNull()
     .$defaultFn(() => new Date().toISOString()),
@@ -86,7 +88,11 @@ export const lintFindings = sqliteTable("lint_findings", {
     .notNull()
     .references(() => projects.id),
   jobId: integer("job_id"),
-  category: text("category").notNull(), // orphan, missing_concept, contradiction, stale_claim, missing_cross_ref, suggested_question
+  // "project" — regular per-project lint finding (default, back-compat).
+  // "parent"  — parent-level lint finding (promotion candidates, recurring
+  //             themes, cross-child gaps). Scoped to a parent project.
+  scope: text("scope").notNull().default("project"),
+  category: text("category").notNull(), // orphan, missing_concept, contradiction, stale_claim, missing_cross_ref, suggested_question, promotion_candidate, recurring_theme, parent_gap
   severity: text("severity").notNull().default("info"), // info, warn
   title: text("title").notNull(),
   description: text("description").notNull(),
