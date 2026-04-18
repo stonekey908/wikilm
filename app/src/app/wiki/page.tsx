@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Search,
   FileText,
@@ -89,11 +89,38 @@ function extractHeadings(body: string): { id: string; level: number; text: strin
   return headings;
 }
 
-function renderMarkdown(body: string, onLinkClick: (slug: string) => void): React.ReactNode[] {
+/**
+ * Section headings that flag "things we don't know yet" — when a research
+ * callback is provided (i.e. we're rendering the synthesis page), each list
+ * item under one of these headings gets a per-item "Research" button.
+ */
+const GAP_HEADING_REGEX = /(knowledge\s+gaps?|gaps?\b|open\s+questions?|what\s+we\s+don'?t\s+know)/i;
+
+/** Strip wikilinks / markdown emphasis / links from a list item so the
+ *  research topic is plain readable text. Conservative — leaves punctuation
+ *  alone. */
+function stripInlineMarkup(text: string): string {
+  return text
+    .replace(/\[\[([^\]]+)\]\]/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/\*(.+?)\*/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .trim();
+}
+
+function renderMarkdown(
+  body: string,
+  onLinkClick: (slug: string) => void,
+  onResearchGap?: (topic: string) => void
+): React.ReactNode[] {
   const lines = body.split("\n");
   const elements: React.ReactNode[] = [];
-  let listItems: string[] = [];
+  // Each item carries the inGaps flag captured at add-time so list boundaries
+  // across section changes don't mis-tag items.
+  let listItems: { text: string; inGaps: boolean }[] = [];
   let listType: "ul" | "ol" | null = null;
+  let inGapsSection = false;
 
   // Pre-compute heading ids so in-page and TOC links stay in sync
   const headingIds = extractHeadings(body);
@@ -108,7 +135,19 @@ function renderMarkdown(body: string, onLinkClick: (slug: string) => void): Reac
         className={`${listType === "ol" ? "list-decimal" : "list-disc"} pl-6 space-y-1 text-[14px] leading-relaxed text-[var(--text-2)]`}
       >
         {listItems.map((item, i) => (
-          <li key={i}>{renderInline(item, onLinkClick)}</li>
+          <li key={i}>
+            {renderInline(item.text, onLinkClick)}
+            {item.inGaps && onResearchGap && (
+              <button
+                onClick={() => onResearchGap(stripInlineMarkup(item.text))}
+                className="ml-2 inline-flex items-center gap-1 text-[11px] font-[500] text-[var(--primary)] hover:underline align-middle"
+                title="Research new sources to close this gap"
+              >
+                <Search className="w-3 h-3" />
+                Research
+              </button>
+            )}
+          </li>
         ))}
       </Tag>
     );
@@ -125,6 +164,8 @@ function renderMarkdown(body: string, onLinkClick: (slug: string) => void): Reac
       flushList();
       const level = headingMatch[1].length;
       const text = headingMatch[2];
+      // Track whether subsequent list items belong to a "gaps" section
+      inGapsSection = Boolean(onResearchGap) && GAP_HEADING_REGEX.test(text);
       const sizes: Record<number, string> = {
         1: "text-[20px] font-[650] tracking-tight mt-6 mb-3 scroll-mt-6",
         2: "text-[17px] font-[620] tracking-tight mt-5 mb-2.5 scroll-mt-6",
@@ -155,7 +196,7 @@ function renderMarkdown(body: string, onLinkClick: (slug: string) => void): Reac
     if (ulMatch) {
       if (listType === "ol") flushList();
       listType = "ul";
-      listItems.push(ulMatch[1]);
+      listItems.push({ text: ulMatch[1], inGaps: inGapsSection });
       continue;
     }
 
@@ -164,7 +205,7 @@ function renderMarkdown(body: string, onLinkClick: (slug: string) => void): Reac
     if (olMatch) {
       if (listType === "ul") flushList();
       listType = "ol";
-      listItems.push(olMatch[1]);
+      listItems.push({ text: olMatch[1], inGaps: inGapsSection });
       continue;
     }
 
@@ -307,6 +348,7 @@ function TypeChip({ type }: { type: string }) {
 /* ─── Page Component ─── */
 
 export default function WikiPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [pages, setPages] = useState<WikiPageMeta[]>([]);
   const [loading, setLoading] = useState(true);
@@ -968,7 +1010,19 @@ export default function WikiPage() {
 
               {/* Rendered body */}
               <div className="wiki-content">
-                {renderMarkdown(detail.body, handleWikilinkClick)}
+                {renderMarkdown(
+                  detail.body,
+                  handleWikilinkClick,
+                  // Only synthesis pages get per-item Research buttons —
+                  // other page types might legitimately have a "Gaps" heading
+                  // that isn't meant to be actionable.
+                  detail.type === "synthesis"
+                    ? (topic: string) =>
+                        router.push(
+                          `/sources?tab=research&topic=${encodeURIComponent(topic)}`
+                        )
+                    : undefined
+                )}
               </div>
 
               {/* Backlinks */}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 /* ──────────────────────────── Types ──────────────────────────── */
 
@@ -97,6 +98,7 @@ function CrossProjectIcon() {
 /* ──────────────────────────── Page ──────────────────────────── */
 
 export default function SourcesPage() {
+  const searchParams = useSearchParams();
   const [tab, setTab] = useState<"library" | "research">("library");
   const [sources, setSources] = useState<Source[]>([]);
   const [dragOver, setDragOver] = useState(false);
@@ -140,8 +142,9 @@ export default function SourcesPage() {
   }, []);
 
   /* ── Research stream ── */
-  const startResearch = useCallback(async () => {
-    if (!researchQuery.trim() || isSearching) return;
+  const startResearch = useCallback(async (topicOverride?: string) => {
+    const topic = (topicOverride ?? researchQuery).trim();
+    if (!topic || isSearching) return;
 
     setResults([]);
     setIsSearching(true);
@@ -154,7 +157,7 @@ export default function SourcesPage() {
       const res = await fetch("/api/sources/research", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic: researchQuery, maxResults }),
+        body: JSON.stringify({ topic, maxResults }),
         signal: controller.signal,
       });
 
@@ -227,6 +230,24 @@ export default function SourcesPage() {
     abortRef.current?.abort();
     setIsSearching(false);
   }, []);
+
+  /* ── Auto-trigger research from URL params ──
+     Used by /lint and the /wiki synthesis detail pane to hand off a
+     knowledge-gap topic: /sources?tab=research&topic=<encoded>.
+     Runs once per page load; ref gate prevents re-trigger on re-renders. */
+  const autoResearchRan = useRef(false);
+  useEffect(() => {
+    if (autoResearchRan.current) return;
+    const urlTab = searchParams.get("tab");
+    const urlTopic = searchParams.get("topic");
+    if (urlTab === "research") setTab("research");
+    if (urlTopic && urlTopic.trim()) {
+      autoResearchRan.current = true;
+      setResearchQuery(urlTopic);
+      // Fire with explicit topic — don't rely on the state update flushing first.
+      startResearch(urlTopic);
+    }
+  }, [searchParams, startResearch]);
 
   /* ── Refresh sources helper ── */
   const refreshSources = useCallback(async () => {
@@ -597,7 +618,7 @@ export default function SourcesPage() {
               </select>
             </div>
             <button
-              onClick={startResearch}
+              onClick={() => startResearch()}
               disabled={isSearching || !researchQuery.trim()}
               className="bg-[var(--primary)] text-[var(--primary-fg)] text-[13px] font-semibold px-[18px] py-2.5 border-none rounded-lg cursor-pointer flex items-center gap-1.5 transition-all whitespace-nowrap hover:bg-[var(--primary-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
             >
