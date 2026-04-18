@@ -18,7 +18,12 @@ import {
   Plus,
   Trash2,
   MessageSquare,
+  Clipboard,
+  FileDown,
+  FileText as FileTextIcon,
 } from "lucide-react";
+import { useToast } from "@/components/toast-provider";
+import { filenameFromMarkdown, markdownToDocumentBlob } from "@/lib/export-docx";
 
 /* ── Markdown helpers ───────────────────────────────────────────── */
 
@@ -153,6 +158,7 @@ const PROJECT_ID = 1; // Default project
 /* ── Component ──────────────────────────────────────────────────── */
 
 export default function ChatPage() {
+  const { addToast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -434,6 +440,62 @@ export default function ChatPage() {
     [sendMessage]
   );
 
+  // ─── Export helpers ─────────────────────────────────────────────
+  const downloadBlob = useCallback((blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    // Delay revoke so the download actually starts
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }, []);
+
+  const copyMarkdown = useCallback(
+    async (content: string) => {
+      try {
+        await navigator.clipboard.writeText(content);
+        addToast({ type: "success", title: "Copied as Markdown" });
+      } catch {
+        addToast({
+          type: "error",
+          title: "Copy failed",
+          description: "Clipboard unavailable in this browser.",
+        });
+      }
+    },
+    [addToast]
+  );
+
+  const downloadMarkdown = useCallback(
+    (content: string) => {
+      const filename = filenameFromMarkdown(content, "md");
+      downloadBlob(new Blob([content], { type: "text/markdown" }), filename);
+      addToast({ type: "success", title: "Downloaded", description: filename });
+    },
+    [addToast, downloadBlob]
+  );
+
+  const downloadDocx = useCallback(
+    async (content: string) => {
+      try {
+        const blob = await markdownToDocumentBlob(content);
+        const filename = filenameFromMarkdown(content, "docx");
+        downloadBlob(blob, filename);
+        addToast({ type: "success", title: "Downloaded", description: filename });
+      } catch (err) {
+        addToast({
+          type: "error",
+          title: "DOCX export failed",
+          description: err instanceof Error ? err.message : "Unknown error",
+        });
+      }
+    },
+    [addToast, downloadBlob]
+  );
+
   const saveToWiki = useCallback(
     async (message: Message) => {
       // Find the user question that preceded this answer
@@ -649,15 +711,39 @@ ${message.content}`;
                     </div>
                   )}
 
-                  {/* Save to wiki button for assistant messages */}
+                  {/* Assistant message footer: save + export */}
                   {msg.role === "assistant" && msg.content && !isStreaming && (
-                    <div className="mt-2 pt-2 border-t border-[var(--border)] flex items-center">
+                    <div className="mt-2 pt-2 border-t border-[var(--border)] flex items-center flex-wrap gap-x-4 gap-y-1">
                       <button
                         onClick={() => saveToWiki(msg)}
                         className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-4)] hover:text-[var(--primary)] transition-colors duration-150"
                       >
                         <BookmarkPlus className="w-3 h-3" />
                         Save to wiki
+                      </button>
+                      <button
+                        onClick={() => copyMarkdown(msg.content)}
+                        className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-4)] hover:text-[var(--primary)] transition-colors duration-150"
+                        title="Copy response as Markdown"
+                      >
+                        <Clipboard className="w-3 h-3" />
+                        Copy
+                      </button>
+                      <button
+                        onClick={() => downloadMarkdown(msg.content)}
+                        className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-4)] hover:text-[var(--primary)] transition-colors duration-150"
+                        title="Download as Markdown file"
+                      >
+                        <FileTextIcon className="w-3 h-3" />
+                        .md
+                      </button>
+                      <button
+                        onClick={() => downloadDocx(msg.content)}
+                        className="flex items-center gap-1.5 text-[11px] font-medium text-[var(--text-4)] hover:text-[var(--primary)] transition-colors duration-150"
+                        title="Download as Word (.docx)"
+                      >
+                        <FileDown className="w-3 h-3" />
+                        .docx
                       </button>
                     </div>
                   )}
