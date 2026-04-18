@@ -20,6 +20,8 @@ import {
   Unlink,
 } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
+import { useProject } from "@/components/project-switcher";
+import { Breadcrumbs } from "@/components/breadcrumbs";
 import { formatJobError } from "@/lib/error-codes";
 
 interface Finding {
@@ -139,6 +141,7 @@ function wikiPageToHref(targetPage: string | null): string | null {
 
 export default function LintPage() {
   const router = useRouter();
+  const { activeProject } = useProject();
   const [data, setData] = useState<FindingsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
@@ -387,6 +390,7 @@ export default function LintPage() {
 
   return (
     <div className="p-8 max-w-[960px]">
+      <Breadcrumbs project={activeProject} />
       {/* Header */}
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import fs from "fs";
 import path from "path";
+import { getProject, wikiDir } from "@/lib/projects";
 
 interface WikiPageMeta {
   title: string;
@@ -78,18 +79,25 @@ function titleFromMeta(meta: Record<string, unknown>, body: string, slug: string
 }
 
 export async function GET(request: NextRequest) {
-  const wikiDir = path.join(process.cwd(), "..", "wiki");
   const searchParams = request.nextUrl.searchParams;
+  const projectIdParam = searchParams.get("projectId");
+  const projectId = projectIdParam ? Number(projectIdParam) : NaN;
+  const project =
+    (Number.isFinite(projectId) ? getProject(projectId) : null) ?? getProject(1);
+  if (!project) {
+    return Response.json({ pages: [] });
+  }
+  const wikiPath = wikiDir(project);
   const search = searchParams.get("search")?.toLowerCase() || "";
   const typeFilter = searchParams.get("type") || "";
 
-  const files = getAllMdFiles(wikiDir);
+  const files = getAllMdFiles(wikiPath);
   const pages: WikiPageMeta[] = [];
 
   for (const filePath of files) {
     const content = fs.readFileSync(filePath, "utf-8");
     const { meta, body } = parseFrontmatter(content);
-    const slug = slugFromPath(filePath, wikiDir);
+    const slug = slugFromPath(filePath, wikiPath);
     const pageType = (meta.type as string) || "unknown";
     const tags = Array.isArray(meta.tags) ? (meta.tags as string[]) : [];
     const title = titleFromMeta(meta, body, slug);
@@ -109,7 +117,7 @@ export async function GET(request: NextRequest) {
       type: pageType,
       tags,
       slug,
-      filePath: path.relative(wikiDir, filePath),
+      filePath: path.relative(wikiPath, filePath),
       updatedAt: stat.mtime.toISOString(),
     });
   }

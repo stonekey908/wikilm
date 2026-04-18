@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useProject } from "@/components/project-switcher";
+import { Breadcrumbs } from "@/components/breadcrumbs";
 import {
   Search,
   FileText,
@@ -350,6 +352,8 @@ function TypeChip({ type }: { type: string }) {
 export default function WikiPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { activeProject } = useProject();
+  const activeProjectId = activeProject?.id ?? 1;
   const [pages, setPages] = useState<WikiPageMeta[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -427,6 +431,7 @@ export default function WikiPage() {
       const params = new URLSearchParams();
       if (search) params.set("search", search);
       if (typeFilter) params.set("type", typeFilter);
+      params.set("projectId", String(activeProjectId));
       const res = await fetch(`/api/wiki?${params.toString()}`);
       const data = await res.json();
       setPages(data.pages);
@@ -435,7 +440,7 @@ export default function WikiPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, typeFilter]);
+  }, [search, typeFilter, activeProjectId]);
 
   useEffect(() => {
     const timer = setTimeout(fetchPages, search ? 300 : 0);
@@ -458,7 +463,11 @@ export default function WikiPage() {
     setSelectedSlug(slug);
     setDetailLoading(true);
     try {
-      const res = await fetch(`/api/wiki/${encodeURIComponent(slug)}`);
+      const params = new URLSearchParams();
+      params.set("projectId", String(activeProjectId));
+      const res = await fetch(
+        `/api/wiki/${encodeURIComponent(slug)}?${params.toString()}`
+      );
       if (res.ok) {
         const data: WikiPageDetail = await res.json();
         setDetail(data);
@@ -482,7 +491,7 @@ export default function WikiPage() {
     } finally {
       setDetailLoading(false);
     }
-  }, []);
+  }, [activeProjectId]);
 
   // Handle wikilink navigation (from within page content)
   function handleWikilinkClick(target: string) {
@@ -575,6 +584,7 @@ export default function WikiPage() {
       >
         {/* Header */}
         <div className="px-5 pt-5 pb-4">
+          <Breadcrumbs project={activeProject} />
           <h1 className="text-[22px] font-[650] tracking-tight text-[var(--text-1)]">
             Wiki
           </h1>
