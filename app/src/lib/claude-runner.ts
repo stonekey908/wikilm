@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { createMockStream, getMockResponse } from "@/lib/__mocks__/claude-mock";
 import { runOllamaJob, cancelOllamaJob, hasOllamaJob } from "@/lib/ollama-runner";
 import { runGeminiJob, cancelGeminiJob, hasGeminiJob, isGeminiAvailable } from "@/lib/gemini-runner";
+import { getProject, projectRoot } from "@/lib/projects";
 
 export const isMockMode = process.env.MOCK_MODE === "true";
 
@@ -680,6 +681,17 @@ Constraints:
 
 After updating, also update wiki/index.md if this synthesis wasn't already listed, and append an entry to wiki/log.md.`;
 
+/**
+ * Read a boolean setting — defaults to false when the row is absent or
+ * the stored value isn't a recognised truthy string ("true" / "1").
+ */
+function getBooleanSetting(key: string): boolean {
+  const row = db.select().from(settings).where(eq(settings.key, key)).get();
+  if (!row) return false;
+  const v = row.value.toLowerCase();
+  return v === "true" || v === "1";
+}
+
 function scheduleSynthesisJob(projectCwd: string, projectId: number): Promise<number> {
   synthesisInFlight = true;
   synthesisPending = false;
@@ -689,13 +701,34 @@ function scheduleSynthesisJob(projectCwd: string, projectId: number): Promise<nu
     projectId,
     type: "synthesis",
     title: "Update project synthesis",
-    onComplete: () => {
+    onComplete: (status) => {
       synthesisInFlight = false;
       // If any ingest finished during this run, fire exactly one more pass
       if (synthesisPending && lastProjectCwd && lastProjectId !== null) {
         scheduleSynthesisJob(lastProjectCwd, lastProjectId).catch((err) => {
           console.error("[synthesis] follow-up run failed:", err);
         });
+      }
+      // Auto-sync parent synthesis — only when the child synthesis actually
+      // succeeded, the setting is enabled, and this project has a parent.
+      // The parent trigger coalesces independently, so multiple children
+      // finishing in a burst won't cause N parent runs.
+      if (status === "completed" && getBooleanSetting("auto_sync_parent_synthesis")) {
+        try {
+          const self = getProject(projectId);
+          if (self?.parentId != null) {
+            const parent = getProject(self.parentId);
+            if (parent) {
+              triggerParentSynthesisUpdate(projectRoot(parent), parent.id).catch(
+                (err) => {
+                  console.error("[synthesis] parent auto-sync failed:", err);
+                }
+              );
+            }
+          }
+        } catch (err) {
+          console.error("[synthesis] parent auto-sync lookup failed:", err);
+        }
       }
     },
   });
