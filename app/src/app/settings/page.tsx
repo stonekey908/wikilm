@@ -197,82 +197,140 @@ export default function SettingsPage() {
                       <div className="text-[12px] text-[var(--text-3)] mt-0.5">{op.desc}</div>
                     </div>
                     <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">
-                      {models.map((m) => {
-                        const isSelected = !isOllamaSelected && !isGeminiSelected && selected === m.value;
-                        const Icon = m.icon;
+                      {/* Three uniform-size dropdowns: Claude / Ollama / Gemini.
+                          The selected provider shows its chosen model label
+                          with primary styling; the others show the provider
+                          placeholder. Switching via any dropdown swaps the
+                          whole operation to that provider. */}
+
+                      {/* Claude — always visible, three fixed presets */}
+                      {(() => {
+                        const isClaudeSelected = !isOllamaSelected && !isGeminiSelected;
+                        const claudeLabel =
+                          models.find((m) => m.value === selected)?.label ?? "Claude";
                         return (
-                          <button
-                            key={m.value}
-                            onClick={() => setModel(op.key, m.value)}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md border text-[12px] font-[500] transition-all duration-150 cursor-pointer ${
-                              isSelected
-                                ? "border-[var(--primary)] bg-[var(--primary-dim)] text-[var(--primary)]"
-                                : "border-[var(--border)] bg-[var(--bg-2)] text-[var(--text-3)] hover:border-[var(--border-strong)] hover:text-[var(--text-2)]"
-                            }`}
-                            title={m.desc}
-                          >
-                            <Icon className="w-3 h-3" />
-                            {m.label}
-                            {isSelected && saving === op.key && (
-                              <Check className="w-3 h-3 text-[var(--green)]" />
+                          <div className="relative w-[130px]">
+                            <select
+                              value={isClaudeSelected ? selected : ""}
+                              onChange={(e) => {
+                                if (e.target.value) setModel(op.key, e.target.value);
+                              }}
+                              className={`w-full flex items-center gap-1.5 pl-7 pr-7 py-1.5 rounded-md border text-[12px] font-[500] transition-all duration-150 cursor-pointer appearance-none ${
+                                isClaudeSelected
+                                  ? "border-[var(--primary)] bg-[var(--primary-dim)] text-[var(--primary)]"
+                                  : "border-[var(--border)] bg-[var(--bg-2)] text-[var(--text-3)] hover:border-[var(--border-strong)] hover:text-[var(--text-2)]"
+                              }`}
+                              title="Claude model"
+                            >
+                              {isClaudeSelected ? (
+                                <option value={selected}>{claudeLabel}</option>
+                              ) : (
+                                <option value="">Claude</option>
+                              )}
+                              {models
+                                .filter((m) => !isClaudeSelected || m.value !== selected)
+                                .map((m) => (
+                                  <option key={m.value} value={m.value}>
+                                    {m.label}
+                                  </option>
+                                ))}
+                            </select>
+                            <Cpu
+                              className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none"
+                              style={{
+                                color: isClaudeSelected ? "var(--primary)" : "var(--text-3)",
+                              }}
+                            />
+                            {isClaudeSelected && saving === op.key && (
+                              <Check className="absolute right-6 top-1/2 -translate-y-1/2 w-3 h-3 text-[var(--green)] pointer-events-none" />
                             )}
-                          </button>
+                          </div>
                         );
-                      })}
+                      })()}
 
-                      {/* Ollama dropdown — only if Ollama is running */}
-                      {ollamaAvailable && ollamaModels.length > 0 && (
-                        <div className="relative">
-                          <select
-                            value={isOllamaSelected ? selected : ""}
-                            onChange={(e) => {
-                              if (e.target.value) setModel(op.key, e.target.value);
-                            }}
-                            className={`flex items-center gap-1.5 pl-7 pr-7 py-1.5 rounded-md border text-[12px] font-[500] transition-all duration-150 cursor-pointer appearance-none ${
-                              isOllamaSelected
-                                ? "border-[var(--primary)] bg-[var(--primary-dim)] text-[var(--primary)]"
-                                : "border-[var(--border)] bg-[var(--bg-2)] text-[var(--text-3)] hover:border-[var(--border-strong)] hover:text-[var(--text-2)]"
-                            }`}
-                            title="Local Ollama model"
-                          >
-                            <option value="">Ollama...</option>
-                            {ollamaModels.map((m) => (
-                              <option key={m.id} value={m.id}>
-                                {m.name}
-                              </option>
-                            ))}
-                          </select>
-                          <Server className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none" style={{ color: isOllamaSelected ? "var(--primary)" : "var(--text-3)" }} />
-                        </div>
-                      )}
+                      {/* Ollama — only if installed */}
+                      {ollamaAvailable && ollamaModels.length > 0 && (() => {
+                        const ollamaLabel = isOllamaSelected
+                          ? ollamaModels.find((m) => m.id === selected)?.name ?? selected.slice(7)
+                          : "Ollama";
+                        return (
+                          <div className="relative w-[130px]">
+                            <select
+                              value={isOllamaSelected ? selected : ""}
+                              onChange={(e) => {
+                                if (e.target.value) setModel(op.key, e.target.value);
+                              }}
+                              className={`w-full flex items-center gap-1.5 pl-7 pr-7 py-1.5 rounded-md border text-[12px] font-[500] transition-all duration-150 cursor-pointer appearance-none ${
+                                isOllamaSelected
+                                  ? "border-[var(--primary)] bg-[var(--primary-dim)] text-[var(--primary)]"
+                                  : "border-[var(--border)] bg-[var(--bg-2)] text-[var(--text-3)] hover:border-[var(--border-strong)] hover:text-[var(--text-2)]"
+                              }`}
+                              title="Local Ollama model"
+                            >
+                              {isOllamaSelected ? (
+                                <option value={selected}>{ollamaLabel}</option>
+                              ) : (
+                                <option value="">Ollama</option>
+                              )}
+                              {ollamaModels
+                                .filter((m) => !isOllamaSelected || m.id !== selected)
+                                .map((m) => (
+                                  <option key={m.id} value={m.id}>
+                                    {m.name}
+                                  </option>
+                                ))}
+                            </select>
+                            <Server
+                              className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none"
+                              style={{
+                                color: isOllamaSelected ? "var(--primary)" : "var(--text-3)",
+                              }}
+                            />
+                          </div>
+                        );
+                      })()}
 
-                      {/* Gemini dropdown — only if gemini CLI is installed.
-                          Great for research/web-grounding thanks to native
-                          Google Search integration. */}
-                      {geminiAvailable && geminiModels.length > 0 && (
-                        <div className="relative">
-                          <select
-                            value={isGeminiSelected ? selected : ""}
-                            onChange={(e) => {
-                              if (e.target.value) setModel(op.key, e.target.value);
-                            }}
-                            className={`flex items-center gap-1.5 pl-7 pr-7 py-1.5 rounded-md border text-[12px] font-[500] transition-all duration-150 cursor-pointer appearance-none ${
-                              isGeminiSelected
-                                ? "border-[var(--primary)] bg-[var(--primary-dim)] text-[var(--primary)]"
-                                : "border-[var(--border)] bg-[var(--bg-2)] text-[var(--text-3)] hover:border-[var(--border-strong)] hover:text-[var(--text-2)]"
-                            }`}
-                            title="Gemini CLI model"
-                          >
-                            <option value="">Gemini...</option>
-                            {geminiModels.map((m) => (
-                              <option key={m.id} value={m.id}>
-                                {m.label}
-                              </option>
-                            ))}
-                          </select>
-                          <Brain className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none" style={{ color: isGeminiSelected ? "var(--primary)" : "var(--text-3)" }} />
-                        </div>
-                      )}
+                      {/* Gemini — only if CLI is installed */}
+                      {geminiAvailable && geminiModels.length > 0 && (() => {
+                        const geminiLabel = isGeminiSelected
+                          ? geminiModels.find((m) => m.id === selected)?.label ?? selected.slice(7)
+                          : "Gemini";
+                        return (
+                          <div className="relative w-[130px]">
+                            <select
+                              value={isGeminiSelected ? selected : ""}
+                              onChange={(e) => {
+                                if (e.target.value) setModel(op.key, e.target.value);
+                              }}
+                              className={`w-full flex items-center gap-1.5 pl-7 pr-7 py-1.5 rounded-md border text-[12px] font-[500] transition-all duration-150 cursor-pointer appearance-none ${
+                                isGeminiSelected
+                                  ? "border-[var(--primary)] bg-[var(--primary-dim)] text-[var(--primary)]"
+                                  : "border-[var(--border)] bg-[var(--bg-2)] text-[var(--text-3)] hover:border-[var(--border-strong)] hover:text-[var(--text-2)]"
+                              }`}
+                              title="Gemini CLI model"
+                            >
+                              {isGeminiSelected ? (
+                                <option value={selected}>{geminiLabel}</option>
+                              ) : (
+                                <option value="">Gemini</option>
+                              )}
+                              {geminiModels
+                                .filter((m) => !isGeminiSelected || m.id !== selected)
+                                .map((m) => (
+                                  <option key={m.id} value={m.id}>
+                                    {m.label}
+                                  </option>
+                                ))}
+                            </select>
+                            <Brain
+                              className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none"
+                              style={{
+                                color: isGeminiSelected ? "var(--primary)" : "var(--text-3)",
+                              }}
+                            />
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>
