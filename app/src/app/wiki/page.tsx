@@ -54,6 +54,15 @@ const TYPE_CONFIG: Record<string, { icon: typeof FileText; label: string; color:
 
 const ALL_TYPES = ["source", "entity", "concept", "comparison", "synthesis", "query"];
 
+const SECTION_LABEL: Record<string, string> = {
+  source: "Sources",
+  entity: "Entities",
+  concept: "Concepts",
+  comparison: "Comparisons",
+  synthesis: "Synthesis",
+  query: "Queries",
+};
+
 /* ─── Markdown Renderer ─── */
 
 // Extract headings (h1-h3) from markdown body with deterministic slug ids.
@@ -310,7 +319,17 @@ export default function WikiPage() {
   const [trail, setTrail] = useState<{ slug: string; title: string }[]>([]);
   const [activeHeading, setActiveHeading] = useState<string | null>(null);
   const [tocExpanded, setTocExpanded] = useState(true);
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  function toggleSection(type: string) {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
+    });
+  }
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -604,63 +623,116 @@ export default function WikiPage() {
 
         {/* Page list */}
         <div className="flex-1 overflow-y-auto px-3 pb-3">
-          {pages.map((page) => {
-            const cfg = getTypeConfig(page.type);
-            const Icon = cfg.icon;
-            const isActive = selectedSlug === page.slug;
-
-            return (
-              <button
-                key={page.slug}
-                onClick={() => loadDetail(page.slug)}
-                className={`w-full text-left px-3 py-2.5 rounded-lg mb-0.5 transition-all cursor-pointer ${
-                  isActive
-                    ? "bg-[var(--primary-dim)] border border-[var(--primary)]/20"
-                    : "hover:bg-[var(--bg-hover)] border border-transparent"
-                }`}
-              >
-                <div className="flex items-start gap-2.5">
-                  <div
-                    className="w-7 h-7 rounded-md flex items-center justify-center shrink-0 mt-0.5"
-                    style={{ background: cfg.dimColor }}
-                  >
-                    <Icon className="w-3.5 h-3.5" style={{ color: cfg.color }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[13px] font-[550] text-[var(--text-1)] truncate">
-                      {page.title}
-                    </div>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <span
-                        className="text-[11px] font-medium px-1.5 py-px rounded"
-                        style={{ color: cfg.color, background: cfg.dimColor }}
-                      >
-                        {cfg.label}
-                      </span>
-                      {page.tags.slice(0, 3).map((tag) => (
-                        <span
-                          key={tag}
-                          className="text-[11px] text-[var(--text-4)]"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
+          {(() => {
+            if (!loading && pages.length === 0) {
+              return (
+                <div className="text-center py-12">
+                  <FileText className="w-10 h-10 mx-auto text-[var(--text-4)] opacity-40 mb-3" />
+                  <p className="text-[14px] text-[var(--text-3)]">No pages found</p>
+                  <p className="text-[12px] text-[var(--text-4)] mt-1">
+                    {search ? "Try a different search term" : "Add sources to your wiki to get started"}
+                  </p>
                 </div>
-              </button>
-            );
-          })}
+              );
+            }
 
-          {!loading && pages.length === 0 && (
-            <div className="text-center py-12">
-              <FileText className="w-10 h-10 mx-auto text-[var(--text-4)] opacity-40 mb-3" />
-              <p className="text-[14px] text-[var(--text-3)]">No pages found</p>
-              <p className="text-[12px] text-[var(--text-4)] mt-1">
-                {search ? "Try a different search term" : "Add sources to your wiki to get started"}
-              </p>
-            </div>
-          )}
+            const renderRow = (page: WikiPageMeta) => {
+              const cfg = getTypeConfig(page.type);
+              const Icon = cfg.icon;
+              const isActive = selectedSlug === page.slug;
+              return (
+                <button
+                  key={page.slug}
+                  onClick={() => loadDetail(page.slug)}
+                  className={`w-full text-left px-3 py-2.5 rounded-lg mb-0.5 transition-all cursor-pointer ${
+                    isActive
+                      ? "bg-[var(--primary-dim)] border border-[var(--primary)]/20"
+                      : "hover:bg-[var(--bg-hover)] border border-transparent"
+                  }`}
+                >
+                  <div className="flex items-start gap-2.5">
+                    <div
+                      className="w-7 h-7 rounded-md flex items-center justify-center shrink-0 mt-0.5"
+                      style={{ background: cfg.dimColor }}
+                    >
+                      <Icon className="w-3.5 h-3.5" style={{ color: cfg.color }} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-[550] text-[var(--text-1)] truncate">
+                        {page.title}
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span
+                          className="text-[11px] font-medium px-1.5 py-px rounded"
+                          style={{ color: cfg.color, background: cfg.dimColor }}
+                        >
+                          {cfg.label}
+                        </span>
+                        {page.tags.slice(0, 3).map((tag) => (
+                          <span
+                            key={tag}
+                            className="text-[11px] text-[var(--text-4)]"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              );
+            };
+
+            // When search or type filter is active → flat list (narrowed scope).
+            const isGrouped = !search && !typeFilter;
+            if (!isGrouped) {
+              return pages.map(renderRow);
+            }
+
+            // Grouped mode: bucket by type and render each section.
+            const buckets = new Map<string, WikiPageMeta[]>();
+            for (const page of pages) {
+              const list = buckets.get(page.type) ?? [];
+              list.push(page);
+              buckets.set(page.type, list);
+            }
+
+            return ALL_TYPES.filter((t) => buckets.has(t)).map((t) => {
+              const items = buckets.get(t)!;
+              const cfg = getTypeConfig(t);
+              const Icon = cfg.icon;
+              const isCollapsed = collapsedSections.has(t);
+              return (
+                <div key={t} className="mb-2">
+                  <button
+                    onClick={() => toggleSection(t)}
+                    className="w-full flex items-center gap-2 px-2 py-1.5 text-left rounded-md hover:bg-[var(--bg-hover)] transition-colors"
+                  >
+                    {isCollapsed ? (
+                      <ChevronRight className="w-3 h-3 text-[var(--text-4)]" />
+                    ) : (
+                      <ChevronDown className="w-3 h-3 text-[var(--text-4)]" />
+                    )}
+                    <div
+                      className="w-5 h-5 rounded flex items-center justify-center shrink-0"
+                      style={{ background: cfg.dimColor }}
+                    >
+                      <Icon className="w-3 h-3" style={{ color: cfg.color }} />
+                    </div>
+                    <span className="text-[11px] font-semibold text-[var(--text-3)] uppercase tracking-wider">
+                      {SECTION_LABEL[t] ?? cfg.label}
+                    </span>
+                    <span className="ml-auto text-[11px] font-mono text-[var(--text-4)]">
+                      {items.length}
+                    </span>
+                  </button>
+                  {!isCollapsed && (
+                    <div className="mt-0.5">{items.map(renderRow)}</div>
+                  )}
+                </div>
+              );
+            });
+          })()}
         </div>
       </div>
 
