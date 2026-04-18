@@ -4,6 +4,7 @@ import { jobs, settings } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { createMockStream, getMockResponse } from "@/lib/__mocks__/claude-mock";
 import { runOllamaJob, cancelOllamaJob, hasOllamaJob } from "@/lib/ollama-runner";
+import { runGeminiJob, cancelGeminiJob, hasGeminiJob, isGeminiAvailable } from "@/lib/gemini-runner";
 
 export const isMockMode = process.env.MOCK_MODE === "true";
 
@@ -18,13 +19,14 @@ const jobQueue: Array<{ jobId: number; options: JobOptions }> = [];
  * can't enumerate the Map from here, we track a running total separately.
  */
 let inFlightOllamaCount = 0;
+let inFlightGeminiCount = 0;
 
 /**
  * Try to start the next queued job if there's capacity.
  */
 function drainQueue() {
   while (
-    runningProcesses.size + inFlightOllamaCount < MAX_CONCURRENT_JOBS &&
+    runningProcesses.size + inFlightOllamaCount + inFlightGeminiCount < MAX_CONCURRENT_JOBS &&
     jobQueue.length > 0
   ) {
     const next = jobQueue.shift()!;
@@ -50,6 +52,24 @@ function startJobProcess(jobId: number, options: JobOptions): void {
       },
       () => {
         inFlightOllamaCount = Math.max(0, inFlightOllamaCount - 1);
+        drainQueue();
+      }
+    );
+    return;
+  }
+  if (model.startsWith("gemini:")) {
+    const modelName = model.slice("gemini:".length);
+    inFlightGeminiCount++;
+    runGeminiJob(
+      jobId,
+      {
+        prompt: options.prompt,
+        model: modelName,
+        projectCwd: options.projectCwd,
+        onComplete: options.onComplete,
+      },
+      () => {
+        inFlightGeminiCount = Math.max(0, inFlightGeminiCount - 1);
         drainQueue();
       }
     );
@@ -106,7 +126,7 @@ interface JobOptions {
  * Get the count of currently running jobs
  */
 export function getRunningJobCount(): number {
-  return runningProcesses.size + inFlightOllamaCount;
+  return runningProcesses.size + inFlightOllamaCount + inFlightGeminiCount;
 }
 
 /**
@@ -300,7 +320,19 @@ async function preflightProvider(model: string): Promise<
       };
     }
   }
-  // Claude (and future Gemini — STO-1746 will slot checks here)
+  if (model.startsWith("gemini:")) {
+    const available = await isGeminiAvailable();
+    if (!available) {
+      return {
+        ok: false,
+        code: "provider_unavailable",
+        error:
+          "Gemini CLI is not installed. Install with `npm i -g @google/gemini-cli` and authenticate with `gemini` once.",
+      };
+    }
+    return { ok: true };
+  }
+  // Claude — trusted (it's the install prerequisite), no check
   return { ok: true };
 }
 
@@ -379,7 +411,8 @@ export async function startJob(options: JobOptions): Promise<number> {
   }
 
   // Create job record
-  const isQueued = runningProcesses.size + inFlightOllamaCount >= MAX_CONCURRENT_JOBS;
+  const isQueued =
+    runningProcesses.size + inFlightOllamaCount + inFlightGeminiCount >= MAX_CONCURRENT_JOBS;
   const result = db
     .insert(jobs)
     .values({
@@ -481,9 +514,13 @@ export function cleanupOrphanedJobs(): void {
  * Also handles Ollama jobs via AbortController.
  */
 export function cancelJob(jobId: number): boolean {
-  // Ollama path first — no PID, just abort the fetch
+  // Ollama path — no PID, abort the fetch
   if (hasOllamaJob(jobId)) {
     return cancelOllamaJob(jobId);
+  }
+  // Gemini path — subprocess, SIGTERM → SIGKILL escalation inside
+  if (hasGeminiJob(jobId)) {
+    return cancelGeminiJob(jobId);
   }
 
   // Queued job (neither spawned nor streaming yet) — drop from queue + mark cancelled
