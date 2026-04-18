@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import { formatJobError } from "@/lib/error-codes";
 import {
   Download,
   MessageSquare,
@@ -26,6 +27,7 @@ interface Job {
   pid: number | null;
   output: string | null;
   error: string | null;
+  errorCode: string | null;
   progress: string | null;
   startedAt: string | null;
   completedAt: string | null;
@@ -304,14 +306,21 @@ export default function JobsPage() {
                 {/* Expanded detail */}
                 {isExpanded && (
                   <div className="px-4 pb-4 pt-1 ml-10">
-                    {/* Error section */}
-                    {job.status === "failed" && job.error && (
-                      <div className="mb-3 rounded-md p-3 text-[12px] font-mono leading-relaxed whitespace-pre-wrap break-all"
-                        style={{ backgroundColor: "var(--red-dim)", color: "var(--red)" }}
-                      >
-                        {job.error}
-                      </div>
-                    )}
+                    {/* Error section — classified title on top, raw text below */}
+                    {job.status === "failed" && (job.error || job.errorCode) && (() => {
+                      const msg = formatJobError(job.errorCode, job.error);
+                      return (
+                        <div
+                          className="mb-3 rounded-md p-3"
+                          style={{ backgroundColor: "var(--red-dim)", color: "var(--red)" }}
+                        >
+                          <div className="text-[12px] font-[600] mb-1">{msg.title}</div>
+                          <div className="text-[12px] font-mono leading-relaxed whitespace-pre-wrap break-all">
+                            {msg.description}
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Output log */}
                     {job.output ? (

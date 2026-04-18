@@ -270,6 +270,41 @@ function spawnJob(jobId: number, options: JobOptions): void {
 }
 
 /**
+ * Verify the chosen model's provider is reachable before spawning a job.
+ * Returns { ok: true } for Claude (trusted — it's an install prerequisite)
+ * and for any provider we don't yet know how to check. For Ollama, does a
+ * 1-second HEAD to /api/tags. Returns a classified error on failure.
+ */
+async function preflightProvider(model: string): Promise<
+  | { ok: true }
+  | { ok: false; code: string; error: string }
+> {
+  if (model.startsWith("ollama:")) {
+    try {
+      const res = await fetch("http://localhost:11434/api/tags", {
+        signal: AbortSignal.timeout(1000),
+      });
+      if (!res.ok) {
+        return {
+          ok: false,
+          code: "provider_unavailable",
+          error: `Ollama responded with HTTP ${res.status}. Is it running and healthy?`,
+        };
+      }
+      return { ok: true };
+    } catch {
+      return {
+        ok: false,
+        code: "provider_unavailable",
+        error: "Ollama is not running. Start it with `ollama serve`.",
+      };
+    }
+  }
+  // Claude (and future Gemini — STO-1746 will slot checks here)
+  return { ok: true };
+}
+
+/**
  * Background job mode — spawns process or queues if at capacity.
  * Used for ingest, lint, research operations.
  */
@@ -314,6 +349,32 @@ export async function startJob(options: JobOptions): Promise<number> {
       options.onComplete?.("completed");
     })();
 
+    return jobId;
+  }
+
+  // Pre-flight the selected provider. If the model can't be reached, insert
+  // the job as already-failed with a classified errorCode so the UI can
+  // show a helpful message instead of a silent failure.
+  const model = getModel(options.type);
+  const preflight = await preflightProvider(model);
+  if (!preflight.ok) {
+    const now = new Date().toISOString();
+    const result = db
+      .insert(jobs)
+      .values({
+        projectId: options.projectId,
+        type: options.type,
+        title: options.title,
+        status: "failed",
+        error: preflight.error,
+        errorCode: preflight.code,
+        startedAt: now,
+        completedAt: now,
+      })
+      .returning({ id: jobs.id })
+      .all();
+    const jobId = result[0].id;
+    options.onComplete?.("failed");
     return jobId;
   }
 
