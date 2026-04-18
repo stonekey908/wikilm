@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo, createContext, useContext } from "react";
-import { ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, MoreHorizontal, Plus, Trash2 } from "lucide-react";
 
 interface Project {
   id: number;
@@ -118,6 +118,40 @@ function ancestorsOf(tree: TreeNode[], id: number): number[] {
   return path;
 }
 
+/** Depth-first flatten of the tree into an ordered list with depth info. */
+function flattenTree(tree: TreeNode[]): { node: TreeNode; depth: number }[] {
+  const out: { node: TreeNode; depth: number }[] = [];
+  function walk(nodes: TreeNode[], depth: number) {
+    for (const n of nodes) {
+      out.push({ node: n, depth });
+      if (n.children.length) walk(n.children, depth + 1);
+    }
+  }
+  walk(tree, 0);
+  return out;
+}
+
+/** Collect ids of the node and every descendant under it. */
+function subtreeIds(tree: TreeNode[], id: number): Set<number> {
+  const result = new Set<number>();
+  function findAndCollect(nodes: TreeNode[]): TreeNode | null {
+    for (const n of nodes) {
+      if (n.id === id) return n;
+      const hit = findAndCollect(n.children);
+      if (hit) return hit;
+    }
+    return null;
+  }
+  const root = findAndCollect(tree);
+  if (!root) return result;
+  function collect(n: TreeNode) {
+    result.add(n.id);
+    n.children.forEach(collect);
+  }
+  collect(root);
+  return result;
+}
+
 export function ProjectSwitcher() {
   const { activeProject, projects, setActiveProject, refreshProjects } = useProject();
   const [open, setOpen] = useState(false);
@@ -125,6 +159,11 @@ export function ProjectSwitcher() {
   const [newName, setNewName] = useState("");
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [collapsed, setCollapsed] = useState<Set<number>>(() => readCollapsed());
+  const [moveTarget, setMoveTarget] = useState<TreeNode | null>(null);
+  const [moveNewParentId, setMoveNewParentId] = useState<number | null>(null);
+  const [moveError, setMoveError] = useState<string | null>(null);
+  const [moveBusy, setMoveBusy] = useState(false);
+  const [menuOpenFor, setMenuOpenFor] = useState<number | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   // Fetch the tree. Refetches whenever the flat projects list changes so
@@ -175,11 +214,51 @@ export function ProjectSwitcher() {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         setOpen(false);
         setCreating(false);
+        setMenuOpenFor(null);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  function openMoveDialog(node: TreeNode) {
+    setMenuOpenFor(null);
+    setMoveTarget(node);
+    setMoveNewParentId(node.parentId ?? null);
+    setMoveError(null);
+  }
+
+  function closeMoveDialog() {
+    setMoveTarget(null);
+    setMoveNewParentId(null);
+    setMoveError(null);
+    setMoveBusy(false);
+  }
+
+  async function handleMoveSubmit() {
+    if (!moveTarget) return;
+    setMoveBusy(true);
+    setMoveError(null);
+    try {
+      const res = await fetch(`/api/projects/${moveTarget.id}/move`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newParentId: moveNewParentId }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setMoveError(data.error ?? `Move failed (HTTP ${res.status})`);
+        setMoveBusy(false);
+        return;
+      }
+      // Success — refresh the flat list; the tree effect re-fetches on that.
+      await refreshProjects();
+      closeMoveDialog();
+    } catch (e) {
+      setMoveError((e as Error).message);
+      setMoveBusy(false);
+    }
+  }
 
   async function handleDelete(project: { id: number; name: string }, e: React.MouseEvent) {
     e.stopPropagation();
@@ -272,13 +351,44 @@ export function ProjectSwitcher() {
             />
             <span className="truncate text-left flex-1">{node.name}</span>
           </button>
-          <button
-            onClick={(e) => handleDelete({ id: node.id, name: node.name }, e)}
-            className="opacity-0 group-hover:opacity-100 text-[var(--text-4)] hover:text-[var(--red)] transition-all shrink-0 p-0.5"
-            title="Delete project"
-          >
-            <Trash2 className="w-3 h-3" />
-          </button>
+          {node.id !== 1 && (
+            <div className="relative shrink-0">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenuOpenFor((prev) => (prev === node.id ? null : node.id));
+                }}
+                className={`${
+                  menuOpenFor === node.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                } text-[var(--text-4)] hover:text-[var(--text-2)] transition-all p-0.5`}
+                title="More actions"
+              >
+                <MoreHorizontal className="w-3 h-3" />
+              </button>
+              {menuOpenFor === node.id && (
+                <div
+                  className="absolute right-0 top-full mt-1 w-[140px] bg-[var(--surface-card)] border border-[var(--border)] rounded-md shadow-[var(--shadow-lg)] z-50 p-1"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    onClick={() => openMoveDialog(node)}
+                    className="w-full text-left px-2 py-1.5 text-[12px] rounded-sm text-[var(--text-2)] hover:bg-[var(--bg-hover)] transition-colors"
+                  >
+                    Move…
+                  </button>
+                  <button
+                    onClick={(e) =>
+                      handleDelete({ id: node.id, name: node.name }, e)
+                    }
+                    className="w-full text-left px-2 py-1.5 text-[12px] rounded-sm text-[var(--red)] hover:bg-[var(--bg-hover)] transition-colors flex items-center gap-1.5"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    Delete
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
         {hasChildren && !isCollapsed && (
           <div>{node.children.map((c) => renderNode(c, level + 1))}</div>
@@ -339,6 +449,116 @@ export function ProjectSwitcher() {
           )}
         </div>
       )}
+
+      {moveTarget && (() => {
+        const blocked = subtreeIds(tree, moveTarget.id);
+        const candidates = flattenTree(tree).filter(
+          ({ node }) => !blocked.has(node.id) && node.id !== 1
+        );
+        const oldSlug = moveTarget.slug;
+        const lastSeg = oldSlug.includes("/")
+          ? oldSlug.slice(oldSlug.lastIndexOf("/") + 1)
+          : oldSlug;
+        const newParentNode = moveNewParentId
+          ? flattenTree(tree).find((x) => x.node.id === moveNewParentId)?.node
+          : null;
+        const newSlug = newParentNode ? `${newParentNode.slug}/${lastSeg}` : lastSeg;
+        const descendantCount = Math.max(blocked.size - 1, 0);
+        const noop = newSlug === oldSlug;
+
+        return (
+          <div
+            className="fixed inset-0 z-[100] bg-black/40 flex items-center justify-center"
+            onClick={closeMoveDialog}
+          >
+            <div
+              className="bg-[var(--surface-card)] border border-[var(--border)] rounded-lg shadow-[var(--shadow-lg)] w-[440px] max-h-[80vh] flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="px-4 py-3 border-b border-[var(--border)]">
+                <div className="text-[13px] font-semibold text-[var(--text-1)]">
+                  Move &ldquo;{moveTarget.name}&rdquo;
+                </div>
+                <div className="text-[11px] text-[var(--text-3)] mt-0.5">
+                  Current slug: {oldSlug}
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto px-2 py-2">
+                <button
+                  onClick={() => setMoveNewParentId(null)}
+                  className={`w-full text-left px-2 py-1.5 rounded-sm text-[13px] transition-colors ${
+                    moveNewParentId === null
+                      ? "bg-[var(--primary-dim)] text-[var(--primary)]"
+                      : "text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
+                  }`}
+                >
+                  <span className="italic">Detach to root</span>
+                </button>
+                {candidates.length > 0 && (
+                  <div className="h-px bg-[var(--border)] my-1" />
+                )}
+                {candidates.map(({ node, depth }) => (
+                  <button
+                    key={node.id}
+                    onClick={() => setMoveNewParentId(node.id)}
+                    className={`w-full text-left px-2 py-1.5 rounded-sm text-[13px] transition-colors truncate ${
+                      moveNewParentId === node.id
+                        ? "bg-[var(--primary-dim)] text-[var(--primary)]"
+                        : "text-[var(--text-2)] hover:bg-[var(--bg-hover)]"
+                    }`}
+                    style={{ paddingLeft: `${depth * 12 + 8}px` }}
+                    title={node.slug}
+                  >
+                    {node.name}{" "}
+                    <span className="text-[11px] text-[var(--text-4)]">
+                      {node.slug}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <div className="px-4 py-3 border-t border-[var(--border)] text-[12px] text-[var(--text-3)]">
+                {noop ? (
+                  <span>Already in this location — pick a different parent.</span>
+                ) : (
+                  <>
+                    Preview:{" "}
+                    <span className="text-[var(--text-2)] font-mono">
+                      {oldSlug}
+                    </span>{" "}
+                    &rarr;{" "}
+                    <span className="text-[var(--text-1)] font-mono">
+                      {newSlug}
+                    </span>
+                    {descendantCount > 0 &&
+                      ` (${descendantCount} descendant${descendantCount === 1 ? "" : "s"} also renamed)`}
+                  </>
+                )}
+              </div>
+              {moveError && (
+                <div className="px-4 py-2 text-[12px] text-[var(--red)] border-t border-[var(--border)]">
+                  {moveError}
+                </div>
+              )}
+              <div className="px-4 py-3 border-t border-[var(--border)] flex justify-end gap-2">
+                <button
+                  onClick={closeMoveDialog}
+                  disabled={moveBusy}
+                  className="px-3 py-1.5 text-[12px] rounded-md text-[var(--text-2)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleMoveSubmit}
+                  disabled={moveBusy || noop}
+                  className="px-3 py-1.5 text-[12px] rounded-md bg-[var(--primary)] text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {moveBusy ? "Moving…" : "Move"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
