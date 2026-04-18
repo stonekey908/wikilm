@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { useToast } from "@/components/toast-provider";
 
 /* ──────────────────────────── Types ──────────────────────────── */
 
@@ -99,6 +100,7 @@ function CrossProjectIcon() {
 
 export default function SourcesPage() {
   const searchParams = useSearchParams();
+  const { addToast } = useToast();
   const [tab, setTab] = useState<"library" | "research">("library");
   const [sources, setSources] = useState<Source[]>([]);
   const [dragOver, setDragOver] = useState(false);
@@ -141,90 +143,133 @@ export default function SourcesPage() {
     return () => clearInterval(interval);
   }, []);
 
-  /* ── Research stream ── */
-  const startResearch = useCallback(async (topicOverride?: string) => {
-    const topic = (topicOverride ?? researchQuery).trim();
-    if (!topic || isSearching) return;
+  /* ── Research stream ──
+     append=true keeps existing results and passes their URLs as
+     excludeUrls so the model avoids returning duplicates; results that
+     come back duplicate anyway are dropped client-side. */
+  const runResearch = useCallback(
+    async (topicOverride: string | undefined, append: boolean) => {
+      const topic = (topicOverride ?? researchQuery).trim();
+      if (!topic || isSearching) return;
 
-    setResults([]);
-    setIsSearching(true);
-    nextResultId.current = 0;
+      // Build the exclusion set from the CURRENT results (append mode) or
+      // fresh (replace mode). Use a local Set that grows as new unique
+      // results stream in — prevents dupes within a single run too.
+      const seenUrls = new Set<string>(
+        append ? results.map((r) => r.url).filter(Boolean) : []
+      );
+      let addedThisRun = 0;
 
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    try {
-      const res = await fetch("/api/sources/research", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, maxResults }),
-        signal: controller.signal,
-      });
-
-      if (!res.ok || !res.body) {
-        setIsSearching(false);
-        return;
+      if (!append) {
+        setResults([]);
+        nextResultId.current = 0;
       }
+      setIsSearching(true);
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
+      const controller = new AbortController();
+      abortRef.current = controller;
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      try {
+        const res = await fetch("/api/sources/research", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            topic,
+            maxResults,
+            excludeUrls: append ? Array.from(seenUrls) : undefined,
+          }),
+          signal: controller.signal,
+        });
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
+        if (!res.ok || !res.body) {
+          setIsSearching(false);
+          return;
+        }
 
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const payload = line.slice(6);
-          try {
-            const evt = JSON.parse(payload);
-            if (evt.type === "content") {
-              const text: string = evt.text;
-              // Check for RESULT: lines
-              if (text.startsWith("RESULT:")) {
-                try {
-                  const json = JSON.parse(text.slice(7));
-                  const result: ResearchResult = {
-                    id: `r${nextResultId.current++}`,
-                    title: json.title ?? "Untitled",
-                    url: json.url ?? "",
-                    domain: json.domain ?? "",
-                    author: json.author ?? "Unknown",
-                    type: json.type ?? "Article",
-                    summary: json.summary ?? "",
-                    relevance: json.relevance ?? 50,
-                    tags: json.tags ?? [],
-                    status: "pending",
-                  };
-                  setResults((prev) => [...prev, result]);
-                } catch {
-                  // malformed JSON line, skip
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const payload = line.slice(6);
+            try {
+              const evt = JSON.parse(payload);
+              if (evt.type === "content") {
+                const text: string = evt.text;
+                if (text.startsWith("RESULT:")) {
+                  try {
+                    const json = JSON.parse(text.slice(7));
+                    const url = json.url ?? "";
+                    // Drop dupes — models sometimes return the excluded list anyway
+                    if (url && seenUrls.has(url)) continue;
+                    if (url) seenUrls.add(url);
+                    const result: ResearchResult = {
+                      id: `r${nextResultId.current++}`,
+                      title: json.title ?? "Untitled",
+                      url,
+                      domain: json.domain ?? "",
+                      author: json.author ?? "Unknown",
+                      type: json.type ?? "Article",
+                      summary: json.summary ?? "",
+                      relevance: json.relevance ?? 50,
+                      tags: json.tags ?? [],
+                      status: "pending",
+                    };
+                    setResults((prev) => [...prev, result]);
+                    addedThisRun++;
+                  } catch {
+                    // malformed JSON line, skip
+                  }
+                } else if (text.trim() === "DONE") {
+                  setIsSearching(false);
                 }
-              } else if (text.trim() === "DONE") {
+              } else if (evt.type === "done") {
                 setIsSearching(false);
               }
-            } else if (evt.type === "done") {
-              setIsSearching(false);
+            } catch {
+              // malformed SSE payload, skip
             }
-          } catch {
-            // malformed SSE payload, skip
           }
         }
+
+        // Load-more with zero additions → let the user know the pool is dry
+        if (append && addedThisRun === 0) {
+          addToast({
+            type: "info",
+            title: "No new sources found",
+            description: "The model couldn't turn up anything beyond what's already listed.",
+          });
+        }
+      } catch (err: unknown) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          // user cancelled
+        }
+      } finally {
+        setIsSearching(false);
+        abortRef.current = null;
       }
-    } catch (err: unknown) {
-      if (err instanceof DOMException && err.name === "AbortError") {
-        // user cancelled
-      }
-    } finally {
-      setIsSearching(false);
-      abortRef.current = null;
-    }
-  }, [researchQuery, isSearching]);
+    },
+    [researchQuery, isSearching, maxResults, results, addToast]
+  );
+
+  const startResearch = useCallback(
+    (topicOverride?: string) => runResearch(topicOverride, false),
+    [runResearch]
+  );
+
+  const loadMoreResearch = useCallback(
+    () => runResearch(undefined, true),
+    [runResearch]
+  );
 
   const cancelResearch = useCallback(() => {
     abortRef.current?.abort();
@@ -627,14 +672,17 @@ export default function SourcesPage() {
             </button>
           </div>
 
-          {/* Status bar */}
+          {/* Live status — honest spinner + count, no fake progress bar.
+              Previously a fixed 65% "progress" div which misled users about
+              how far along the search actually was. */}
           {isSearching && (
             <div className="flex items-center gap-2.5 px-4 py-3 bg-[var(--primary-dim)] border border-[rgba(13,148,136,0.15)] rounded-lg mb-5 text-[13px] text-[var(--primary)]">
               <span className="inline-block w-3.5 h-3.5 border-2 border-[rgba(13,148,136,0.2)] border-t-[var(--primary)] rounded-full animate-spin shrink-0" />
-              Searching and analyzing sources...
-              <div className="flex-1 h-[3px] bg-[rgba(13,148,136,0.15)] rounded-sm overflow-hidden">
-                <div className="h-full w-[65%] bg-[var(--primary)] rounded-sm" />
-              </div>
+              <span className="flex-1">
+                {results.length === 0
+                  ? "Searching the web…"
+                  : `${results.length} source${results.length === 1 ? "" : "s"} found so far…`}
+              </span>
               <button
                 onClick={cancelResearch}
                 className="text-[var(--text-3)] text-xs cursor-pointer underline underline-offset-2 shrink-0 hover:text-[var(--text-2)] bg-transparent border-none p-0"
@@ -774,6 +822,21 @@ export default function SourcesPage() {
               </div>
             ))}
           </div>
+
+          {/* Load more — appends another batch to the existing list,
+              skipping dupes. Hidden while searching or empty. */}
+          {!isSearching && results.length > 0 && (
+            <div className="flex justify-center mt-4">
+              <button
+                onClick={loadMoreResearch}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-[13px] font-[550] text-[var(--text-2)] bg-[var(--bg-2)] border border-[var(--border)] rounded-lg hover:border-[var(--border-strong)] hover:text-[var(--text-1)] transition-all cursor-pointer"
+                title={`Fetch up to ${maxResults} more — duplicates will be skipped`}
+              >
+                <SearchIcon />
+                Load more ({maxResults})
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
