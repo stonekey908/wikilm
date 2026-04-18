@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Share2, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
+import { useProject } from "@/components/project-switcher";
 
 interface GraphNode {
   slug: string;
@@ -150,6 +151,8 @@ function computeLayout(
 
 export default function GraphPage() {
   const router = useRouter();
+  const { activeProject } = useProject();
+  const activeProjectId = activeProject?.id ?? 1;
   const [nodes, setNodes] = useState<GraphNode[]>([]);
   const [edges, setEdges] = useState<GraphEdge[]>([]);
   const [loading, setLoading] = useState(true);
@@ -166,7 +169,7 @@ export default function GraphPage() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch("/api/wiki/graph")
+    fetch(`/api/wiki/graph?projectId=${activeProjectId}`)
       .then((r) => r.json())
       .then((data: { nodes: GraphNode[]; edges: GraphEdge[] }) => {
         setNodes(data.nodes ?? []);
@@ -174,7 +177,7 @@ export default function GraphPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  }, [activeProjectId]);
 
   // Observe container size so layout adapts
   useEffect(() => {
