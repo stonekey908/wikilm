@@ -17,7 +17,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
-import { ProjectSwitcher } from "@/components/project-switcher";
+import { ProjectSwitcher, useProject } from "@/components/project-switcher";
 import { RunningJobsPanel } from "@/components/running-jobs-panel";
 import { HelpModal } from "@/components/help-modal";
 
@@ -49,6 +49,8 @@ interface SidebarData {
 export function Sidebar() {
   const pathname = usePathname();
   const { resolvedTheme, setTheme } = useTheme();
+  const { activeProject } = useProject();
+  const activeProjectId = activeProject?.id ?? null;
   const [data, setData] = useState<SidebarData>({
     sourceCount: 0,
     runningJobs: 0,
@@ -69,8 +71,9 @@ export function Sidebar() {
   }, []);
 
   const fetchSidebarData = useCallback(async () => {
+    if (activeProjectId === null) return;
     try {
-      const res = await fetch("/api/claude/job");
+      const res = await fetch(`/api/claude/job?projectId=${activeProjectId}`);
       if (res.ok) {
         const json = await res.json();
         const running = json.jobs?.filter(
@@ -91,7 +94,7 @@ export function Sidebar() {
     } catch {
       // silently fail
     }
-  }, []);
+  }, [activeProjectId]);
 
   useEffect(() => {
     fetchSidebarData();
