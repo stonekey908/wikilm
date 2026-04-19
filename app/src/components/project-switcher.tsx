@@ -200,23 +200,31 @@ export function ProjectSwitcher() {
     };
   }, [projects]);
 
-  // Effective "collapsed" set — start from persisted `collapsed` and force
-  // ancestors of the active project open so the active node stays visible.
-  // The forced-open state is not persisted; user's explicit collapses stick.
-  const effectiveCollapsed = useMemo(() => {
-    if (!activeProject) return collapsed;
+  // Auto-expand ancestors of the active project ONCE per active-project
+  // change so the active node is visible on switch. Runs only when
+  // activeProject.id genuinely changes, so user's explicit chevron-collapse
+  // on an ancestor is not immediately undone on the next render.
+  const autoExpandedFor = useRef<number | null>(null);
+  useEffect(() => {
+    if (!activeProject) return;
+    if (autoExpandedFor.current === activeProject.id) return;
+    autoExpandedFor.current = activeProject.id;
     const ancestors = ancestorsOf(tree, activeProject.id);
-    if (ancestors.length === 0) return collapsed;
-    const next = new Set(collapsed);
-    let changed = false;
-    for (const id of ancestors) {
-      if (next.has(id)) {
-        next.delete(id);
-        changed = true;
+    if (ancestors.length === 0) return;
+    setCollapsed((prev) => {
+      let changed = false;
+      const next = new Set(prev);
+      for (const id of ancestors) {
+        if (next.has(id)) {
+          next.delete(id);
+          changed = true;
+        }
       }
-    }
-    return changed ? next : collapsed;
-  }, [tree, activeProject, collapsed]);
+      if (!changed) return prev;
+      writeCollapsed(next);
+      return next;
+    });
+  }, [activeProject?.id, tree]);
 
   function toggleCollapsed(id: number) {
     setCollapsed((prev) => {
@@ -322,7 +330,7 @@ export function ProjectSwitcher() {
 
   function renderNode(node: TreeNode, level: number): React.ReactNode {
     const hasChildren = node.children.length > 0;
-    const isCollapsed = effectiveCollapsed.has(node.id);
+    const isCollapsed = collapsed.has(node.id);
     const isActive = activeProject?.id === node.id;
     const projectForClick = projects.find((p) => p.id === node.id);
 
