@@ -4,6 +4,7 @@ import { sources } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import fs from "fs";
 import path from "path";
+import { getProject, projectRoot } from "@/lib/projects";
 
 export async function DELETE(
   _request: NextRequest,
@@ -52,18 +53,23 @@ export async function POST(
       return Response.json({ error: "Source not found" }, { status: 404 });
     }
 
+    const project = getProject(source.projectId) ?? getProject(1);
+    if (!project) {
+      return Response.json({ error: "No project found" }, { status: 404 });
+    }
+
     // Update status to ingesting
     db.update(sources).set({ status: "ingesting" }).where(eq(sources.id, sourceId)).run();
 
     // Start ingest job
     const { startJob } = await import("@/lib/claude-runner");
-    const projectCwd = path.join(process.cwd(), "..");
+    const projectCwd = projectRoot(project);
     const prompt = `Ingest ${source.filePath}`;
 
     const jobId = await startJob({
       prompt,
       projectCwd,
-      projectId: source.projectId,
+      projectId: project.id,
       type: "ingest",
       title: `Ingest: ${source.title}`,
       onComplete: (status) => {

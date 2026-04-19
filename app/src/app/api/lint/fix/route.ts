@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
-import path from "path";
 import { db } from "@/db";
 import { jobs } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { startFixJob } from "@/lib/lint";
+import { getProject, projectRoot } from "@/lib/projects";
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
@@ -24,13 +24,18 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "No valid finding IDs" }, { status: 400 });
   }
 
-  const projectCwd = path.join(process.cwd(), "..");
+  const targetProjectId = projectId ?? 1;
+  const project = getProject(targetProjectId) ?? getProject(1);
+  if (!project) {
+    return Response.json({ error: "No project found" }, { status: 404 });
+  }
+  const projectCwd = projectRoot(project);
 
   try {
     const jobId = await startFixJob({
       findingIds: ids,
       projectCwd,
-      projectId: projectId ?? 1,
+      projectId: project.id,
     });
     const job = db
       .select({ status: jobs.status, error: jobs.error, errorCode: jobs.errorCode })

@@ -6,6 +6,7 @@ import { startJob, triggerSynthesisUpdate } from "@/lib/claude-runner";
 import path from "path";
 import { writeFile, mkdir } from "fs/promises";
 import fs from "fs";
+import { getProject, projectRoot } from "@/lib/projects";
 
 /**
  * Programmatic markdown upload.
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
   const tags: string[] = Array.isArray(body?.tags)
     ? body.tags.filter((t: unknown): t is string => typeof t === "string")
     : [];
-  const projectId = typeof body?.projectId === "number" ? body.projectId : 1;
+  const projectIdInput = typeof body?.projectId === "number" ? body.projectId : 1;
 
   if (typeof title !== "string" || !title.trim()) {
     return Response.json({ error: "title is required" }, { status: 400 });
@@ -75,6 +76,13 @@ export async function POST(request: NextRequest) {
   if (typeof content !== "string" || !content.trim()) {
     return Response.json({ error: "content is required" }, { status: 400 });
   }
+
+  const project = getProject(projectIdInput) ?? getProject(1);
+  if (!project) {
+    return Response.json({ error: "No project found" }, { status: 404 });
+  }
+  const projectId = project.id;
+  const projectCwd = projectRoot(project);
 
   await mkdir(RAW_DIR, { recursive: true });
 
@@ -104,7 +112,6 @@ export async function POST(request: NextRequest) {
 
   const sourceId = result[0].id;
 
-  const projectCwd = path.join(process.cwd(), "..");
   const prompt = `Ingest raw/${filename}`;
 
   const jobId = await startJob({
