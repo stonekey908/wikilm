@@ -179,9 +179,9 @@ This is a general-purpose knowledge base. Topics are handled via tags in frontma
 
 ## Current Phase
 
-**Nesting + MCP shipped.** STO-1758 (parent/child project nesting) + 8 follow-ups closed across 2 days. WikiLM now supports nested projects end-to-end — ingest, synthesis, lint, parent synthesis, parent lint, dashboard nudges, move, cross-project wikilinks, tree sidebar, breadcrumbs, graph subtree view. STO-1743 MCP server v1 shipped at `mcp/` and registered globally in Claude Code. Knowledge base now usable from any Claude Code session at any level of the project tree.
+**Output generation + note capture shipped.** STO-1766 (NotebookLM-style output generation) shipped end-to-end: 5 artifact types (report, cheat, summary, deck, infographic) running through the job queue with model provenance, scope, nudges, per-artifact delete, kill-any-job support, and a slide-up Running Jobs panel. STO-1768 (add-note UI on `/sources`), STO-1769 (chat-to-note summariser), and STO-1771 (hardcoded `PROJECT_ID=1` fix on `/chat`) all shipped on 2026-04-19. MCP server gained `generate_output` as a 9th tool. Root README written with 8 screenshots + Karpathy attribution. In-app Help modal added.
 
-Outstanding: STO-1766 (NotebookLM-style output generation, High — new, next session's big item) and STO-1767 (MCP v2 destructive ops, Low).
+Outstanding: STO-1770 (cascade source removal on delete, Low) and STO-1767 (MCP v2 destructive ops, Low). Both purely additive / nice-to-have.
 
 ## Known Issues
 
@@ -194,6 +194,9 @@ Outstanding: STO-1766 (NotebookLM-style output generation, High — new, next se
 - Local directory is still `~/SecondBrain/` and DB file is still `secondbrain.db` — deferred per user preference ("leave it as long as everything else is ok")
 - Ingest prompt can reference entities without creating pages → dangling wikilinks (tightened in STO-1765 but not zero-risk — "wikilink discipline" rule is soft guidance, not enforced by code)
 - MCP v1 omits destructive ops (move/delete/promote) — tracked as STO-1767
+- Deleting a source leaves behind wiki pages it seeded (mentions, citations) — tracked as STO-1770
+- Mobile UI not responsive — 3-pane layouts (wiki detail, chat) work but cramped on phone-width; no PWA manifest. Works fine on iPad.
+- No auth anywhere — safe to expose via tunnel/LAN only if you add a reverse proxy with basic auth
 
 ## Known Gotchas
 
@@ -215,48 +218,74 @@ Outstanding: STO-1766 (NotebookLM-style output generation, High — new, next se
 - **Research results cleared on tab close** → sessionStorage is per-tab → fix: migrated `sb_research_query` + `sb_research_results` to localStorage
 - **Backup only grabbed top-level wiki/** → `projects/<slug>/wiki/` was silently excluded → fix: tar now includes both `wiki/` and `projects/`; archive renamed `content-<ts>.tar.gz`
 - **`gh repo rename` updates both GitHub and the local remote** → so after renaming you don't need a separate `git remote set-url`
+- **Marp CLI hangs forever when spawned without stdin** → default behavior reads markdown from stdin, background hooks have no stdin → fix: always pass `--no-stdin` + a `timeout: 60_000` to `execFile` (see `outputs/generate/route.ts` deck branch).
+- **Wikilinks render as raw `[[path/name]]` in Marp decks + docx** → Marp + the docx lib don't know about wiki syntax → fix: apply `humanizeWikilinks(markdown)` preprocessor on the copy handed to the exporter. Keep the authored `.md` intact so WikiLM's viewer keeps clickable links — only preprocess the derived artifact.
+- **Output regenerations silently overwrote earlier artifacts** → baseSlug was date-only → fix: baseSlug now includes HHmm timestamp (`buildOutputBaseSlug` in `output-types.ts`).
+- **Infographic `.html` invisible in wiki list / graph** → walker only picks up `.md` → fix: post-job hook writes a companion `.md` stub with `type: output` frontmatter that references both the `.html` and `.png` artifacts.
+- **Source card subtitles leaked raw JSON** → code fell through to `s.meta` which is the JSON blob → fix: `humanizeSubtitle` helper prefers `author`, then parses `meta` JSON to surface `domain`/`summary`/type label.
+- **Modal can't be dismissed while a long job runs** → fixed by removing `disabled={inFlight}` from X/outside-click handlers; added an "in-flight footer" with Cancel job + "Close — let it run" buttons. Job keeps running in the background.
+- **Chat page used hardcoded `PROJECT_ID=1`** → sessions + saved queries all landed in top-level wiki regardless of active project → fix: `useProject()` everywhere + `?projectId=` filter on `GET /api/chat/sessions` (STO-1771).
+- **Claude Code `claude -p` subprocess default tools allow limited FS writes** → the output-generation prompt wants to write HTML with `<script>` tags, which triggered "Write tool: blocked extension" in earlier versions → current setup already lists Write + Edit in `--allowedTools`, so fine today; flag if it regresses.
 
 ## Last Session
 
 ```
-**Date:** 2026-04-19 (short MCP-only session)
+**Date:** 2026-04-19 (long session — output generation + note capture)
 **Who:** Claude session
 **What was done:**
 
-Dogfooding run on the WikiLM MCP server from inside the WikiLM repo itself:
+Four tickets shipped + one bug filed/fixed:
 
-- Explored existing `ai/` project — read synthesis + 4 concept pages (us-china competition, benchmarks, agentic commerce, ai-for-science). Content held up on inspection.
-- Created new sub-project `coding/wikilm` (id=12) under `coding/` to house generic engineering patterns extracted from this repo's own history.
-- Authored + ingested one consolidated source: "Engineering Lessons from Building WikiLM" — 7 reusable patterns with pattern-first framing, WikiLM case-study anchors, and cross-links.
-- Ingest ran clean end-to-end via MCP `save_learning` + background job polling (sqlite-backed Monitor).
+STO-1766 — NotebookLM-style output generation (High, Done)
+- Five artifact types all running through the job queue with model provenance:
+  - Report → .md + .docx
+  - Executive summary → .md + .docx
+  - Cheat sheet → .md + .docx
+  - Briefing deck → .md + .pdf + .pptx (Marp CLI)
+  - Infographic → .html + .png (headless Chrome)
+- New endpoints (with path-traversal guards): generate, download, delete
+- Central output-types registry (src/lib/output-types.ts) — id, label, prompt builder, primary/companion extensions
+- Post-job hooks: docx via export-docx, decks via Marp CLI (--no-stdin + timeout), infographic PNG via puppeteer-core + system Chrome discovery. humanizeWikilinks preprocessor for exports.
+- baseSlug now includes HHmm timestamp → regenerations don't silently overwrite.
+- Generate Output modal with scope (project / whole subtree) + focus nudge. Dismissible mid-generation (job stays running).
+- Outputs appear in /wiki with a new pink Sparkles-icon "output" type. Per-row trash delete.
+- Sidebar footer active-job now clickable → slide-up Running Jobs panel with per-row cancel. Model badge shown everywhere (sidebar, panel, /jobs, output frontmatter).
+- MCP server gained generate_output as its 9th tool.
 
-Pages produced under `projects/coding/wikilm/wiki/`:
-- 1 source summary (sources/engineering-lessons-from-building-wikilm)
-- 1 entity page (entities/wikilm) — auto-extracted
-- 7 concept pages:
-  - subprocess-cwd-discipline
-  - burst-coalescing
-  - provider-prefix-dispatch
-  - non-interactive-subprocess-flags
-  - dual-source-of-truth-drift
-  - data-layout-enumerator-cascade
-  - generative-pipeline-link-integrity
-- 1 synthesis/project-overview — auto-generated, substantive, clusters patterns into (subprocess hygiene / drift / scale+integrity), flags 4 real gaps (link validator TODO, Ollama streaming, STO-1766 output gen, STO-1767 MCP v2).
-- index.md + log.md updated by ingest.
+STO-1768 — Add-note UI on /sources (Medium, Done)
+- NoteComposerModal component: title, tags (chip input), markdown body, project picker (useProject default), Pending/Ingest-now segmented control. Validates title + body ≥ 10 chars. Blocks dismiss during submit.
+- "New note" button wired in /sources top-right action row. Posts to existing /api/sources/upload-md.
 
-Spot-checked `concepts/burst-coalescing` — extraction preserved negative case ("do not apply to per-event work"), named `claude-runner.ts`, cross-links are purposeful, 5 inbound backlinks.
+STO-1769 — Chat-to-note (Medium, Done)
+- Added "note-summary" to JobOptions.type union + ENV_MODELS + typeIcons on /jobs + running-jobs-panel.
+- New POST /api/chat/save-as-note — builds summariser prompt (Overview / Key points / Open questions + YAML frontmatter) and spawns note-summary job. onComplete reads the file, parses frontmatter, inserts source row as pending.
+- "Save thread as note" button in /chat header, disabled until ≥ 2 messages.
+- UAT passed: ~22s run on sonnet produced clean, well-structured MoE-vs-dense note.
 
-Prior multi-day work (STO-1758 nesting + STO-1743 MCP v1 + STO-1759/60/61/62/63 + STO-1764/1765) remains shipped; see git log 177f504…857f362 for those details.
+STO-1771 — Fix hardcoded PROJECT_ID=1 on /chat (Medium, Done — filed this session)
+- Surfaced during STO-1769 work. /chat was writing all sessions + saved queries to project 1 regardless of active project.
+- useProject() throughout. GET /api/chat/sessions accepts ?projectId= filter. Session sidebar re-fetches on project switch and clears the active thread.
+- Replaced two native alert() calls in saveToWiki with toasts.
 
-Tickets filed but not touched (still open):
-- STO-1766: Output generation — reports/slides/infographics (NotebookLM-style). High priority.
-- STO-1767: MCP v2 destructive ops (move/delete/promote preview-confirm pairs). Low.
+Peripheral polish this session:
+- Sources page: humanizeSubtitle helper — no more raw JSON bleeding into source cards.
+- In-app Help modal added (sidebar footer + ? keyboard shortcut). Explains the idea, the flow, each page, output generation, nested projects, and credits Karpathy.
+- Root README.md written (was missing) — positioning, 8 screenshots (wiki concept detail, synthesis page, generate modal, help modal, jobs, sources, lint, nudges), setup pointers, Karpathy gist attribution.
+- Fixed source cards leaking JSON subtitles.
+
+Commits (all on main, pushed):
+- 7744bad feat(STO-1766): NotebookLM-style output generation + in-app help
+- bd69947 docs: expand README with lint, nudges, and synthesis/concept screenshots
+- 9427b16 feat: in-UI note capture (STO-1768, STO-1769, STO-1771)
 
 **What's next:**
-- STO-1766 output generation is still the top new item. Fresh session recommended — design a "Generate output" panel with 5 types (report/deck/infographic/cheat/summary), scope toggle, nudge input, endpoint wiring + prompt templates per type.
-- Optional: add more dev-project concept contributions under `coding/wikilm` or start seeding `coding/codeview` so the `coding/` parent synthesis has more to roll up.
+- STO-1770: Cascade source removal — delete source + sweep wiki pages it seeded. Bigger scope (touches wiki rewrites), Low priority. Needs design thinking about what "sweep" actually means — find + confirm each affected page, or spawn a rewrite subprocess?
+- STO-1767: MCP v2 destructive ops (move/delete/promote preview-confirm pairs). Low. Easy to land when wanted.
+- Optional: mobile-responsive UI polish. WikiLM has no mobile tuning today — the 3-pane wiki detail and chat header are cramped on phone-width. Usable on iPad.
+- Optional: expose via LAN or cloudflared tunnel for remote/mobile access (no auth today — don't expose broadly without basic auth).
+- Optional: start dogfooding output generation more — the ai/llms example artifacts are good, but we haven't produced any for coding/wikilm yet.
 
-**Branch:** main (content committed this session).
+**Branch:** main (clean, pushed to origin at 9427b16 before this update).
 **Blockers:** None.
 ```
 
