@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useProject } from "@/components/project-switcher";
 import { Breadcrumbs } from "@/components/breadcrumbs";
@@ -404,7 +404,18 @@ function TypeChip({ type }: { type: string }) {
 
 /* ─── Page Component ─── */
 
+// Page default is a thin Suspense wrapper around WikiPageInner; the
+// inner component is what uses useSearchParams(). Next.js 16 requires
+// the boundary for prerender — see STO-1759.
 export default function WikiPage() {
+  return (
+    <Suspense fallback={null}>
+      <WikiPageInner />
+    </Suspense>
+  );
+}
+
+function WikiPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { activeProject, projects, setActiveProject } = useProject();
