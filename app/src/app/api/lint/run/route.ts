@@ -1,15 +1,19 @@
 import { NextRequest } from "next/server";
-import path from "path";
 import { db } from "@/db";
 import { jobs } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { startLintJob } from "@/lib/lint";
+import { getProject, projectRoot } from "@/lib/projects";
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
-  const projectId = body?.projectId ?? 1;
-
-  const projectCwd = path.join(process.cwd(), "..");
+  const projectIdParam = body?.projectId ?? 1;
+  const project = getProject(projectIdParam) ?? getProject(1);
+  if (!project) {
+    return Response.json({ error: "No project found" }, { status: 404 });
+  }
+  const projectId = project.id;
+  const projectCwd = projectRoot(project);
 
   try {
     const jobId = await startLintJob({ projectCwd, projectId });

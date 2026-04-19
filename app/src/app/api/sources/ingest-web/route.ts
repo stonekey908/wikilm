@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { sources } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { startJob, triggerSynthesisUpdate } from "@/lib/claude-runner";
-import path from "path";
+import { getProject, projectRoot } from "@/lib/projects";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -13,11 +13,17 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Missing required fields: title, url" }, { status: 400 });
   }
 
+  const targetProjectId = projectId ?? 1;
+  const project = getProject(targetProjectId) ?? getProject(1);
+  if (!project) {
+    return Response.json({ error: "No project found" }, { status: 404 });
+  }
+
   // Create a source record for the web source
   const result = db
     .insert(sources)
     .values({
-      projectId: projectId ?? 1,
+      projectId: project.id,
       title,
       type: "web",
       filePath: url,
@@ -30,7 +36,7 @@ export async function POST(request: NextRequest) {
 
   const sourceId = result[0].id;
 
-  const projectCwd = path.join(process.cwd(), "..");
+  const projectCwd = projectRoot(project);
   const prompt = `Fetch and ingest the following source into the wiki:
 
 Title: ${title}
@@ -46,7 +52,7 @@ Search the web for this source, download or read its content, create a source su
   const jobId = await startJob({
     prompt,
     projectCwd,
-    projectId: projectId ?? 1,
+    projectId: project.id,
     type: "ingest",
     title: `Ingest: ${title}`,
     onComplete: (status) => {
@@ -55,7 +61,7 @@ Search the web for this source, download or read its content, create a source su
         .where(eq(sources.id, sourceId))
         .run();
       if (status === "completed") {
-        triggerSynthesisUpdate(projectCwd, projectId ?? 1).catch((err) => {
+        triggerSynthesisUpdate(projectCwd, project.id).catch((err) => {
           console.error("[synthesis] failed to trigger:", err);
         });
       }
