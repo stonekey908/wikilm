@@ -226,6 +226,7 @@ Outstanding: STO-1770 (cascade source removal on delete, Low) and STO-1767 (MCP 
 - **Modal can't be dismissed while a long job runs** → fixed by removing `disabled={inFlight}` from X/outside-click handlers; added an "in-flight footer" with Cancel job + "Close — let it run" buttons. Job keeps running in the background.
 - **Chat page used hardcoded `PROJECT_ID=1`** → sessions + saved queries all landed in top-level wiki regardless of active project → fix: `useProject()` everywhere + `?projectId=` filter on `GET /api/chat/sessions` (STO-1771).
 - **Claude Code `claude -p` subprocess default tools allow limited FS writes** → the output-generation prompt wants to write HTML with `<script>` tags, which triggered "Write tool: blocked extension" in earlier versions → current setup already lists Write + Edit in `--allowedTools`, so fine today; flag if it regresses.
+- **Cross-project API endpoints that should be project-scoped** → audit: any `GET /api/.../something` that reads `lintFindings`, `chatSessions`, `sources` etc. must take a `?projectId=` query param and filter. Reminder triggered twice this session: STO-1771 (chat sessions), STO-1772 (dashboard nudges). Default assumption for any new list endpoint: scope by active project, expose the unfiltered variant only if there's an explicit reason (e.g. cross-project search).
 
 ## Last Session
 
@@ -273,10 +274,16 @@ Peripheral polish this session:
 - Root README.md written (was missing) — positioning, 8 screenshots (wiki concept detail, synthesis page, generate modal, help modal, jobs, sources, lint, nudges), setup pointers, Karpathy gist attribution.
 - Fixed source cards leaking JSON subtitles.
 
+STO-1772 — Dashboard Nudges not scoped to active project (Medium, Done — filed + fixed this session)
+- Surfaced by user at end of session. `/api/dashboard/nudges` was returning all parent-scoped findings unfiltered; `NudgesSection` didn't pass a projectId.
+- Endpoint now accepts `?projectId=` and filters; NudgesSection uses `useProject()` and re-fetches on switch. Hidden/busy state resets across switches so optimistic dismissals don't leak.
+- Same class of bug as STO-1771 — added "audit project-scoping on list endpoints" gotcha.
+
 Commits (all on main, pushed):
 - 7744bad feat(STO-1766): NotebookLM-style output generation + in-app help
 - bd69947 docs: expand README with lint, nudges, and synthesis/concept screenshots
 - 9427b16 feat: in-UI note capture (STO-1768, STO-1769, STO-1771)
+- 8efd727 fix(STO-1772): scope Dashboard Nudges to active project
 
 **What's next:**
 - STO-1770: Cascade source removal — delete source + sweep wiki pages it seeded. Bigger scope (touches wiki rewrites), Low priority. Needs design thinking about what "sweep" actually means — find + confirm each affected page, or spawn a rewrite subprocess?
