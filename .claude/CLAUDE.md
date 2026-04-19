@@ -291,6 +291,7 @@ Commits (all on main, pushed):
 - 9427b16 feat: in-UI note capture (STO-1768, STO-1769, STO-1771)
 - 8efd727 fix(STO-1772): scope Dashboard Nudges to active project
 - 4db4d43 fix(STO-1773): scope /lint + /sources ingest to active project
+- a642b65 fix(STO-1773): scope sidebar + running-jobs-panel to active project (sweep)
 
 **What's next:**
 - STO-1770: Cascade source removal — delete source + sweep wiki pages it seeded. Bigger scope (touches wiki rewrites), Low priority. Needs design thinking about what "sweep" actually means — find + confirm each affected page, or spawn a rewrite subprocess?
