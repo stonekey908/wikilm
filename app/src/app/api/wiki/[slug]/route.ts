@@ -4,53 +4,7 @@ import path from "path";
 import { db } from "@/db";
 import { projects } from "@/db/schema";
 import { getProject, wikiDir, type Project } from "@/lib/projects";
-
-function parseFrontmatter(content: string): { meta: Record<string, unknown>; body: string } {
-  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
-  if (!match) return { meta: {}, body: content };
-
-  const yamlBlock = match[1];
-  const body = match[2];
-  const meta: Record<string, unknown> = {};
-
-  for (const line of yamlBlock.split("\n")) {
-    const colonIndex = line.indexOf(":");
-    if (colonIndex === -1) continue;
-    const key = line.slice(0, colonIndex).trim();
-    let value: unknown = line.slice(colonIndex + 1).trim();
-
-    if (typeof value === "string" && /^".*"$/.test(value)) {
-      value = value.slice(1, -1);
-    }
-
-    if (typeof value === "string" && /^\[.*\]$/.test(value)) {
-      value = value
-        .slice(1, -1)
-        .split(",")
-        .map((s) => s.trim().replace(/^"|"$/g, ""));
-    }
-
-    meta[key] = value;
-  }
-
-  return { meta, body };
-}
-
-function getAllMdFiles(dir: string): string[] {
-  const results: string[] = [];
-  if (!fs.existsSync(dir)) return results;
-
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      results.push(...getAllMdFiles(fullPath));
-    } else if (entry.name.endsWith(".md")) {
-      results.push(fullPath);
-    }
-  }
-  return results;
-}
+import { getAllMdFiles, parseFrontmatter } from "@/lib/wiki-utils";
 
 interface Backlink {
   slug: string;

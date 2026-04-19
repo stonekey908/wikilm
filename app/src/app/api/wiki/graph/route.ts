@@ -7,6 +7,7 @@ import {
   wikiDir,
   type Project,
 } from "@/lib/projects";
+import { getAllMdFiles, parseFrontmatter } from "@/lib/wiki-utils";
 
 /**
  * Node identity in subtree mode is project-qualified — two projects can
@@ -27,36 +28,6 @@ interface GraphEdge {
   from: string; // node id
   to: string; // node id
   crossProject: boolean;
-}
-
-function parseFrontmatter(content: string): { meta: Record<string, unknown>; body: string } {
-  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
-  if (!match) return { meta: {}, body: content };
-
-  const yamlBlock = match[1];
-  const body = match[2];
-  const meta: Record<string, unknown> = {};
-
-  for (const line of yamlBlock.split("\n")) {
-    const colonIndex = line.indexOf(":");
-    if (colonIndex === -1) continue;
-    const key = line.slice(0, colonIndex).trim();
-    let value: unknown = line.slice(colonIndex + 1).trim();
-    if (typeof value === "string" && /^".*"$/.test(value)) value = value.slice(1, -1);
-    meta[key] = value;
-  }
-  return { meta, body };
-}
-
-function getAllMdFiles(dir: string): string[] {
-  const results: string[] = [];
-  if (!fs.existsSync(dir)) return results;
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) results.push(...getAllMdFiles(fullPath));
-    else if (entry.name.endsWith(".md")) results.push(fullPath);
-  }
-  return results;
 }
 
 function slugFromPath(filePath: string, baseDir: string): string {
