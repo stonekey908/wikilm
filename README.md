@@ -28,18 +28,47 @@ Outputs can be scoped to the current page or the whole subtree, optionally nudge
 
 ## Screenshots
 
-### Wiki with generated outputs
-Outputs appear inline with source/entity/concept pages, filterable by type.
+### Wiki — concept page
+A concept page opened in the detail pane. Everything the LLM writes is structured markdown with `[[wikilinks]]`. The right side shows a generated table of contents; each wikilink is clickable and the left list stays filterable. Below the fold (not shown) are backlinks — every other page that references this one.
 
-![Wiki view with output pages](docs/screenshots/01-wiki-with-outputs.png)
+![Concept detail with wikilinks and TOC](docs/screenshots/01-wiki-with-outputs.png)
+
+### Wiki — synthesis page
+Synthesis pages are LLM-written overviews that cluster pages across a project around a theme. They regenerate automatically after each ingest (or on demand) so the "big picture" view of the knowledge base stays in sync as sources pile up.
+
+![Synthesis project-overview page](docs/screenshots/06-wiki-synthesis.png)
 
 ### Generate output modal
-Pick a type, choose scope (this page or the whole subtree), optionally nudge the prompt, run in the background.
+Pick a type, choose scope (this page or the whole subtree), and optionally add a **focus nudge** to bias the prompt (e.g. "audience: technical" or "focus on commercial implications"). Generation runs as a background job — you can close the modal, keep working, and pick up the artifact when it lands.
 
 ![Generate output modal](docs/screenshots/02-generate-modal.png)
 
+### Lint — wiki health check
+Click **Run lint** to have Claude scan the whole project for quality issues. The lint page surfaces five categories:
+
+- **Orphans** — pages nothing else links to
+- **Contradictions** — pages making competing claims (usually flags a missing comparison page)
+- **Missing cross-references** — pages that mention a concept by name but don't `[[wikilink]]` to its page
+- **Concept gaps** — ideas mentioned repeatedly across sources that deserve their own page
+- **Stale claims** — assertions in old pages that newer sources may have superseded
+
+Each finding has a one-click **Fix** button that spawns a small Claude subprocess to patch the specific file, plus a **Fix all** for bulk resolution per category.
+
+![Lint findings](docs/screenshots/07-lint.png)
+
+### Dashboard — Nudges (parent-scoped findings)
+Nudges are a second tier of lint that only runs on **parent projects** in the nested tree (e.g. `ai` over `ai/llms`, `ai/digital-twins`). They surface cross-project patterns that single-project lint can't see:
+
+- **Promotion candidates** — an entity or concept defined in one child that belongs at the parent level because it's relevant to several children
+- **Recurring themes** — ideas showing up across multiple children that deserve a parent-level synthesis
+- **Parent gaps** — topics the parent synthesis should cover but doesn't
+
+Each nudge has a **Promote** / **Create concept** / **Research** / **Dismiss** action, so promoting a child entity up to the parent project is a single click — no hand-editing filesystem paths.
+
+![Parent-project nudges on the dashboard](docs/screenshots/08-nudges.png)
+
 ### Jobs page
-Every Claude subprocess — ingest, synthesis, lint, research, output — shows up here with type icon, status, model, and a cancel button.
+Every Claude subprocess — ingest, synthesis, lint, research, output generation — shows up here with type icon, status, model, and a cancel button.
 
 ![Jobs page showing model badges](docs/screenshots/03-jobs-page.png)
 
