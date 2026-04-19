@@ -163,12 +163,20 @@ export async function GET(
   let filePath = path.join(wikiPath, `${slug}.md`);
 
   if (!fs.existsSync(filePath)) {
-    // Try to find it by searching all files
+    // Try to find it by searching all files. First try exact relative-path
+    // match; if that fails, fall back to matching by last segment so
+    // cross-project wikilinks like [[project/bare-name]] still resolve when
+    // the target lives under a type subdir (entities/, concepts/, …).
     const files = getAllMdFiles(wikiPath);
-    const match = files.find((f) => {
-      const relative = path.relative(wikiPath, f).replace(/\.md$/, "").replace(/\\/g, "/");
-      return relative === slug;
-    });
+    const toRelative = (f: string) =>
+      path.relative(wikiPath, f).replace(/\.md$/, "").replace(/\\/g, "/");
+    let match = files.find((f) => toRelative(f) === slug);
+    if (!match) {
+      match = files.find((f) => {
+        const rel = toRelative(f);
+        return rel.split("/").pop() === slug;
+      });
+    }
     if (match) {
       filePath = match;
     } else {
