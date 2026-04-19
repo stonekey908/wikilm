@@ -110,7 +110,8 @@ export default function JobsPage() {
 
   const fetchJobs = useCallback(async () => {
     try {
-      const res = await fetch("/api/claude/job");
+      const qp = activeProject ? `?projectId=${activeProject.id}` : "";
+      const res = await fetch(`/api/claude/job${qp}`);
       if (res.ok) {
         const data = await res.json();
         setJobs(data.jobs);
@@ -120,7 +121,7 @@ export default function JobsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeProject]);
 
   useEffect(() => {
     fetchJobs();
