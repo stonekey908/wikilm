@@ -90,6 +90,7 @@ const ENV_MODELS: Record<string, string | undefined> = {
   chat: process.env.CLAUDE_MODEL_CHAT ?? process.env.CLAUDE_MODEL,
   synthesis: process.env.CLAUDE_MODEL_SYNTHESIS ?? process.env.CLAUDE_MODEL,
   output: process.env.CLAUDE_MODEL_OUTPUT ?? process.env.CLAUDE_MODEL,
+  "note-summary": process.env.CLAUDE_MODEL_NOTE_SUMMARY ?? process.env.CLAUDE_MODEL,
 };
 
 /**
@@ -123,7 +124,7 @@ interface JobOptions {
   prompt: string;
   projectCwd: string;
   projectId: number;
-  type: "ingest" | "query" | "lint" | "fix" | "research" | "synthesis" | "output";
+  type: "ingest" | "query" | "lint" | "fix" | "research" | "synthesis" | "output" | "note-summary";
   title: string;
   onComplete?: (status: "completed" | "failed") => void;
 }
