@@ -1,14 +1,18 @@
+import { NextRequest } from "next/server";
 import { db } from "@/db";
 import { lintFindings, projects } from "@/db/schema";
 import { and, desc, eq } from "drizzle-orm";
 
 /**
- * GET /api/dashboard/nudges
+ * GET /api/dashboard/nudges?projectId=<n>
  *
- * Returns open parent-scoped lint findings grouped by type, each enriched
- * with the parent project's slug for cross-linking. Empty arrays when no
- * findings exist for a type — the UI hides the section entirely when all
- * three groups are empty.
+ * Returns open parent-scoped lint findings for the given project, grouped
+ * by type, each enriched with the project's slug for cross-linking. Empty
+ * arrays when no findings exist for a type — the UI hides the section
+ * entirely when all three groups are empty.
+ *
+ * Without a projectId the endpoint returns findings across all projects
+ * (legacy behavior — kept so ad-hoc curl calls still work).
  */
 export interface DashboardNudge {
   id: number;
@@ -30,7 +34,19 @@ export interface NudgesResponse {
   gap: DashboardNudge[];
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const projectIdParam = request.nextUrl.searchParams.get("projectId");
+  const projectId = projectIdParam ? Number(projectIdParam) : null;
+
+  const whereClause =
+    projectId && Number.isFinite(projectId)
+      ? and(
+          eq(lintFindings.scope, "parent"),
+          eq(lintFindings.status, "open"),
+          eq(lintFindings.projectId, projectId)
+        )
+      : and(eq(lintFindings.scope, "parent"), eq(lintFindings.status, "open"));
+
   const rows = db
     .select({
       id: lintFindings.id,
@@ -47,12 +63,7 @@ export async function GET() {
     })
     .from(lintFindings)
     .innerJoin(projects, eq(projects.id, lintFindings.projectId))
-    .where(
-      and(
-        eq(lintFindings.scope, "parent"),
-        eq(lintFindings.status, "open")
-      )
-    )
+    .where(whereClause)
     .orderBy(desc(lintFindings.createdAt))
     .all();
 
