@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
-import path from "path";
 import { streamClaude } from "@/lib/claude-runner";
+import { getProject, projectRoot } from "@/lib/projects";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -33,8 +33,12 @@ If the index or synthesis do not exist yet, say so and answer from whatever you 
 
 User question: ${prompt}`;
 
-  // Resolve project root (parent of app/)
-  const projectCwd = path.join(process.cwd(), "..");
+  const targetProjectId = body?.projectId ?? 1;
+  const project = getProject(targetProjectId) ?? getProject(1);
+  if (!project) {
+    return Response.json({ error: "No project found" }, { status: 404 });
+  }
+  const projectCwd = projectRoot(project);
   const stream = streamClaude({ prompt: wrappedPrompt, projectCwd, type: "chat" });
 
   return new Response(stream, {
