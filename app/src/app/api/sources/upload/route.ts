@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { startJob, triggerSynthesisUpdate } from "@/lib/claude-runner";
 import path from "path";
 import { writeFile, mkdir } from "fs/promises";
+import { getProject, projectRoot } from "@/lib/projects";
 
 const RAW_DIR = path.join(process.cwd(), "..", "raw");
 
@@ -40,6 +41,16 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "No files provided" }, { status: 400 });
   }
 
+  const projectIdRaw = formData.get("projectId");
+  const parsedProjectId =
+    typeof projectIdRaw === "string" ? Number(projectIdRaw) : NaN;
+  const targetProjectId = Number.isFinite(parsedProjectId) ? parsedProjectId : 1;
+  const project = getProject(targetProjectId) ?? getProject(1);
+  if (!project) {
+    return Response.json({ error: "No project found" }, { status: 404 });
+  }
+  const projectCwd = projectRoot(project);
+
   await mkdir(RAW_DIR, { recursive: true });
 
   const created: Array<{ id: number; title: string; jobId: number }> = [];
@@ -66,7 +77,7 @@ export async function POST(request: NextRequest) {
     const result = db
       .insert(sources)
       .values({
-        projectId: 1,
+        projectId: project.id,
         title,
         type,
         filePath: `raw/${filename}`,
@@ -78,13 +89,12 @@ export async function POST(request: NextRequest) {
     const sourceId = result[0].id;
 
     // Auto-start ingestion job
-    const projectCwd = path.join(process.cwd(), "..");
     const prompt = `Ingest raw/${filename}`;
 
     const jobId = await startJob({
       prompt,
       projectCwd,
-      projectId: 1,
+      projectId: project.id,
       type: "ingest",
       title: `Ingest: ${title}`,
       onComplete: (status) => {
@@ -93,7 +103,7 @@ export async function POST(request: NextRequest) {
           .where(eq(sources.id, sourceId))
           .run();
         if (status === "completed") {
-          triggerSynthesisUpdate(projectCwd, 1).catch((err) => {
+          triggerSynthesisUpdate(projectCwd, project.id).catch((err) => {
             console.error("[synthesis] failed to trigger:", err);
           });
         }
