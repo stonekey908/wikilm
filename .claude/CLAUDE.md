@@ -277,13 +277,20 @@ Peripheral polish this session:
 STO-1772 — Dashboard Nudges not scoped to active project (Medium, Done — filed + fixed this session)
 - Surfaced by user at end of session. `/api/dashboard/nudges` was returning all parent-scoped findings unfiltered; `NudgesSection` didn't pass a projectId.
 - Endpoint now accepts `?projectId=` and filters; NudgesSection uses `useProject()` and re-fetches on switch. Hidden/busy state resets across switches so optimistic dismissals don't leak.
-- Same class of bug as STO-1771 — added "audit project-scoping on list endpoints" gotcha.
+- Same class of bug as STO-1771.
+
+STO-1773 — /lint + /sources ingest not scoped to active project (Medium, Done — filed + fixed this session)
+- Third instance of the same class of bug in one session.
+- /lint: 4 call sites (fetchFindings, runLint, fixOne, fixMany) all used hardcoded `projectId: 1`. Now use `activeProject.id` from `useProject()`. fetchFindings defers until project is hydrated; selected-ids reset on project switch.
+- /sources: 3 call sites (addUrl quick-URL ingest, setResultStatus research-approve ingest, uploadFiles multipart upload) had hardcoded `projectId: 1` or omitted it entirely. All now use `activeProject?.id ?? 1`.
+- Added "audit project-scoping on list endpoints" gotcha to prevent recurrence.
 
 Commits (all on main, pushed):
 - 7744bad feat(STO-1766): NotebookLM-style output generation + in-app help
 - bd69947 docs: expand README with lint, nudges, and synthesis/concept screenshots
 - 9427b16 feat: in-UI note capture (STO-1768, STO-1769, STO-1771)
 - 8efd727 fix(STO-1772): scope Dashboard Nudges to active project
+- 4db4d43 fix(STO-1773): scope /lint + /sources ingest to active project
 
 **What's next:**
 - STO-1770: Cascade source removal — delete source + sweep wiki pages it seeded. Bigger scope (touches wiki rewrites), Low priority. Needs design thinking about what "sweep" actually means — find + confirm each affected page, or spawn a rewrite subprocess?
