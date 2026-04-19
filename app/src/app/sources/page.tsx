@@ -403,7 +403,7 @@ function SourcesPageInner() {
           title: fallbackTitle,
           url: parsed.toString(),
           domain: parsed.hostname.replace(/^www\./, ""),
-          projectId: 1,
+          projectId: activeProject?.id ?? 1,
         }),
       });
       if (res.ok) {
@@ -415,18 +415,19 @@ function SourcesPageInner() {
     } finally {
       setAddingUrl(false);
     }
-  }, [quickUrl, addingUrl, refreshSources]);
+  }, [quickUrl, addingUrl, refreshSources, activeProject]);
 
   /* ── Upload handler ── */
   const uploadFiles = useCallback(async (files: FileList | File[]) => {
     const fd = new FormData();
     for (const f of files) fd.append("files", f);
+    if (activeProject) fd.append("projectId", String(activeProject.id));
     const res = await fetch("/api/sources/upload", {
       method: "POST",
       body: fd,
     });
     if (res.ok) refreshSources();
-  }, [refreshSources]);
+  }, [refreshSources, activeProject]);
 
   /* ── Drag & drop ── */
   const handleDrop = useCallback(
@@ -471,7 +472,7 @@ function SourcesPageInner() {
               type: result.type,
               summary: result.summary,
               tags: result.tags,
-              projectId: 1,
+              projectId: activeProject?.id ?? 1,
             }),
           });
           refreshSources();
@@ -480,7 +481,7 @@ function SourcesPageInner() {
         }
       }
     },
-    [results, refreshSources]
+    [results, refreshSources, activeProject]
   );
 
   const approvedCount = results.filter((r) => r.status === "approved").length;

@@ -142,6 +142,7 @@ function wikiPageToHref(targetPage: string | null): string | null {
 export default function LintPage() {
   const router = useRouter();
   const { activeProject } = useProject();
+  const activeProjectId = activeProject?.id ?? null;
   const [data, setData] = useState<FindingsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
@@ -152,8 +153,13 @@ export default function LintPage() {
   const { addToast } = useToast();
 
   const fetchFindings = useCallback(async () => {
+    // Defer until the active project is known so the first paint reflects
+    // the real project, not project 1 via endpoint default.
+    if (activeProjectId === null) return;
     try {
-      const res = await fetch("/api/lint/findings?status=active");
+      const res = await fetch(
+        `/api/lint/findings?status=active&projectId=${activeProjectId}`
+      );
       if (res.ok) {
         const json: FindingsResponse = await res.json();
         setData(json);
@@ -172,9 +178,12 @@ export default function LintPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeProjectId]);
 
+  // Re-fetch when project changes; clear selections so a fix-all from
+  // another project can't fire against stale ids.
   useEffect(() => {
+    setSelected(new Set());
     fetchFindings();
     const interval = setInterval(fetchFindings, 4000);
     return () => clearInterval(interval);
@@ -186,13 +195,13 @@ export default function LintPage() {
   const lintRunning = jobRunning && latestJob?.type === "lint";
 
   async function runLint() {
-    if (starting || jobRunning) return;
+    if (starting || jobRunning || activeProjectId === null) return;
     setStarting(true);
     try {
       const res = await fetch("/api/lint/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId: 1 }),
+        body: JSON.stringify({ projectId: activeProjectId }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -255,11 +264,12 @@ export default function LintPage() {
   }
 
   async function fixOne(id: number) {
+    if (activeProjectId === null) return;
     try {
       const res = await fetch(`/api/lint/findings/${id}/fix`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId: 1 }),
+        body: JSON.stringify({ projectId: activeProjectId }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -294,13 +304,13 @@ export default function LintPage() {
   }
 
   async function fixMany(ids: number[]) {
-    if (ids.length === 0) return;
+    if (ids.length === 0 || activeProjectId === null) return;
     setFixingBulk(true);
     try {
       const res = await fetch("/api/lint/fix", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId: 1, findingIds: ids }),
+        body: JSON.stringify({ projectId: activeProjectId, findingIds: ids }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
