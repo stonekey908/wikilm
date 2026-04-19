@@ -157,6 +157,9 @@ export function ProjectSwitcher() {
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
+  // When creating under a specific parent (via "Add child…"), hold that id
+  // so handleCreate can POST with parentId. null = root-level create.
+  const [createParentId, setCreateParentId] = useState<number | null>(null);
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [collapsed, setCollapsed] = useState<Set<number>>(() => readCollapsed());
   const [moveTarget, setMoveTarget] = useState<TreeNode | null>(null);
@@ -311,7 +314,10 @@ export function ProjectSwitcher() {
       const res = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newName.trim() }),
+        body: JSON.stringify({
+          name: newName.trim(),
+          parentId: createParentId,
+        }),
       });
       if (res.ok) {
         const project = await res.json();
@@ -319,6 +325,7 @@ export function ProjectSwitcher() {
         refreshProjects();
         setNewName("");
         setCreating(false);
+        setCreateParentId(null);
         setOpen(false);
       }
     } catch {
@@ -406,6 +413,17 @@ export function ProjectSwitcher() {
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
+                    onClick={() => {
+                      setMenuOpenFor(null);
+                      setCreateParentId(node.id);
+                      setCreating(true);
+                      setNewName("");
+                    }}
+                    className="w-full text-left px-2 py-1.5 text-[12px] rounded-sm text-[var(--text-2)] hover:bg-[var(--bg-hover)] transition-colors"
+                  >
+                    Add child…
+                  </button>
+                  <button
                     onClick={() => openMoveDialog(node)}
                     className="w-full text-left px-2 py-1.5 text-[12px] rounded-sm text-[var(--text-2)] hover:bg-[var(--bg-hover)] transition-colors"
                   >
@@ -461,22 +479,36 @@ export function ProjectSwitcher() {
 
           {creating ? (
             <div className="px-2 py-1.5">
+              {createParentId !== null && (() => {
+                const parent = projects.find((p) => p.id === createParentId);
+                return parent ? (
+                  <div className="text-[11px] text-[var(--text-3)] mb-1 font-mono truncate">
+                    Under {parent.slug}/
+                  </div>
+                ) : null;
+              })()}
               <input
                 autoFocus
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleCreate();
-                  if (e.key === "Escape") setCreating(false);
+                  if (e.key === "Escape") {
+                    setCreating(false);
+                    setCreateParentId(null);
+                  }
                 }}
-                placeholder="Project name"
+                placeholder={createParentId !== null ? "Child project name" : "Project name"}
                 className="w-full px-2 py-1.5 text-[13px] bg-[var(--bg-2)] border border-[var(--border-input)] rounded-md text-[var(--text-1)] placeholder:text-[var(--text-4)] outline-none focus:ring-2 focus:ring-[var(--ring)]"
               />
             </div>
           ) : (
             <button
               className="flex items-center gap-2 px-2.5 py-2 rounded-md w-full text-[13px] text-[var(--primary)] hover:bg-[var(--bg-hover)] transition-colors duration-100"
-              onClick={() => setCreating(true)}
+              onClick={() => {
+                setCreateParentId(null);
+                setCreating(true);
+              }}
             >
               <Plus className="w-3.5 h-3.5" />
               New Project
