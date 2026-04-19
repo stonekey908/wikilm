@@ -3,7 +3,7 @@ import path from "path";
 import { startJob, getRunningJobCount } from "@/lib/claude-runner";
 import { db } from "@/db";
 import { jobs } from "@/db/schema";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -28,13 +28,14 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export async function GET() {
-  const allJobs = db
-    .select()
-    .from(jobs)
-    .orderBy(desc(jobs.createdAt))
-    .limit(50)
-    .all();
+export async function GET(request: NextRequest) {
+  const param = request.nextUrl.searchParams.get("projectId");
+  const projectId = param ? Number(param) : null;
+  const query = db.select().from(jobs).orderBy(desc(jobs.createdAt)).limit(50);
+  const allJobs =
+    projectId !== null && Number.isFinite(projectId)
+      ? query.where(eq(jobs.projectId, projectId)).all()
+      : query.all();
 
   return Response.json({ jobs: allJobs, runningCount: getRunningJobCount() });
 }
