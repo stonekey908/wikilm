@@ -69,6 +69,11 @@ export async function POST(request: NextRequest) {
     ? body.tags.filter((t: unknown): t is string => typeof t === "string")
     : [];
   const projectIdInput = typeof body?.projectId === "number" ? body.projectId : 1;
+  // Per STO-1743 design Q6: default behavior is PENDING — the raw file + source
+  // row land immediately, and the user manually triggers ingest from /sources.
+  // Callers opt in to immediate ingest with `ingest: true` (used by UI flows
+  // that want the "upload + ingest now" experience).
+  const ingestNow = body?.ingest === true;
 
   if (typeof title !== "string" || !title.trim()) {
     return Response.json({ error: "title is required" }, { status: 400 });
@@ -105,12 +110,21 @@ export async function POST(request: NextRequest) {
       type: "note",
       filePath: `raw/${filename}`,
       meta: JSON.stringify({ tags, programmatic: true }),
-      status: "ingesting",
+      status: ingestNow ? "ingesting" : "pending",
     })
     .returning({ id: sources.id })
     .all();
 
   const sourceId = result[0].id;
+
+  if (!ingestNow) {
+    // Pending path — just captured, not yet ingested. User curates from
+    // /sources (Ingest / Edit / Discard actions).
+    return Response.json(
+      { sourceId, status: "pending", filePath: `raw/${filename}` },
+      { status: 201 }
+    );
+  }
 
   const prompt = `Ingest raw/${filename}`;
 
@@ -134,7 +148,7 @@ export async function POST(request: NextRequest) {
   });
 
   return Response.json(
-    { sourceId, jobId, filePath: `raw/${filename}` },
+    { sourceId, jobId, status: "ingesting", filePath: `raw/${filename}` },
     { status: 201 }
   );
 }
