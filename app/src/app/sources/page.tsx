@@ -5,6 +5,8 @@ import { useSearchParams } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
 import { useProject } from "@/components/project-switcher";
 import { Breadcrumbs } from "@/components/breadcrumbs";
+import { NoteComposerModal } from "@/components/note-composer-modal";
+import { PenLine } from "lucide-react";
 
 /* ──────────────────────────── Types ──────────────────────────── */
 
@@ -142,6 +144,7 @@ function SourcesPageInner() {
   const { addToast } = useToast();
   const { activeProject } = useProject();
   const [tab, setTab] = useState<"library" | "research">("library");
+  const [noteModalOpen, setNoteModalOpen] = useState(false);
   const [sources, setSources] = useState<Source[]>([]);
   const [dragOver, setDragOver] = useState(false);
   // Research state lives in localStorage — survives tab close, reload,
@@ -518,11 +521,29 @@ function SourcesPageInner() {
             Manage raw materials and discover new sources
           </p>
         </div>
-        <button className="flex items-center gap-1.5 text-xs text-[var(--text-3)] bg-[var(--bg-2)] border border-[var(--border)] px-3 py-1.5 rounded-md cursor-pointer transition-all hover:border-[var(--primary)] hover:text-[var(--primary)] shrink-0 mt-0.5">
-          <CrossProjectIcon />
-          Cross-project search
-        </button>
+        <div className="flex items-center gap-2 shrink-0 mt-0.5">
+          <button
+            onClick={() => setNoteModalOpen(true)}
+            className="flex items-center gap-1.5 text-xs text-[var(--primary-fg)] bg-[var(--primary)] border border-transparent px-3 py-1.5 rounded-md cursor-pointer transition-opacity hover:opacity-90"
+          >
+            <PenLine className="w-3.5 h-3.5" />
+            New note
+          </button>
+          <button className="flex items-center gap-1.5 text-xs text-[var(--text-3)] bg-[var(--bg-2)] border border-[var(--border)] px-3 py-1.5 rounded-md cursor-pointer transition-all hover:border-[var(--primary)] hover:text-[var(--primary)]">
+            <CrossProjectIcon />
+            Cross-project search
+          </button>
+        </div>
       </div>
+
+      <NoteComposerModal
+        open={noteModalOpen}
+        onClose={() => setNoteModalOpen(false)}
+        onSubmitted={() => {
+          refreshSources();
+          setNoteModalOpen(false);
+        }}
+      />
 
       {/* ── Tabs ── */}
       <div className="flex border-b border-[var(--border)] mb-6">

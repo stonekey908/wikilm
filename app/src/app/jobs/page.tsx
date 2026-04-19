@@ -20,6 +20,7 @@ import {
   Ban,
   Sparkles,
   Layers,
+  PenLine,
 } from "lucide-react";
 
 interface Job {
@@ -47,6 +48,7 @@ const typeIcons: Record<string, typeof Download> = {
   research: Search,
   synthesis: Layers,
   output: Sparkles,
+  "note-summary": PenLine,
 };
 
 const typeColors: Record<string, { color: string; dim: string }> = {
@@ -57,6 +59,7 @@ const typeColors: Record<string, { color: string; dim: string }> = {
   research: { color: "var(--green)", dim: "var(--green-dim)" },
   synthesis: { color: "var(--chart-4)", dim: "rgba(139,92,246,0.08)" },
   output: { color: "var(--chart-5)", dim: "rgba(236,72,153,0.08)" },
+  "note-summary": { color: "var(--orange)", dim: "var(--orange-dim)" },
 };
 
 const statusFilters = ["all", "running", "queued", "completed", "failed", "cancelled"] as const;

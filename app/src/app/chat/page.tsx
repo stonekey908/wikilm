@@ -21,8 +21,10 @@ import {
   Clipboard,
   FileDown,
   FileText as FileTextIcon,
+  PenLine,
 } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
+import { useProject } from "@/components/project-switcher";
 import { filenameFromMarkdown, markdownToDocumentBlob } from "@/lib/export-docx";
 
 /* ── Markdown helpers ───────────────────────────────────────────── */
@@ -153,16 +155,21 @@ function relativeTime(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString();
 }
 
-const PROJECT_ID = 1; // Default project
+// PROJECT_ID used to be hardcoded here. It now comes from `useProject()`
+// inside the component so sessions, saves, and chat-to-note all land in the
+// active project (fixes STO-1771).
 
 /* ── Component ──────────────────────────────────────────────────── */
 
 export default function ChatPage() {
   const { addToast } = useToast();
+  const { activeProject } = useProject();
+  const activeProjectId = activeProject?.id ?? 1;
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [searchAllProjects, setSearchAllProjects] = useState(false);
+  const [savingAsNote, setSavingAsNote] = useState(false);
 
   // Session state
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -183,14 +190,11 @@ export default function ChatPage() {
     inputRef.current?.focus();
   }, [activeSessionId]);
 
-  // Load sessions on mount
-  useEffect(() => {
-    fetchSessions();
-  }, []);
-
   const fetchSessions = useCallback(async () => {
     try {
-      const res = await fetch("/api/chat/sessions");
+      const res = await fetch(
+        `/api/chat/sessions?projectId=${activeProjectId}`
+      );
       if (res.ok) {
         const data = await res.json();
         setSessions(data.sessions);
@@ -198,7 +202,17 @@ export default function ChatPage() {
     } catch {
       // silently ignore
     }
-  }, []);
+  }, [activeProjectId]);
+
+  // Load + reload sessions when the active project changes so the sidebar
+  // always reflects the project the user is looking at.
+  useEffect(() => {
+    fetchSessions();
+    // Also clear the active thread when switching projects — a session from
+    // another project shouldn't stay open in the main pane.
+    setActiveSessionId(null);
+    setMessages([]);
+  }, [fetchSessions]);
 
   const loadSession = useCallback(async (sessionId: number) => {
     try {
@@ -264,7 +278,7 @@ export default function ChatPage() {
         const res = await fetch("/api/chat/sessions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ projectId: PROJECT_ID, title }),
+          body: JSON.stringify({ projectId: activeProjectId, title }),
         });
         if (!res.ok) return null;
         const session = await res.json();
@@ -275,7 +289,7 @@ export default function ChatPage() {
         return null;
       }
     },
-    []
+    [activeProjectId]
   );
 
   const stopGeneration = useCallback(() => {
@@ -496,6 +510,40 @@ export default function ChatPage() {
     [addToast, downloadBlob]
   );
 
+  // Summarise the whole thread into a pending note via /api/chat/save-as-note.
+  // Different from the per-message "Save to wiki" button: this one captures
+  // the entire conversation as a single curated note, which the user then
+  // ingests from /sources once they've reviewed it.
+  const saveThreadAsNote = useCallback(async () => {
+    if (messages.length < 2 || savingAsNote) return;
+    setSavingAsNote(true);
+    try {
+      const payload = messages.map((m) => ({ role: m.role, content: m.content }));
+      const res = await fetch("/api/chat/save-as-note", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: payload, projectId: activeProjectId }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data?.error || `Request failed (${res.status})`);
+      }
+      addToast({
+        type: "success",
+        title: "Summarising thread…",
+        description: "A draft note will land in /sources when the job finishes.",
+      });
+    } catch (err) {
+      addToast({
+        type: "error",
+        title: "Couldn't save thread as note",
+        description: err instanceof Error ? err.message : "Unknown error",
+      });
+    } finally {
+      setSavingAsNote(false);
+    }
+  }, [messages, savingAsNote, activeProjectId, addToast]);
+
   const saveToWiki = useCallback(
     async (message: Message) => {
       // Find the user question that preceded this answer
@@ -528,16 +576,19 @@ ${message.content}`;
         const response = await fetch("/api/claude/stream", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt }),
+          body: JSON.stringify({ prompt, projectId: activeProjectId }),
         });
         if (response.ok) {
-          alert("Saved to wiki as a query page.");
+          addToast({
+            type: "success",
+            title: "Saved to wiki as a query page",
+          });
         }
       } catch {
-        alert("Failed to save to wiki.");
+        addToast({ type: "error", title: "Failed to save to wiki" });
       }
     },
-    [messages]
+    [messages, activeProjectId, addToast]
   );
 
   return (
@@ -631,18 +682,39 @@ ${message.content}`;
                 Ask questions about your knowledge base
               </p>
             </div>
-            {/* Cross-project toggle */}
-            <button
-              onClick={() => setSearchAllProjects((v) => !v)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] font-medium border transition-all duration-150 ${
-                searchAllProjects
-                  ? "bg-[var(--primary-dim)] border-[var(--primary)] text-[var(--primary)]"
-                  : "bg-[var(--bg-1)] border-[var(--border)] text-[var(--text-3)] hover:border-[var(--border-strong)] hover:text-[var(--text-2)]"
-              }`}
-            >
-              <Globe className="w-3.5 h-3.5" />
-              Search all projects
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Save whole thread as a draft note — enabled once ≥ 2 msgs exist */}
+              <button
+                onClick={saveThreadAsNote}
+                disabled={messages.length < 2 || savingAsNote}
+                title={
+                  messages.length < 2
+                    ? "Ask a question first"
+                    : "Summarise this thread as a pending note in /sources"
+                }
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] font-medium border bg-[var(--bg-1)] border-[var(--border)] text-[var(--text-3)] hover:border-[var(--border-strong)] hover:text-[var(--text-2)] disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-150"
+              >
+                {savingAsNote ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <PenLine className="w-3.5 h-3.5" />
+                )}
+                Save thread as note
+              </button>
+
+              {/* Cross-project toggle */}
+              <button
+                onClick={() => setSearchAllProjects((v) => !v)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[13px] font-medium border transition-all duration-150 ${
+                  searchAllProjects
+                    ? "bg-[var(--primary-dim)] border-[var(--primary)] text-[var(--primary)]"
+                    : "bg-[var(--bg-1)] border-[var(--border)] text-[var(--text-3)] hover:border-[var(--border-strong)] hover:text-[var(--text-2)]"
+                }`}
+              >
+                <Globe className="w-3.5 h-3.5" />
+                Search all projects
+              </button>
+            </div>
           </div>
         </div>
 
