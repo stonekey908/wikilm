@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="wikilm" content='{"output_type":"infographic","scope":"project","project_slug":"ai/llms","generated_at":"2026-04-19","nudge":null,"sources":["sources/best-llms-2026-zapier","concepts/mixture-of-experts","concepts/llm-landscape-2026","concepts/reasoning-models","concepts/multimodal-llms","synthesis/project-overview"]}'>
+<title>LLM Landscape 2026 — WikiLM Infographic</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  width: 1200px;
+  min-height: 1800px;
+  margin: 0;
+  background: #F8FAFC;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, Helvetica, Arial, sans-serif;
+  color: #0F172A;
+}
+
+/* ── 1. Title band (150px) ── */
+.title-band {
+  width: 1200px;
+  height: 150px;
+  background: #0F172A;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+}
+.title-band::before {
+  content: '';
+  position: absolute;
+  left: -80px; top: -80px;
+  width: 300px; height: 300px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(37,99,235,0.14) 0%, transparent 70%);
+}
+.title-band::after {
+  content: '';
+  position: absolute;
+  right: -40px; bottom: -80px;
+  width: 260px; height: 260px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(217,119,6,0.10) 0%, transparent 70%);
+}
+.title-band h1 {
+  font-size: 46px;
+  font-weight: 900;
+  color: #F8FAFC;
+  letter-spacing: -1.5px;
+  position: relative;
+  z-index: 1;
+}
+.title-band h1 em { color: #60A5FA; font-style: normal; }
+.title-band .subtitle {
+  font-size: 13px;
+  color: #64748B;
+  font-weight: 500;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  position: relative;
+  z-index: 1;
+}
+
+/* ── 2. Stats row (220px) ── */
+.stats-row {
+  width: 1200px;
+  height: 220px;
+  background: #0A0F1E;
+  display: flex;
+  align-items: center;
+  padding: 0 32px;
+  border-top: 1px solid rgba(255,255,255,0.04);
+}
+.stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  text-align: center;
+  border-right: 1px solid rgba(255,255,255,0.06);
+}
+.stat:last-child { border-right: none; }
+.stat-val {
+  font-size: 60px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -2px;
+}
+.stat-lbl {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #94A3B8;
+  margin-top: 10px;
+  line-height: 1.5;
+}
+.stat-src {
+  font-size: 10px;
+  color: #334155;
+  margin-top: 6px;
+}
+.cv { color: #60A5FA; }
+.ca { color: #FCD34D; }
+.ct { color: #34D399; }
+
+/* ── 3. Diagram section (620px) ── */
+.diagram-section {
+  width: 1200px;
+  height: 620px;
+  padding: 32px 30px 20px;
+  background: #F8FAFC;
+}
+.section-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2.5px;
+  color: #94A3B8;
+  margin-bottom: 18px;
+}
+
+/* ── 4. Callouts (730px) ── */
+.callouts-section {
+  width: 1200px;
+  min-height: 730px;
+  padding: 36px 30px 40px;
+  background: #F1F5F9;
+  border-top: 2px solid #E2E8F0;
+}
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+  margin-top: 20px;
+}
+.card {
+  background: #FFFFFF;
+  border-radius: 10px;
+  padding: 24px 22px 20px;
+  border: 1px solid #E2E8F0;
+  border-top: 5px solid;
+}
+.card.b  { border-top-color: #2563EB; }
+.card.a  { border-top-color: #D97706; }
+.card.t  { border-top-color: #0D9488; }
+.card-icon {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  font-weight: 900;
+  margin-bottom: 12px;
+  line-height: 1;
+}
+.card.b .card-icon { background: #EFF6FF; color: #2563EB; }
+.card.a .card-icon { background: #FFFBEB; color: #D97706; }
+.card.t .card-icon { background: #F0FDFA; color: #0D9488; }
+.card h3 {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: #0F172A;
+  line-height: 1.35;
+}
+.card p {
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: #475569;
+}
+.card .src {
+  font-size: 10px;
+  color: #94A3B8;
+  margin-top: 14px;
+  font-style: italic;
+}
+
+/* ── 5. Footer (80px) ── */
+.footer {
+  width: 1200px;
+  height: 80px;
+  background: #0A0F1E;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 40px;
+}
+.footer-brand { font-size: 13px; color: #64748B; font-weight: 600; }
+.footer-sources { font-size: 10px; color: #334155; max-width: 680px; line-height: 1.5; text-align: center; }
+.footer-slug { font-size: 12px; color: #475569; }
+</style>
+</head>
+<body>
+
+<!-- ── 1. TITLE BAND ── -->
+<div class="title-band">
+  <h1>The <em>2026 LLM</em> Landscape</h1>
+  <div class="subtitle">21 Models &nbsp;·&nbsp; 3 Tectonic Shifts &nbsp;·&nbsp; 1 Geographic Fault Line</div>
+</div>
+
+<!-- ── 2. STATS ROW ── -->
+<div class="stats-row">
+  <div class="stat">
+    <div class="stat-val cv">21</div>
+    <div class="stat-lbl">Models<br>Evaluated</div>
+    <div class="stat-src">Zapier Best LLMs 2026</div>
+  </div>
+  <div class="stat">
+    <div class="stat-val ca">8</div>
+    <div class="stat-lbl">MoE<br>Flagships</div>
+    <div class="stat-src">concepts/mixture-of-experts</div>
+  </div>
+  <div class="stat">
+    <div class="stat-val ct">2M</div>
+    <div class="stat-lbl">Max Context<br>Window (tokens)</div>
+    <div class="stat-src">xAI Grok 4 · concepts/llm-landscape-2026</div>
+  </div>
+  <div class="stat">
+    <div class="stat-val ca">2T</div>
+    <div class="stat-lbl">Largest Model<br>Params (Llama 4 MoE)</div>
+    <div class="stat-src">sources/best-llms-2026-zapier</div>
+  </div>
+  <div class="stat">
+    <div class="stat-val cv">6</div>
+    <div class="stat-lbl">Chinese<br>Open Labs</div>
+    <div class="stat-src">concepts/llm-landscape-2026</div>
+  </div>
+</div>
+
+<!-- ── 3. MAIN DIAGRAM ── -->
+<div class="diagram-section">
+  <div class="section-label">Geographic &amp; Structural Fault Line — 2026</div>
+
+  <svg width="1140" height="548" viewBox="0 0 1140 548" xmlns="http://www.w3.org/2000/svg" style="display:block;">
+    <defs>
+      <linearGradient id="gl" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#EFF6FF"/>
+        <stop offset="100%" stop-color="#DBEAFE"/>
+      </linearGradient>
+      <linearGradient id="gr" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#FEF3C7"/>
+        <stop offset="100%" stop-color="#FFFBEB"/>
+      </linearGradient>
+    </defs>
+
+    <!-- Panel backgrounds -->
+    <rect x="0"   y="0" width="510" height="548" rx="12" fill="url(#gl)" stroke="#BFDBFE" stroke-width="1.5"/>
+    <rect x="630" y="0" width="510" height="548" rx="12" fill="url(#gr)" stroke="#FDE68A" stroke-width="1.5"/>
+
+    <!-- Center zone -->
+    <rect x="510" y="0" width="120" height="548" fill="#F0FDF4"/>
+    <line x1="570" y1="16" x2="570" y2="532" stroke="#86EFAC" stroke-width="1" stroke-dasharray="4 4"/>
+
+    <!-- Column headers -->
+    <text x="255" y="28" text-anchor="middle" font-size="14" font-weight="800" fill="#1D4ED8" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" letter-spacing="0.5">WEST · PROPRIETARY</text>
+    <text x="885" y="28" text-anchor="middle" font-size="14" font-weight="800" fill="#B45309" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif" letter-spacing="0.5">EAST · OPEN-WEIGHT</text>
+    <text x="570" y="28" text-anchor="middle" font-size="9"  font-weight="700" fill="#16A34A" font-family="-apple-system,system-ui,sans-serif" letter-spacing="2">SHARED</text>
+
+    <!-- ── TIER BANDS ── -->
+    <!-- Flagship band -->
+    <rect x="6"   y="40" width="498" height="172" rx="6" fill="rgba(37,99,235,0.04)" stroke="#BFDBFE" stroke-width="0.5"/>
+    <rect x="624" y="40" width="510" height="172" rx="6" fill="rgba(217,119,6,0.04)"  stroke="#FDE68A" stroke-width="0.5"/>
+    <text x="18"  y="56" font-size="8" font-weight="700" fill="#93C5FD" font-family="-apple-system,system-ui,sans-serif" letter-spacing="2">FLAGSHIP</text>
+    <text x="636" y="56" font-size="8" font-weight="700" fill="#FCD34D" font-family="-apple-system,system-ui,sans-serif" letter-spacing="2">FLAGSHIP</text>
+
+    <!-- General band -->
+    <rect x="6"   y="222" width="498" height="154" rx="6" fill="rgba(37,99,235,0.03)" stroke="#BFDBFE" stroke-width="0.5"/>
+    <rect x="624" y="222" width="510" height="154" rx="6" fill="rgba(217,119,6,0.03)"  stroke="#FDE68A" stroke-width="0.5"/>
+    <text x="18"  y="238" font-size="8" font-weight="700" fill="#93C5FD" font-family="-apple-system,system-ui,sans-serif" letter-spacing="2">GENERAL</text>
+    <text x="636" y="238" font-size="8" font-weight="700" fill="#FCD34D" font-family="-apple-system,system-ui,sans-serif" letter-spacing="2">GENERAL</text>
+
+    <!-- Edge / Small band -->
+    <rect x="6"   y="386" width="498" height="150" rx="6" fill="rgba(37,99,235,0.02)" stroke="#BFDBFE" stroke-width="0.5"/>
+    <rect x="624" y="386" width="510" height="150" rx="6" fill="rgba(217,119,6,0.02)"  stroke="#FDE68A" stroke-width="0.5"/>
+    <text x="18"  y="402" font-size="8" font-weight="700" fill="#93C5FD" font-family="-apple-system,system-ui,sans-serif" letter-spacing="2">EDGE / SMALL</text>
+    <text x="636" y="402" font-size="8" font-weight="700" fill="#FCD34D" font-family="-apple-system,system-ui,sans-serif" letter-spacing="2">EDGE / SMALL</text>
+
+    <!-- ── LEFT MODEL CARDS (col A x=18 w=222, col B x=270 w=222) ── -->
+
+    <!-- Flagship row 1 -->
+    <rect x="18"  y="64" width="222" height="56" rx="7" fill="white" stroke="#93C5FD" stroke-width="1.5"/>
+    <rect x="18"  y="64" width="5"   height="56" rx="2.5" fill="#2563EB"/>
+    <text x="34"  y="87" font-size="14" font-weight="700" fill="#1E3A8A" font-family="-apple-system,system-ui,sans-serif">GPT-5.4</text>
+    <text x="34"  y="106" font-size="11" fill="#64748B" font-family="-apple-system,system-ui,sans-serif">OpenAI · multimodal · reasoning</text>
+
+    <rect x="270" y="64" width="222" height="56" rx="7" fill="white" stroke="#93C5FD" stroke-width="1.5"/>
+    <rect x="270" y="64" width="5"   height="56" rx="2.5" fill="#7C3AED"/>
+    <text x="286" y="87" font-size="14" font-weight="700" fill="#1E3A8A" font-family="-apple-system,system-ui,sans-serif">Claude 4.7</text>
+    <text x="286" y="106" font-size="11" fill="#64748B" font-family="-apple-system,system-ui,sans-serif">Anthropic · multimodal · reasoning</text>
+
+    <!-- Flagship row 2 -->
+    <rect x="18"  y="132" width="222" height="56" rx="7" fill="white" stroke="#93C5FD" stroke-width="1.5"/>
+    <rect x="18"  y="132" width="5"   height="56" rx="2.5" fill="#0891B2"/>
+    <text x="34"  y="155" font-size="14" font-weight="700" fill="#1E3A8A" font-family="-apple-system,system-ui,sans-serif">Gemini 3.1</text>
+    <text x="34"  y="174" font-size="11" fill="#64748B" font-family="-apple-system,system-ui,sans-serif">Google DeepMind · 1M ctx</text>
+
+    <rect x="270" y="132" width="222" height="56" rx="7" fill="white" stroke="#93C5FD" stroke-width="1.5"/>
+    <rect x="270" y="132" width="5"   height="56" rx="2.5" fill="#DC2626"/>
+    <text x="286" y="155" font-size="14" font-weight="700" fill="#1E3A8A" font-family="-apple-system,system-ui,sans-serif">Grok 4</text>
+    <text x="286" y="174" font-size="11" fill="#64748B" font-family="-apple-system,system-ui,sans-serif">xAI · 2M ctx window · reasoning</text>
+    <!-- 2M badge -->
+    <rect x="451" y="130" width="32" height="15" rx="7" fill="#DC2626"/>
+    <text x="467" y="141" text-anchor="middle" font-size="8.5" font-weight="700" fill="white" font-family="-apple-system,system-ui,sans-serif">2M</text>
+
+    <!-- General row 1 -->
+    <rect x="18"  y="247" width="222" height="56" rx="7" fill="white" stroke="#BFDBFE" stroke-width="1"/>
+    <rect x="18"  y="247" width="5"   height="56" rx="2.5" fill="#0D9488"/>
+    <text x="34"  y="270" font-size="14" font-weight="700" fill="#1E3A8A" font-family="-apple-system,system-ui,sans-serif">Command A</text>
+    <text x="34"  y="289" font-size="11" fill="#64748B" font-family="-apple-system,system-ui,sans-serif">Cohere · enterprise-focused</text>
+
+    <rect x="270" y="247" width="222" height="56" rx="7" fill="white" stroke="#BFDBFE" stroke-width="1"/>
+    <rect x="270" y="247" width="5"   height="56" rx="2.5" fill="#0891B2"/>
+    <text x="286" y="270" font-size="14" font-weight="700" fill="#1E3A8A" font-family="-apple-system,system-ui,sans-serif">Nova 2</text>
+    <text x="286" y="289" font-size="11" fill="#64748B" font-family="-apple-system,system-ui,sans-serif">Amazon · 1M ctx window</text>
+
+    <!-- Edge row 1 -->
+    <rect x="18"  y="412" width="222" height="56" rx="7" fill="white" stroke="#BFDBFE" stroke-width="1"/>
+    <rect x="18"  y="412" width="5"   height="56" rx="2.5" fill="#64748B"/>
+    <text x="34"  y="435" font-size="14" font-weight="700" fill="#1E3A8A" font-family="-apple-system,system-ui,sans-serif">Phi</text>
+    <text x="34"  y="454" font-size="11" fill="#64748B" font-family="-apple-system,system-ui,sans-serif">Microsoft · 3B–15B · reasoning</text>
+
+    <!-- West footer -->
+    <rect x="6" y="480" width="498" height="52" rx="7" fill="rgba(37,99,235,0.07)"/>
+    <text x="255" y="500" text-anchor="middle" font-size="11" font-weight="600" fill="#3B82F6" font-family="-apple-system,system-ui,sans-serif">7 western labs · API-gated · enterprise contracts</text>
+    <text x="255" y="518" text-anchor="middle" font-size="10" fill="#60A5FA" font-family="-apple-system,system-ui,sans-serif">OpenAI · Anthropic · Google · xAI · Cohere · Amazon · Microsoft</text>
+
+    <!-- ── RIGHT MODEL CARDS (col A x=634 w=222, col B x=884 w=222) ── -->
+
+    <!-- Flagship row 1 -->
+    <rect x="634" y="64" width="222" height="56" rx="7" fill="white" stroke="#FCD34D" stroke-width="1.5"/>
+    <rect x="850" y="64" width="5"   height="56" rx="2.5" fill="#D97706"/>
+    <text x="648" y="87" font-size="14" font-weight="700" fill="#92400E" font-family="-apple-system,system-ui,sans-serif">Llama 4</text>
+    <text x="648" y="106" font-size="11" fill="#64748B" font-family="-apple-system,system-ui,sans-serif">Meta · 2T params MoE · multimodal</text>
+
+    <!-- Parity border: DeepSeek -->
+    <rect x="884" y="64" width="222" height="56" rx="7" fill="white" stroke="#F59E0B" stroke-width="2.5"/>
+    <rect x="1100" y="64" width="5" height="56" rx="2.5" fill="#D97706"/>
+    <text x="898" y="87" font-size="14" font-weight="700" fill="#92400E" font-family="-apple-system,system-ui,sans-serif">DeepSeek R1/V3.2</text>
+    <text x="898" y="106" font-size="11" fill="#64748B" font-family="-apple-system,system-ui,sans-serif">DeepSeek · 671B MoE · reasoning</text>
+    <rect x="1062" y="60" width="40" height="16" rx="8" fill="#D97706"/>
+    <text x="1082" y="72" text-anchor="middle" font-size="8.5" font-weight="700" fill="white" font-family="-apple-system,system-ui,sans-serif">≈SOTA</text>
+
+    <!-- Flagship row 2 -->
+    <rect x="634" y="132" width="222" height="56" rx="7" fill="white" stroke="#FCD34D" stroke-width="1.5"/>
+    <rect x="850" y="132" width="5"   height="56" rx="2.5" fill="#D97706"/>
+    <text x="648" y="155" font-size="14" font-weight="700" fill="#92400E" font-family="-apple-system,system-ui,sans-serif">Kimi K2.5</text>
+    <text x="648" y="174" font-size="11" fill="#64748B" font-family="-apple-system,system-ui,sans-serif">Moonshot AI · 1T MoE · reasoning</text>
+
+    <!-- Parity border: Qwen 3.5 Max -->
+    <rect x="884" y="132" width="222" height="56" rx="7" fill="white" stroke="#F59E0B" stroke-width="2.5"/>
+    <rect x="1100" y="132" width="5" height="56" rx="2.5" fill="#D97706"/>
+    <text x="898" y="155" font-size="14" font-weight="700" fill="#92400E" font-family="-apple-system,system-ui,sans-serif">Qwen 3.5 Max</text>
+    <text x="898" y="174" font-size="11" fill="#64748B" font-family="-apple-system,system-ui,sans-serif">Alibaba · 235B MoE · reasoning</text>
+    <rect x="1062" y="128" width="40" height="16" rx="8" fill="#D97706"/>
+    <text x="1082" y="140" text-anchor="middle" font-size="8.5" font-weight="700" fill="white" font-family="-apple-system,system-ui,sans-serif">≈SOTA</text>
+
+    <!-- General row 1 -->
+    <rect x="634" y="247" width="222" height="56" rx="7" fill="white" stroke="#FDE68A" stroke-width="1"/>
+    <rect x="850" y="247" width="5"   height="56" rx="2.5" fill="#B45309"/>
+    <text x="648" y="270" font-size="14" font-weight="700" fill="#92400E" font-family="-apple-system,system-ui,sans-serif">Mistral 3</text>
+    <text x="648" y="289" font-size="11" fill="#64748B" font-family="-apple-system,system-ui,sans-serif">Mistral AI · 675B / 41B active (MoE)</text>
+
+    <rect x="884" y="247" width="222" height="56" rx="7" fill="white" stroke="#FDE68A" stroke-width="1"/>
+    <rect x="1100" y="247" width="5" height="56" rx="2.5" fill="#B45309"/>
+    <text x="898" y="270" font-size="14" font-weight="700" fill="#92400E" font-family="-apple-system,system-ui,sans-serif">GLM-5</text>
+    <text x="898" y="289" font-size="11" fill="#64748B" font-family="-apple-system,system-ui,sans-serif">Z.ai · 744B MoE · reasoning</text>
+
+    <!-- General row 2 -->
+    <rect x="634" y="315" width="222" height="56" rx="7" fill="white" stroke="#FDE68A" stroke-width="1"/>
+    <rect x="850" y="315" width="5"   height="56" rx="2.5" fill="#B45309"/>
+    <text x="648" y="338" font-size="14" font-weight="700" fill="#92400E" font-family="-apple-system,system-ui,sans-serif">MiniMax M2.5</text>
+    <text x="648" y="357" font-size="11" fill="#64748B" font-family="-apple-system,system-ui,sans-serif">MiniMax · 230B MoE · reasoning</text>
+
+    <rect x="884" y="315" width="222" height="56" rx="7" fill="white" stroke="#FDE68A" stroke-width="1"/>
+    <rect x="1100" y="315" width="5" height="56" rx="2.5" fill="#B45309"/>
+    <text x="898" y="338" font-size="14" font-weight="700" fill="#92400E" font-family="-apple-system,system-ui,sans-serif">MiMo-V2-Flash</text>
+    <text x="898" y="357" font-size="11" fill="#64748B" font-family="-apple-system,system-ui,sans-serif">Xiaomi · 309B MoE</text>
+
+    <!-- Edge row 1 -->
+    <rect x="634" y="412" width="222" height="56" rx="7" fill="white" stroke="#FDE68A" stroke-width="1"/>
+    <rect x="850" y="412" width="5"   height="56" rx="2.5" fill="#64748B"/>
+    <text x="648" y="435" font-size="14" font-weight="700" fill="#92400E" font-family="-apple-system,system-ui,sans-serif">Gemma 3</text>
+    <text x="648" y="454" font-size="11" fill="#64748B" font-family="-apple-system,system-ui,sans-serif">Google · 270M–27B params</text>
+
+    <rect x="884" y="412" width="222" height="56" rx="7" fill="white" stroke="#FDE68A" stroke-width="1"/>
+    <rect x="1100" y="412" width="5" height="56" rx="2.5" fill="#64748B"/>
+    <text x="898" y="435" font-size="14" font-weight="700" fill="#92400E" font-family="-apple-system,system-ui,sans-serif">gpt-oss</text>
+    <text x="898" y="454" font-size="11" fill="#64748B" font-family="-apple-system,system-ui,sans-serif">OpenAI · 21B–117B params</text>
+
+    <!-- East footer -->
+    <rect x="624" y="480" width="510" height="52" rx="7" fill="rgba(217,119,6,0.07)"/>
+    <text x="879" y="500" text-anchor="middle" font-size="11" font-weight="600" fill="#B45309" font-family="-apple-system,system-ui,sans-serif">6 chinese labs · open-weight · strategic release</text>
+    <text x="879" y="518" text-anchor="middle" font-size="10" fill="#D97706" font-family="-apple-system,system-ui,sans-serif">DeepSeek · Alibaba · Moonshot · MiniMax · Xiaomi · Z.ai</text>
+
+    <!-- ── CENTER STRIP: shared capability markers ── -->
+    <rect x="517" y="72"  width="106" height="36" rx="6" fill="#DCFCE7" stroke="#86EFAC" stroke-width="1"/>
+    <text x="570" y="88"  text-anchor="middle" font-size="10" font-weight="700" fill="#166534" font-family="-apple-system,system-ui,sans-serif">MoE</text>
+    <text x="570" y="101" text-anchor="middle" font-size="9"  fill="#16A34A"  font-family="-apple-system,system-ui,sans-serif">Architecture</text>
+
+    <rect x="517" y="140" width="106" height="36" rx="6" fill="#DCFCE7" stroke="#86EFAC" stroke-width="1"/>
+    <text x="570" y="156" text-anchor="middle" font-size="10" font-weight="700" fill="#166534" font-family="-apple-system,system-ui,sans-serif">Reasoning</text>
+    <text x="570" y="169" text-anchor="middle" font-size="9"  fill="#16A34A"  font-family="-apple-system,system-ui,sans-serif">Table Stakes</text>
+
+    <rect x="517" y="255" width="106" height="36" rx="6" fill="#DCFCE7" stroke="#86EFAC" stroke-width="1"/>
+    <text x="570" y="271" text-anchor="middle" font-size="10" font-weight="700" fill="#166534" font-family="-apple-system,system-ui,sans-serif">Multimodal</text>
+    <text x="570" y="284" text-anchor="middle" font-size="9"  fill="#16A34A"  font-family="-apple-system,system-ui,sans-serif">Text + Vision</text>
+
+    <!-- Parity badge (center) -->
+    <rect x="514" y="333" width="112" height="66" rx="10" fill="#16A34A"/>
+    <text x="570" y="358" text-anchor="middle" font-size="16" font-weight="900" fill="white" font-family="-apple-system,system-ui,sans-serif">PARITY</text>
+    <text x="570" y="376" text-anchor="middle" font-size="9"  font-weight="700" fill="#BBF7D0" font-family="-apple-system,system-ui,sans-serif">ACHIEVED</text>
+    <text x="570" y="392" text-anchor="middle" font-size="9"  fill="#86EFAC" font-family="-apple-system,system-ui,sans-serif">Open = Proprietary</text>
+    <!-- Arrows -->
+    <line x1="514" y1="366" x2="492" y2="366" stroke="#16A34A" stroke-width="2"/>
+    <polygon points="492,362 478,366 492,370" fill="#16A34A"/>
+    <line x1="626" y1="366" x2="650" y2="366" stroke="#16A34A" stroke-width="2"/>
+    <polygon points="650,362 664,366 650,370" fill="#16A34A"/>
+
+    <rect x="517" y="420" width="106" height="36" rx="6" fill="#F0FDF4" stroke="#86EFAC" stroke-width="1"/>
+    <text x="570" y="436" text-anchor="middle" font-size="10" font-weight="700" fill="#166534" font-family="-apple-system,system-ui,sans-serif">Efficiency</text>
+    <text x="570" y="449" text-anchor="middle" font-size="9"  fill="#16A34A"  font-family="-apple-system,system-ui,sans-serif">Over Raw Compute</text>
+
+    <!-- Legend: ≈SOTA -->
+    <text x="510" y="540" text-anchor="middle" font-size="9" fill="#94A3B8" font-family="-apple-system,system-ui,sans-serif">≈SOTA = benchmarks at or above proprietary frontier (Zapier 2026)</text>
+  </svg>
+</div>
+
+<!-- ── 4. CALLOUTS ── -->
+<div class="callouts-section">
+  <div class="section-label">Key Insights — Sourced From This Wiki</div>
+  <div class="cards-grid">
+
+    <div class="card b">
+      <div class="card-icon">=</div>
+      <h3>Open Models Now Match Proprietary</h3>
+      <p>Qwen 3.5 Max "matches or exceeds models like DeepSeek V3.2, Grok 4, and Claude 4.6 Opus." The proprietary tier's moat is narrowing fast, driven entirely by Chinese open-weight labs releasing at frontier quality.</p>
+      <div class="src">From sources/best-llms-2026-zapier</div>
+    </div>
+
+    <div class="card a">
+      <div class="card-icon">∑</div>
+      <h3>MoE is the Universal Architecture</h3>
+      <p>8 flagship 2026 models use Mixture-of-Experts. Mistral 3 activates only 41B of 675B total parameters per token — about 6%. MoE makes direct parameter comparisons across models "impossible," per the wiki; active compute is the real metric.</p>
+      <div class="src">From concepts/mixture-of-experts</div>
+    </div>
+
+    <div class="card t">
+      <div class="card-icon">↔</div>
+      <h3>Context Window Race at 2M Tokens</h3>
+      <p>Grok 4 leads at 2 million tokens. Gemini 3.1 and Amazon Nova 2 both offer 1 million. The gap between the leader and second tier is already 2×. Whether extreme context windows deliver practical utility at scale is flagged as a knowledge gap in this wiki.</p>
+      <div class="src">From concepts/llm-landscape-2026</div>
+    </div>
+
+    <div class="card b">
+      <div class="card-icon">∞</div>
+      <h3>Reasoning is Now Table Stakes</h3>
+      <p>Extended chain-of-thought inference ships in GPT-5.4, Claude 4.7, and Grok 4 on the proprietary side; and DeepSeek R1, Qwen 3.5 Max, GLM-5, Kimi K2.5, and MiniMax M2.5 on the open side. It is no longer a product differentiator — higher latency is the only cost.</p>
+      <div class="src">From concepts/reasoning-models · synthesis/project-overview</div>
+    </div>
+
+    <div class="card a">
+      <div class="card-icon">◎</div>
+      <h3>The Geographic Split Is Strategic</h3>
+      <p>Western labs monetise via API access and enterprise contracts. Chinese labs release open weights as "a competitive and political strategy" countering Western gatekeeping. Six Chinese labs — DeepSeek, Alibaba, Moonshot, MiniMax, Xiaomi, Z.ai — now field frontier-class models independently.</p>
+      <div class="src">From concepts/llm-landscape-2026</div>
+    </div>
+
+    <div class="card t">
+      <div class="card-icon">★</div>
+      <h3>DeepSeek Rewrote the Efficiency Story</h3>
+      <p>DeepSeek "achieved state-of-the-art performance using more limited computer hardware and less financial investment than typical LLMs." This proved that frontier results no longer require frontier compute budgets — a finding that reframes the competitive dynamics of the entire landscape.</p>
+      <div class="src">From sources/best-llms-2026-zapier</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── 5. FOOTER ── -->
+<div class="footer">
+  <div class="footer-brand">Generated by WikiLM</div>
+  <div class="footer-sources">
+    Sources: sources/best-llms-2026-zapier · concepts/mixture-of-experts · concepts/llm-landscape-2026 · concepts/reasoning-models · concepts/multimodal-llms · synthesis/project-overview
+  </div>
+  <div class="footer-slug">ai/llms · 2026-04-19</div>
+</div>
+
+</body>
+</html>

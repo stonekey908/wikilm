@@ -14,9 +14,12 @@ import {
   Settings,
   Sun,
   Moon,
+  HelpCircle,
 } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { ProjectSwitcher } from "@/components/project-switcher";
+import { RunningJobsPanel } from "@/components/running-jobs-panel";
+import { HelpModal } from "@/components/help-modal";
 
 interface NavItem {
   label: string;
@@ -40,7 +43,7 @@ const settingsItem = { label: "Settings", href: "/settings", icon: Settings };
 interface SidebarData {
   sourceCount: number;
   runningJobs: number;
-  activeJob: { title: string; progress: string | null } | null;
+  activeJob: { title: string; progress: string | null; model: string | null } | null;
 }
 
 export function Sidebar() {
@@ -51,6 +54,19 @@ export function Sidebar() {
     runningJobs: 0,
     activeJob: null,
   });
+  const [jobsPanelOpen, setJobsPanelOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "?" && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
+        e.preventDefault();
+        setHelpOpen((v) => !v);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const fetchSidebarData = useCallback(async () => {
     try {
@@ -64,7 +80,11 @@ export function Sidebar() {
           sourceCount: 0, // Will be populated by sources API
           runningJobs: running?.length ?? 0,
           activeJob: running?.[0]
-            ? { title: running[0].title, progress: running[0].progress }
+            ? {
+                title: running[0].title,
+                progress: running[0].progress,
+                model: running[0].model ?? null,
+              }
             : null,
         });
       }
@@ -175,29 +195,62 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="p-2 border-t border-[var(--border)]">
-        {/* Active Job Indicator */}
+        {/* Active Job Indicator — click to open the full running-jobs panel */}
         {data.activeJob && (
-          <div className="flex items-center gap-2 px-2.5 py-2 bg-[var(--bg-2)] border border-[var(--border)] rounded-md mb-1.5">
+          <button
+            onClick={() => setJobsPanelOpen(true)}
+            className="w-full flex items-center gap-2 px-2.5 py-2 bg-[var(--bg-2)] border border-[var(--border)] hover:border-[var(--border-strong)] rounded-md mb-1.5 text-left transition-colors cursor-pointer"
+            title="Show all running jobs"
+          >
             <div className="w-3 h-3 border-[1.5px] border-[var(--border-strong)] border-t-[var(--primary)] rounded-full animate-spin shrink-0" />
             <div className="min-w-0 flex-1">
               <div className="text-[12px] font-medium text-[var(--text-2)] truncate">
                 {data.activeJob.title}
               </div>
-              {data.activeJob.progress && (
-                <div className="text-[10px] text-[var(--text-3)] font-mono">
-                  {(() => {
-                    try {
-                      const p = JSON.parse(data.activeJob.progress);
-                      return `${p.current} / ${p.total}`;
-                    } catch {
-                      return "";
-                    }
-                  })()}
-                </div>
-              )}
+              <div className="text-[10px] text-[var(--text-3)] font-mono flex items-center gap-1 flex-wrap">
+                {data.activeJob.model && (
+                  <span className="px-1 rounded bg-[var(--bg-3)] truncate max-w-[120px]">
+                    {data.activeJob.model}
+                  </span>
+                )}
+                {(() => {
+                  if (!data.activeJob.progress) return null;
+                  try {
+                    const p = JSON.parse(data.activeJob.progress);
+                    return (
+                      <span>
+                        {p.current} / {p.total}
+                      </span>
+                    );
+                  } catch {
+                    return null;
+                  }
+                })()}
+                {data.runningJobs > 1 && (
+                  <span className="text-[var(--primary)] font-[600]">
+                    +{data.runningJobs - 1} more
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
+          </button>
         )}
+        <RunningJobsPanel
+          open={jobsPanelOpen}
+          onClose={() => setJobsPanelOpen(false)}
+        />
+
+        <button
+          onClick={() => setHelpOpen(true)}
+          className="flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[13px] font-[450] text-[var(--text-3)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)] w-full text-left transition-all duration-100"
+          title="How WikiLM works (press ?)"
+        >
+          <HelpCircle className="w-4 h-4 shrink-0 opacity-55" />
+          Help
+          <span className="ml-auto text-[10px] font-mono px-1 rounded bg-[var(--bg-2)] text-[var(--text-4)]">
+            ?
+          </span>
+        </button>
 
         <button
           onClick={toggleTheme}
@@ -211,6 +264,8 @@ export function Sidebar() {
           {resolvedTheme === "dark" ? "Light mode" : "Dark mode"}
         </button>
       </div>
+
+      <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
     </aside>
   );
 }

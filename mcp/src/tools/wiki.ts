@@ -160,6 +160,73 @@ export async function saveLearning(input: z.infer<typeof saveLearningSchema>) {
 }
 
 /**
+ * generate_output — POST /api/projects/:id/outputs/generate
+ *
+ * Queues a Claude subprocess that writes a generated artifact (report, deck,
+ * cheat sheet, summary, or infographic) to the project's wiki/outputs/.
+ * Returns the jobId immediately; callers poll get_job_status until it reports
+ * `completed`, then read the files by base slug (same pattern as the UI).
+ *
+ * For decks + infographics, a post-job hook produces derived formats (.pdf,
+ * .pptx, .png) alongside the primary file. All derivations share the same
+ * base slug so clients can enumerate them without a second API call.
+ */
+export const generateOutputSchema = z
+  .object({
+    type: z
+      .enum(["report", "cheat", "summary", "deck", "infographic"])
+      .describe(
+        "Output type: report (structured md+docx), cheat (dense 1-pager md+docx), summary (500-word brief md+docx), deck (Marp slides md+pdf+pptx), infographic (single-page html+png)."
+      ),
+    scope: z
+      .enum(["project", "subtree"])
+      .default("project")
+      .describe(
+        "project = this project only. subtree = this project plus all descendants (parent-style synthesis)."
+      ),
+    nudge: z
+      .string()
+      .optional()
+      .describe(
+        'Optional focus/audience hint, e.g. "focus on commercial implications" or "audience: technical".'
+      ),
+    project: z
+      .string()
+      .optional()
+      .describe(
+        "Project slug. If omitted, resolved from CWD map or falls back to root."
+      ),
+  })
+  .strict();
+
+export async function generateOutput(
+  input: z.infer<typeof generateOutputSchema>
+) {
+  const project = await resolveProject(input.project);
+  const res = await api.post<{
+    jobId: number;
+    baseSlug: string;
+    primaryPath: string;
+    type: string;
+    scope: string;
+  }>(`/api/projects/${project.id}/outputs/generate`, {
+    type: input.type,
+    scope: input.scope ?? "project",
+    nudge: input.nudge,
+  });
+  return {
+    project: { id: project.id, slug: project.slug, name: project.name },
+    jobId: res.jobId,
+    baseSlug: res.baseSlug,
+    primaryPath: res.primaryPath,
+    type: res.type,
+    scope: res.scope,
+    note:
+      "Job queued. Poll get_job_status(jobId) until status=completed. Files land in wiki/outputs/ under the returned baseSlug.",
+  };
+}
+
+/**
  * get_job_status — GET /api/claude/job then filter to the given id.
  * The app's endpoint doesn't support a jobId filter, so we pull the
  * recent list (up to 50) and match in-process.

@@ -37,6 +37,8 @@ import {
   listWikiPagesSchema,
   saveLearning,
   saveLearningSchema,
+  generateOutput,
+  generateOutputSchema,
   getJobStatus,
   getJobStatusSchema,
 } from "./tools/wiki.js";
@@ -187,6 +189,21 @@ async function main() {
       },
     },
     wrap(saveLearning)
+  );
+
+  server.registerTool(
+    "generate_output",
+    {
+      title: "Generate a WikiLM output artifact",
+      description:
+        "Queue an LLM-generated artifact (report, deck, cheat sheet, summary, or infographic) from a project's wiki content. Returns jobId + baseSlug; poll get_job_status(jobId) until completed, then the files exist at wiki/outputs/<baseSlug>.<ext> with the derived formats (.docx, .pdf, .pptx, .png) alongside.",
+      inputSchema: generateOutputSchema.shape,
+      annotations: {
+        destructiveHint: false,
+        openWorldHint: true,
+      },
+    },
+    wrap(generateOutput)
   );
 
   server.registerTool(

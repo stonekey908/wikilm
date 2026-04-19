@@ -89,14 +89,18 @@ const ENV_MODELS: Record<string, string | undefined> = {
   fix: process.env.CLAUDE_MODEL_FIX ?? process.env.CLAUDE_MODEL,
   chat: process.env.CLAUDE_MODEL_CHAT ?? process.env.CLAUDE_MODEL,
   synthesis: process.env.CLAUDE_MODEL_SYNTHESIS ?? process.env.CLAUDE_MODEL,
+  output: process.env.CLAUDE_MODEL_OUTPUT ?? process.env.CLAUDE_MODEL,
 };
 
 /**
  * Resolve the model setting for a given operation type.
  * Returns raw value — may be a Claude alias (e.g. "sonnet") or an Ollama id
  * ("ollama:qwen2.5-coder:7b"). Caller dispatches based on the prefix.
+ *
+ * Exported so route handlers can log + persist the model in the same form
+ * the subprocess spawns with.
  */
-function getModel(type: string): string {
+export function getModel(type: string): string {
   const key = `model_${type}`;
   const row = db.select().from(settings).where(eq(settings.key, key)).get();
   return row?.value ?? ENV_MODELS[type] ?? "sonnet";
@@ -119,7 +123,7 @@ interface JobOptions {
   prompt: string;
   projectCwd: string;
   projectId: number;
-  type: "ingest" | "query" | "lint" | "fix" | "research" | "synthesis";
+  type: "ingest" | "query" | "lint" | "fix" | "research" | "synthesis" | "output";
   title: string;
   onComplete?: (status: "completed" | "failed") => void;
 }
@@ -398,6 +402,7 @@ export async function startJob(options: JobOptions): Promise<number> {
         type: options.type,
         title: options.title,
         status: "running",
+        model: "mock",
         startedAt: new Date().toISOString(),
       })
       .returning({ id: jobs.id })
@@ -448,6 +453,7 @@ export async function startJob(options: JobOptions): Promise<number> {
         status: "failed",
         error: preflight.error,
         errorCode: preflight.code,
+        model,
         startedAt: now,
         completedAt: now,
       })
@@ -458,7 +464,9 @@ export async function startJob(options: JobOptions): Promise<number> {
     return jobId;
   }
 
-  // Create job record
+  // Create job record. `model` is captured here (the model resolved at
+  // spawn time) so /jobs + the running-jobs panel can display which LLM
+  // drove each job — important because settings can change between runs.
   const isQueued =
     runningProcesses.size + inFlightOllamaCount + inFlightGeminiCount >= MAX_CONCURRENT_JOBS;
   const result = db
@@ -468,6 +476,7 @@ export async function startJob(options: JobOptions): Promise<number> {
       type: options.type,
       title: options.title,
       status: isQueued ? "queued" : "running",
+      model,
       startedAt: isQueued ? null : new Date().toISOString(),
     })
     .returning({ id: jobs.id })

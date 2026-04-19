@@ -103,6 +103,32 @@ function CrossProjectIcon() {
 // Page default is a thin Suspense wrapper around SourcesPageInner; the
 // inner component is what uses useSearchParams(). Next.js 16 requires
 // the boundary for prerender — see STO-1759.
+
+/**
+ * Resolve a human-readable subtitle for a source card.
+ *
+ * `author` is the ideal — it's already human. If absent, `meta` may contain
+ * a JSON blob from the ingest pipeline — parse it and prefer known fields
+ * (`domain`, `summary`). Fall back to the type label so cards never render
+ * raw JSON braces again. Previously the subtitle was `author ?? meta ??
+ * "Unknown"`, which dumped `{"tags":[...],...}` directly into the UI for
+ * every programmatically-created note.
+ */
+function humanizeSubtitle(s: Source): string {
+  if (s.author && s.author.trim()) return s.author;
+  if (s.meta && s.meta.trim().startsWith("{")) {
+    try {
+      const parsed = JSON.parse(s.meta) as Record<string, unknown>;
+      if (typeof parsed.domain === "string" && parsed.domain) return parsed.domain;
+      if (typeof parsed.summary === "string" && parsed.summary) return parsed.summary;
+    } catch {
+      // fall through to type label
+    }
+  }
+  const typeLabel = s.type.charAt(0).toUpperCase() + s.type.slice(1);
+  return typeLabel;
+}
+
 export default function SourcesPage() {
   return (
     <Suspense fallback={null}>
@@ -624,7 +650,7 @@ function SourcesPageInner() {
                   {s.title}
                 </div>
                 <div className="text-[11px] text-[var(--text-3)]">
-                  {s.author ?? s.meta ?? "Unknown"} &middot;{" "}
+                  {humanizeSubtitle(s)} &middot;{" "}
                   {new Date(s.createdAt).toLocaleDateString("en-US", {
                     month: "short",
                     year: "numeric",

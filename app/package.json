@@ -14,6 +14,7 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@marp-team/marp-cli": "^4.3.1",
     "better-sqlite3": "^12.9.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -21,6 +22,7 @@
     "drizzle-orm": "^0.45.2",
     "lucide-react": "^1.8.0",
     "next": "16.2.3",
+    "puppeteer-core": "^24.41.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "shadcn": "^4.2.0",
