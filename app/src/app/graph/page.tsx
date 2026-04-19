@@ -222,11 +222,36 @@ export default function GraphPage() {
   }, []);
 
   // Map projectId -> color lookup for subtree-mode node coloring and legend.
+  // In subtree mode, prefer a deterministic distinct palette over the user's
+  // picked colors so clusters stay visually separable even when two projects
+  // happen to share the default teal. Projects beyond the palette fall back
+  // to their own color.
+  const SUBTREE_PALETTE = useMemo(
+    () => [
+      "var(--chart-1)",
+      "var(--chart-2)",
+      "var(--chart-3)",
+      "var(--chart-4)",
+      "var(--chart-5)",
+      "#f59e0b", // amber
+      "#ec4899", // pink
+      "#14b8a6", // teal
+    ],
+    []
+  );
   const projectColor = useMemo(() => {
     const m = new Map<number, string>();
-    for (const p of projects) m.set(p.id, p.color);
+    if (effectiveScope === "subtree") {
+      // Deterministic ordering: by project id so assignment is stable.
+      const ordered = [...projects].sort((a, b) => a.id - b.id);
+      ordered.forEach((p, i) => {
+        m.set(p.id, SUBTREE_PALETTE[i % SUBTREE_PALETTE.length]);
+      });
+    } else {
+      for (const p of projects) m.set(p.id, p.color);
+    }
     return m;
-  }, [projects]);
+  }, [projects, effectiveScope, SUBTREE_PALETTE]);
 
   const projectName = useMemo(() => {
     const m = new Map<number, string>();
