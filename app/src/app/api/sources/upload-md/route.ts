@@ -25,8 +25,6 @@ import { getProject, projectRoot } from "@/lib/projects";
  * multipart /api/sources/upload endpoint.
  */
 
-const RAW_DIR = path.join(process.cwd(), "..", "raw");
-
 function slugify(input: string): string {
   return input
     .toLowerCase()
@@ -35,10 +33,10 @@ function slugify(input: string): string {
     .slice(0, 80) || "note";
 }
 
-function uniqueFilename(baseSlug: string): string {
+function uniqueFilename(rawDir: string, baseSlug: string): string {
   let candidate = `${baseSlug}.md`;
   let i = 2;
-  while (fs.existsSync(path.join(RAW_DIR, candidate))) {
+  while (fs.existsSync(path.join(rawDir, candidate))) {
     candidate = `${baseSlug}-${i}.md`;
     i++;
   }
@@ -88,11 +86,15 @@ export async function POST(request: NextRequest) {
   }
   const projectId = project.id;
   const projectCwd = projectRoot(project);
+  // Per-project raw dir so markdown lives alongside the project's wiki
+  // instead of polluting the top-level raw/ (which was the previous
+  // behavior and would orphan files for nested projects on ingest).
+  const rawDir = path.join(projectCwd, "raw");
 
-  await mkdir(RAW_DIR, { recursive: true });
+  await mkdir(rawDir, { recursive: true });
 
-  const filename = uniqueFilename(slugify(title));
-  const filePath = path.join(RAW_DIR, filename);
+  const filename = uniqueFilename(rawDir, slugify(title));
+  const filePath = path.join(rawDir, filename);
 
   // If the caller didn't include frontmatter, prepend one so downstream ingest
   // has consistent metadata to work with.
