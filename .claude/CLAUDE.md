@@ -219,11 +219,50 @@ Outstanding: STO-1766 (NotebookLM-style output generation, High — new, next se
 ## Last Session
 
 ```
-**Date:** 2026-04-18 → 2026-04-19 (multi-day)
+**Date:** 2026-04-19 (short MCP-only session)
 **Who:** Claude session
 **What was done:**
 
-Design + ship + UAT + polish on parent/child nesting, then MCP v1:
+Dogfooding run on the WikiLM MCP server from inside the WikiLM repo itself:
+
+- Explored existing `ai/` project — read synthesis + 4 concept pages (us-china competition, benchmarks, agentic commerce, ai-for-science). Content held up on inspection.
+- Created new sub-project `coding/wikilm` (id=12) under `coding/` to house generic engineering patterns extracted from this repo's own history.
+- Authored + ingested one consolidated source: "Engineering Lessons from Building WikiLM" — 7 reusable patterns with pattern-first framing, WikiLM case-study anchors, and cross-links.
+- Ingest ran clean end-to-end via MCP `save_learning` + background job polling (sqlite-backed Monitor).
+
+Pages produced under `projects/coding/wikilm/wiki/`:
+- 1 source summary (sources/engineering-lessons-from-building-wikilm)
+- 1 entity page (entities/wikilm) — auto-extracted
+- 7 concept pages:
+  - subprocess-cwd-discipline
+  - burst-coalescing
+  - provider-prefix-dispatch
+  - non-interactive-subprocess-flags
+  - dual-source-of-truth-drift
+  - data-layout-enumerator-cascade
+  - generative-pipeline-link-integrity
+- 1 synthesis/project-overview — auto-generated, substantive, clusters patterns into (subprocess hygiene / drift / scale+integrity), flags 4 real gaps (link validator TODO, Ollama streaming, STO-1766 output gen, STO-1767 MCP v2).
+- index.md + log.md updated by ingest.
+
+Spot-checked `concepts/burst-coalescing` — extraction preserved negative case ("do not apply to per-event work"), named `claude-runner.ts`, cross-links are purposeful, 5 inbound backlinks.
+
+Prior multi-day work (STO-1758 nesting + STO-1743 MCP v1 + STO-1759/60/61/62/63 + STO-1764/1765) remains shipped; see git log 177f504…857f362 for those details.
+
+Tickets filed but not touched (still open):
+- STO-1766: Output generation — reports/slides/infographics (NotebookLM-style). High priority.
+- STO-1767: MCP v2 destructive ops (move/delete/promote preview-confirm pairs). Low.
+
+**What's next:**
+- STO-1766 output generation is still the top new item. Fresh session recommended — design a "Generate output" panel with 5 types (report/deck/infographic/cheat/summary), scope toggle, nudge input, endpoint wiring + prompt templates per type.
+- Optional: add more dev-project concept contributions under `coding/wikilm` or start seeding `coding/codeview` so the `coding/` parent synthesis has more to roll up.
+
+**Branch:** main (content committed this session).
+**Blockers:** None.
+```
+
+## Prior Session (2026-04-18 → 2026-04-19)
+
+Prior multi-day session shipped parent/child nesting + MCP v1:
 
 STO-1758 — WikiLM parent/child project nesting (Done)
 - 8 vertical slices: foundation → nav → cross-project links → move → children section → graph scope → parent synthesis/lint → dashboard nudges
