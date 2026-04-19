@@ -300,7 +300,7 @@ Commits (all on main, pushed):
 - Optional: expose via LAN or cloudflared tunnel for remote/mobile access (no auth today — don't expose broadly without basic auth).
 - Optional: start dogfooding output generation more — the ai/llms example artifacts are good, but we haven't produced any for coding/wikilm yet.
 
-**Branch:** main (clean, pushed to origin at 9427b16 before this update).
+**Branch:** main (clean, pushed to origin at bebc00c — see full commit list above).
 **Blockers:** None.
 ```
 
