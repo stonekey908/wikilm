@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
 import { useProject } from "@/components/project-switcher";
@@ -100,7 +100,18 @@ function CrossProjectIcon() {
 
 /* ──────────────────────────── Page ──────────────────────────── */
 
+// Page default is a thin Suspense wrapper around SourcesPageInner; the
+// inner component is what uses useSearchParams(). Next.js 16 requires
+// the boundary for prerender — see STO-1759.
 export default function SourcesPage() {
+  return (
+    <Suspense fallback={null}>
+      <SourcesPageInner />
+    </Suspense>
+  );
+}
+
+function SourcesPageInner() {
   const searchParams = useSearchParams();
   const { addToast } = useToast();
   const { activeProject } = useProject();
@@ -152,7 +163,8 @@ export default function SourcesPage() {
   /* ── Fetch sources (poll while any are ingesting) ── */
   useEffect(() => {
     const fetchSources = () => {
-      fetch("/api/sources")
+      const qp = activeProject ? `?projectId=${activeProject.id}` : "";
+      fetch(`/api/sources${qp}`)
         .then((r) => r.json())
         .then((d) => setSources(d.sources ?? []))
         .catch(() => {});
@@ -160,7 +172,7 @@ export default function SourcesPage() {
     fetchSources();
     const interval = setInterval(fetchSources, 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [activeProject]);
 
   /* ── Research stream ──
      append=true keeps existing results and passes their URLs as
@@ -315,9 +327,10 @@ export default function SourcesPage() {
 
   /* ── Refresh sources helper ── */
   const refreshSources = useCallback(async () => {
-    const d = await fetch("/api/sources").then((r) => r.json());
+    const qp = activeProject ? `?projectId=${activeProject.id}` : "";
+    const d = await fetch(`/api/sources${qp}`).then((r) => r.json());
     setSources(d.sources ?? []);
-  }, []);
+  }, [activeProject]);
 
   /* ── Delete source ── */
   const deleteSource = useCallback(async (id: number) => {
