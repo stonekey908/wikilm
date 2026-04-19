@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SecondBrain — Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@350..700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ─── Nova Light Theme ─── */
+  :root, [data-theme="light"] {
+    --bg-0: #ffffff;
+    --bg-1: #f9fafb;
+    --bg-2: #f3f4f6;
+    --bg-3: #e5e7eb;
+    --bg-hover: rgba(0,0,0,0.02);
+    --bg-active: rgba(0,0,0,0.05);
+    --surface-card: #ffffff;
+    --border: #e5e7eb;
+    --border-strong: #d1d5db;
+    --border-input: #d1d5db;
+    --text-1: #09090b;
+    --text-2: #3f3f46;
+    --text-3: #71717a;
+    --text-4: #a1a1aa;
+    --primary: #0d9488;
+    --primary-fg: #ffffff;
+    --primary-dim: rgba(13,148,136,0.08);
+    --primary-hover: #0f766e;
+    --green: #16a34a;
+    --green-dim: rgba(22,163,74,0.08);
+    --red: #dc2626;
+    --red-dim: rgba(220,38,38,0.08);
+    --blue: #2563eb;
+    --blue-dim: rgba(37,99,235,0.08);
+    --orange: #ea580c;
+    --orange-dim: rgba(234,88,12,0.08);
+    --chart-1: #0d9488;
+    --chart-2: #3b82f6;
+    --chart-3: #6366f1;
+    --chart-4: #8b5cf6;
+    --chart-5: #ec4899;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,0.1);
+    --ring: rgba(13,148,136,0.25);
+  }
+
+  /* ─── Nova Dark Theme ─── */
+  [data-theme="dark"] {
+    --bg-0: #09090b;
+    --bg-1: #0f0f12;
+    --bg-2: #18181b;
+    --bg-3: #27272a;
+    --bg-hover: rgba(255,255,255,0.03);
+    --bg-active: rgba(255,255,255,0.06);
+    --surface-card: #111114;
+    --border: #27272a;
+    --border-strong: #3f3f46;
+    --border-input: #3f3f46;
+    --text-1: #fafafa;
+    --text-2: #d4d4d8;
+    --text-3: #71717a;
+    --text-4: #52525b;
+    --primary: #14b8a6;
+    --primary-fg: #042f2e;
+    --primary-dim: rgba(20,184,166,0.1);
+    --primary-hover: #2dd4bf;
+    --green: #22c55e;
+    --green-dim: rgba(34,197,94,0.1);
+    --red: #ef4444;
+    --red-dim: rgba(239,68,68,0.1);
+    --blue: #3b82f6;
+    --blue-dim: rgba(59,130,246,0.1);
+    --orange: #f97316;
+    --orange-dim: rgba(249,115,22,0.1);
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+    --ring: rgba(20,184,166,0.3);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg-0);
+    color: var(--text-1);
+    height: 100vh;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  .app { display: flex; height: 100vh; }
+
+  /* ─── Sidebar ─── */
+  .sidebar {
+    width: 240px;
+    background: var(--bg-1);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .sidebar-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 16px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo-mark {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    background: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .logo-mark svg { width: 14px; height: 14px; }
+
+  .logo-text {
+    font-size: 14px;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    color: var(--text-1);
+  }
+
+  /* ─── Project Switcher ─── */
+  .project-switcher {
+    margin: 10px 10px 4px;
+    padding: 8px 10px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: all 150ms ease;
+  }
+
+  .project-switcher:hover { border-color: var(--border-strong); }
+
+  .project-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--primary);
+    flex-shrink: 0;
+  }
+
+  .project-info { flex: 1; min-width: 0; }
+
+  .project-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-1);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .project-stats {
+    font-size: 11px;
+    color: var(--text-3);
+  }
+
+  .project-chevron {
+    color: var(--text-4);
+    flex-shrink: 0;
+  }
+
+  /* ─── Project Dropdown ─── */
+  .project-dropdown {
+    position: absolute;
+    top: 100px;
+    left: 10px;
+    width: 220px;
+    background: var(--surface-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--shadow-lg);
+    z-index: 50;
+    padding: 4px;
+    display: none;
+  }
+
+  .project-dropdown.open { display: block; }
+
+  .project-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 100ms;
+    font-size: 13px;
+    color: var(--text-2);
+  }
+
+  .project-dropdown-item:hover { background: var(--bg-hover); }
+  .project-dropdown-item.active { background: var(--primary-dim); color: var(--primary); font-weight: 550; }
+
+  .project-dropdown-item .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .project-dropdown-divider { height: 1px; background: var(--border); margin: 4px 0; }
+
+  .project-dropdown-item.new-project { color: var(--primary); }
+
+  /* ─── Nav ─── */
+  .nav-section {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 8px 8px 0;
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .nav-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-4);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 12px 10px 6px;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 450;
+    color: var(--text-3);
+    cursor: pointer;
+    transition: all 100ms ease;
+    text-decoration: none;
+  }
+
+  .nav-item:hover { background: var(--bg-hover); color: var(--text-2); }
+  .nav-item.active { background: var(--bg-active); color: var(--text-1); font-weight: 550; }
+
+  .nav-icon { width: 16px; height: 16px; flex-shrink: 0; opacity: 0.55; }
+  .nav-item.active .nav-icon { opacity: 0.85; }
+  .nav-item:hover .nav-icon { opacity: 0.7; }
+
+  .nav-badge {
+    margin-left: auto;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--primary-dim);
+    color: var(--primary);
+    padding: 1px 6px;
+    border-radius: 10px;
+  }
+
+  .nav-badge.running {
+    background: var(--green-dim);
+    color: var(--green);
+    animation: pulse 2s ease infinite;
+  }
+
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+
+  .nav-divider { height: 1px; background: var(--border); margin: 6px 2px; }
+
+  /* ─── Sidebar Footer ─── */
+  .sidebar-footer {
+    padding: 8px;
+    border-top: 1px solid var(--border);
+  }
+
+  .job-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 6px;
+  }
+
+  .mini-spinner {
+    width: 12px; height: 12px;
+    border: 1.5px solid var(--border-strong);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .job-indicator-text {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-2);
+    flex: 1;
+  }
+
+  .job-indicator-sub {
+    font-size: 10px;
+    color: var(--text-3);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .theme-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 450;
+    color: var(--text-3);
+    cursor: pointer;
+    transition: all 100ms ease;
+    background: none;
+    border: none;
+    width: 100%;
+    font-family: inherit;
+    text-align: left;
+  }
+
+  .theme-toggle:hover { background: var(--bg-hover); color: var(--text-2); }
+
+  /* ─── Main Content ─── */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+  }
+
+  .main-scroll {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--bg-3) transparent;
+  }
+
+  .main-scroll::-webkit-scrollbar { width: 6px; }
+  .main-scroll::-webkit-scrollbar-track { background: transparent; }
+  .main-scroll::-webkit-scrollbar-thumb { background: var(--bg-3); border-radius: 3px; }
+
+  .page-content { padding: 32px 40px; max-width: 960px; }
+
+  /* ─── Page Header ─── */
+  .page-header {
+    margin-bottom: 24px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+
+  .page-title {
+    font-size: 22px;
+    font-weight: 650;
+    color: var(--text-1);
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+  }
+
+  .page-subtitle {
+    font-size: 14px;
+    color: var(--text-3);
+    margin-top: 4px;
+    font-weight: 400;
+  }
+
+  .cross-project-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-3);
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 150ms;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+
+  .cross-project-toggle:hover { border-color: var(--primary); color: var(--primary); }
+
+  /* ─── Tabs ─── */
+  .tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+
+  .tab {
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-3);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 120ms ease;
+    margin-bottom: -1px;
+  }
+
+  .tab:hover { color: var(--text-2); }
+  .tab.active { color: var(--text-1); border-bottom-color: var(--primary); }
+
+  .tab-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-4);
+    margin-left: 4px;
+  }
+
+  .tab.active .tab-count { color: var(--primary); }
+
+  /* ─── Research Input ─── */
+  .research-input-wrap {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .research-input {
+    flex: 1;
+    background: var(--bg-0);
+    border: 1px solid var(--border-input);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--text-1);
+    outline: none;
+    transition: all 150ms ease;
+  }
+
+  .research-input::placeholder { color: var(--text-4); }
+  .research-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--ring); }
+
+  .btn-primary {
+    background: var(--primary);
+    color: var(--primary-fg);
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 10px 18px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 150ms ease;
+    white-space: nowrap;
+  }
+
+  .btn-primary:hover { background: var(--primary-hover); }
+
+  /* ─── Status Bar ─── */
+  .research-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: var(--primary-dim);
+    border: 1px solid rgba(13,148,136,0.15);
+    border-radius: 8px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    color: var(--primary);
+    animation: fadeIn 200ms ease;
+  }
+
+  [data-theme="dark"] .research-status { border-color: rgba(20,184,166,0.15); }
+
+  .research-spinner {
+    width: 14px; height: 14px;
+    border: 2px solid rgba(13,148,136,0.2);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    flex-shrink: 0;
+  }
+
+  .progress-track {
+    flex: 1;
+    height: 3px;
+    background: rgba(13,148,136,0.15);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    width: 65%;
+    background: var(--primary);
+    border-radius: 2px;
+    animation: grow 3s ease-out forwards;
+  }
+
+  @keyframes grow { from { width: 10%; } to { width: 65%; } }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+  .cancel-link {
+    color: var(--text-3);
+    font-size: 12px;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    flex-shrink: 0;
+  }
+
+  .cancel-link:hover { color: var(--text-2); }
+
+  /* ─── Bulk Bar ─── */
+  .bulk-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding: 8px 12px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--text-3);
+  }
+
+  .bulk-bar .ct { font-weight: 600; color: var(--text-2); }
+  .bulk-bar .sep { opacity: 0.3; }
+
+  .btn-sm {
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg-0);
+    color: var(--text-3);
+    cursor: pointer;
+    transition: all 120ms;
+  }
+
+  .btn-sm:hover { border-color: var(--border-strong); color: var(--text-2); }
+
+  .btn-sm.primary-sm {
+    background: var(--primary-dim);
+    color: var(--primary);
+    border-color: transparent;
+    margin-left: auto;
+  }
+
+  .btn-sm.primary-sm:hover { background: rgba(13,148,136,0.15); }
+
+  /* ─── Result Cards ─── */
+  .results-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-4);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 12px;
+  }
+
+  .cards { display: flex; flex-direction: column; gap: 8px; }
+
+  .card {
+    background: var(--surface-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px;
+    transition: all 150ms ease;
+    animation: cardIn 300ms ease backwards;
+  }
+
+  .card:nth-child(1) { animation-delay: 0ms; }
+  .card:nth-child(2) { animation-delay: 60ms; }
+  .card:nth-child(3) { animation-delay: 120ms; }
+  .card:nth-child(4) { animation-delay: 180ms; }
+  .card:nth-child(5) { animation-delay: 240ms; }
+
+  .card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-sm); }
+
+  @keyframes cardIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  .card-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 6px;
+  }
+
+  .card-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-1);
+    line-height: 1.4;
+  }
+
+  .card-relevance {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 7px;
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
+
+  .rel-high { background: var(--green-dim); color: var(--green); }
+  .rel-med { background: var(--blue-dim); color: var(--blue); }
+  .rel-low { background: var(--bg-2); color: var(--text-3); }
+
+  .card-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-3);
+    margin-bottom: 8px;
+  }
+
+  .dot { width: 2px; height: 2px; border-radius: 50%; background: var(--text-4); }
+
+  .card-summary {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-2);
+    margin-bottom: 12px;
+  }
+
+  .card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 12px;
+  }
+
+  .tag {
+    font-size: 11px;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--bg-2);
+    color: var(--text-3);
+  }
+
+  .card-actions {
+    display: flex;
+    gap: 6px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+
+  .btn-action {
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 550;
+    padding: 5px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 120ms ease;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border: none;
+  }
+
+  .btn-approve { background: var(--green-dim); color: var(--green); }
+  .btn-approve:hover { background: rgba(22,163,74,0.15); }
+  .btn-skip { background: transparent; color: var(--text-3); border: 1px solid var(--border) !important; }
+  .btn-skip:hover { background: var(--bg-hover); color: var(--text-2); }
+  .btn-bookmark { background: var(--primary-dim); color: var(--primary); }
+  .btn-bookmark:hover { background: rgba(13,148,136,0.15); }
+  .btn-preview { background: transparent; color: var(--text-3); border: 1px solid var(--border) !important; margin-left: auto; }
+  .btn-preview:hover { background: var(--bg-hover); color: var(--text-2); }
+
+  /* ─── Approved State ─── */
+  .card.approved { border-color: rgba(22,163,74,0.2); }
+  [data-theme="dark"] .card.approved { border-color: rgba(34,197,94,0.2); }
+
+  .approved-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 550;
+    color: var(--green);
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+
+  .approved-bar .progress-text {
+    margin-left: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-3);
+  }
+
+  .mini-spinner-green {
+    width: 12px; height: 12px;
+    border: 1.5px solid var(--green-dim);
+    border-top-color: var(--green);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  /* ─── Library Tab ─── */
+  .drop-zone {
+    border: 1.5px dashed var(--border-strong);
+    border-radius: 8px;
+    padding: 28px;
+    text-align: center;
+    color: var(--text-3);
+    font-size: 13px;
+    transition: all 200ms ease;
+    cursor: pointer;
+    margin-bottom: 20px;
+  }
+
+  .drop-zone:hover { border-color: var(--primary); background: var(--primary-dim); color: var(--text-2); }
+  .drop-zone-hint { font-size: 11px; color: var(--text-4); margin-top: 4px; }
+
+  .lib-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 8px;
+  }
+
+  .lib-card {
+    background: var(--surface-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    transition: all 150ms;
+  }
+
+  .lib-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-sm); }
+
+  .lib-type {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-4);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .lib-type-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .lib-type-dot.pdf { background: var(--red); }
+  .lib-type-dot.web { background: var(--blue); }
+  .lib-type-dot.note { background: var(--orange); }
+
+  .lib-title { font-size: 13px; font-weight: 600; color: var(--text-1); line-height: 1.35; margin-bottom: 4px; }
+  .lib-meta { font-size: 11px; color: var(--text-3); }
+
+  .lib-status {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 8px;
+    font-size: 11px;
+    font-weight: 550;
+  }
+
+  .lib-status.ingested { color: var(--green); }
+  .lib-status.pending { color: var(--orange); }
+  .lib-status-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+  /* ─── Toast ─── */
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--surface-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--text-1);
+    box-shadow: var(--shadow-lg);
+    animation: toastIn 300ms ease backwards;
+    animation-delay: 1.5s;
+    z-index: 100;
+  }
+
+  @keyframes toastIn { from { opacity:0; transform: translateY(8px) scale(0.98); } to { opacity:1; transform: translateY(0) scale(1); } }
+
+  .toast-icon {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--green-dim);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .toast-icon svg { width: 11px; height: 11px; }
+  .toast-body strong { font-weight: 600; }
+  .toast-sub { font-size: 12px; color: var(--text-3); }
+  .toast-x { margin-left: 8px; color: var(--text-4); cursor: pointer; font-size: 15px; line-height: 1; }
+  .toast-x:hover { color: var(--text-2); }
+
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ═══ SIDEBAR ═══ -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo-mark">
+        <svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.8"><circle cx="8" cy="8" r="3.5"/><path d="M8 1v3M8 12v3M1 8h3M12 8h3"/></svg>
+      </div>
+      <span class="logo-text">SecondBrain</span>
+    </div>
+
+    <!-- Project Switcher -->
+    <div class="project-switcher" onclick="toggleDropdown()">
+      <div class="project-dot"></div>
+      <div class="project-info">
+        <div class="project-name">AI Research</div>
+        <div class="project-stats">24 sources &middot; 87 pages</div>
+      </div>
+      <svg class="project-chevron" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 6.5l3 3 3-3"/></svg>
+    </div>
+
+    <!-- Project Dropdown -->
+    <div class="project-dropdown" id="projectDropdown">
+      <div class="project-dropdown-item active">
+        <span class="dot" style="background: var(--primary);"></span>
+        AI Research
+      </div>
+      <div class="project-dropdown-item">
+        <span class="dot" style="background: var(--blue);"></span>
+        Regulatory Compliance
+      </div>
+      <div class="project-dropdown-item">
+        <span class="dot" style="background: var(--orange);"></span>
+        Personal Notes
+      </div>
+      <div class="project-dropdown-item">
+        <span class="dot" style="background: #8b5cf6;"></span>
+        Investment Research
+      </div>
+      <div class="project-dropdown-divider"></div>
+      <div class="project-dropdown-item new-project">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/></svg>
+        New Project
+      </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="nav-section">
+      <div class="nav-label">Navigate</div>
+      <a class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="1.5" width="5" height="5" rx="1"/><rect x="9.5" y="1.5" width="5" height="5" rx="1"/><rect x="1.5" y="9.5" width="5" height="5" rx="1"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/></svg>
+        Dashboard
+      </a>
+      <a class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 2h7l3 3v9H3V2z"/><path d="M10 2v3h3"/><path d="M5.5 7.5h5M5.5 10h3.5"/></svg>
+        Wiki
+      </a>
+      <a class="nav-item active">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1v8M4.5 5.5L8 9l3.5-3.5"/><path d="M2 10v3h12v-3"/></svg>
+        Sources
+        <span class="nav-badge">24</span>
+      </a>
+      <a class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 10.5a1.5 1.5 0 01-1.5 1.5h-7L2 15V3.5A1.5 1.5 0 013.5 2h9A1.5 1.5 0 0114 3.5z"/></svg>
+        Chat
+      </a>
+      <a class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><polyline points="8,4 8,8 11,10"/></svg>
+        Jobs
+        <span class="nav-badge running">1</span>
+      </a>
+      <a class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="4" cy="4" r="2"/><circle cx="12" cy="4" r="2"/><circle cx="4" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><line x1="6" y1="4" x2="10" y2="4"/><line x1="4" y1="6" x2="4" y2="10"/><line x1="6" y1="5.5" x2="10" y2="10.5"/></svg>
+        Graph
+      </a>
+
+      <div class="nav-divider"></div>
+
+      <a class="nav-item">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2.5"/><line x1="8" y1="1" x2="8" y2="3.5"/><line x1="8" y1="12.5" x2="8" y2="15"/><line x1="1" y1="8" x2="3.5" y2="8"/><line x1="12.5" y1="8" x2="15" y2="8"/></svg>
+        Settings
+      </a>
+    </div>
+
+    <!-- Footer -->
+    <div class="sidebar-footer">
+      <div class="job-indicator">
+        <div class="mini-spinner"></div>
+        <div>
+          <div class="job-indicator-text">Ingesting source...</div>
+          <div class="job-indicator-sub">4 / 12 pages</div>
+        </div>
+      </div>
+      <button class="theme-toggle" onclick="toggleTheme()">
+        <svg class="nav-icon" id="theme-icon-light" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="3.5"/><line x1="8" y1="1" x2="8" y2="3"/><line x1="8" y1="13" x2="8" y2="15"/><line x1="1" y1="8" x2="3" y2="8"/><line x1="13" y1="8" x2="15" y2="8"/></svg>
+        <svg class="nav-icon hidden" id="theme-icon-dark" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13.5,9.5 A5.5,5.5 0 1,1 6.5,2.5 A4,4 0 0,0 13.5,9.5"/></svg>
+        <span id="theme-label">Dark mode</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ═══ MAIN ═══ -->
+  <div class="main">
+    <div class="main-scroll">
+      <div class="page-content">
+
+        <div class="page-header">
+          <div>
+            <h1 class="page-title">Sources</h1>
+            <p class="page-subtitle">Manage raw materials and discover new sources</p>
+          </div>
+          <button class="cross-project-toggle">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="6" r="5"/><circle cx="11" cy="11" r="5"/></svg>
+            Cross-project search
+          </button>
+        </div>
+
+        <div class="tabs">
+          <div class="tab" id="tab-library" onclick="switchTab('library')">Library <span class="tab-count">24</span></div>
+          <div class="tab active" id="tab-research" onclick="switchTab('research')">Research <span class="tab-count">5</span></div>
+        </div>
+
+        <!-- ═══ LIBRARY ═══ -->
+        <div id="content-library" class="hidden">
+          <div class="drop-zone">
+            <div style="font-size: 20px; margin-bottom: 6px; opacity: 0.4;">+</div>
+            Drop files here or click to upload
+            <div class="drop-zone-hint">PDF, Markdown, Text, HTML</div>
+          </div>
+          <div class="lib-grid">
+            <div class="lib-card">
+              <div class="lib-type"><span class="lib-type-dot pdf"></span>PDF</div>
+              <div class="lib-title">Karpathy — LLM Wiki Second Brain</div>
+              <div class="lib-meta">Medium &middot; Apr 2026</div>
+              <div class="lib-status ingested"><span class="lib-status-dot"></span> Ingested &middot; 14 pages</div>
+            </div>
+            <div class="lib-card">
+              <div class="lib-type"><span class="lib-type-dot web"></span>Web</div>
+              <div class="lib-title">Attention Is All You Need</div>
+              <div class="lib-meta">arXiv &middot; 2017</div>
+              <div class="lib-status ingested"><span class="lib-status-dot"></span> Ingested &middot; 22 pages</div>
+            </div>
+            <div class="lib-card">
+              <div class="lib-type"><span class="lib-type-dot web"></span>Web</div>
+              <div class="lib-title">The Bitter Lesson — Rich Sutton</div>
+              <div class="lib-meta">sutton.ca &middot; 2019</div>
+              <div class="lib-status ingested"><span class="lib-status-dot"></span> Ingested &middot; 8 pages</div>
+            </div>
+            <div class="lib-card">
+              <div class="lib-type"><span class="lib-type-dot note"></span>Note</div>
+              <div class="lib-title">Meeting notes — AI strategy sync</div>
+              <div class="lib-meta">Personal &middot; Apr 12</div>
+              <div class="lib-status pending"><span class="lib-status-dot"></span> Pending ingestion</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══ RESEARCH ═══ -->
+        <div id="content-research">
+          <div class="research-input-wrap">
+            <input class="research-input" value="autonomous AI agents and tool use" placeholder="Enter a research topic...">
+            <button class="btn-primary">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="6.5" cy="6.5" r="5"/><line x1="10.5" y1="10.5" x2="15" y2="15"/></svg>
+              Research
+            </button>
+          </div>
+
+          <div class="research-status">
+            <div class="research-spinner"></div>
+            Searching and analyzing sources...
+            <div class="progress-track"><div class="progress-fill"></div></div>
+            <span class="cancel-link">Cancel</span>
+          </div>
+
+          <div class="bulk-bar">
+            <span><span class="ct">5</span> found</span>
+            <span class="sep">&middot;</span>
+            <span><span class="ct">1</span> approved</span>
+            <button class="btn-sm">Skip remaining</button>
+            <button class="btn-sm primary-sm">Approve all</button>
+          </div>
+
+          <div class="results-label">Discovered Sources</div>
+
+          <div class="cards">
+            <!-- Approved -->
+            <div class="card approved">
+              <div class="card-top">
+                <div class="card-title">Toolformer: Language Models Can Teach Themselves to Use Tools</div>
+                <span class="card-relevance rel-high">96%</span>
+              </div>
+              <div class="card-meta"><span>arxiv.org</span><span class="dot"></span><span>Schick et al., 2023</span><span class="dot"></span><span>Paper</span></div>
+              <div class="card-summary">Introduces Toolformer where LLMs learn to decide which APIs to call, when, and what arguments to pass. Demonstrates self-supervised learning of tool use without extensive human annotation.</div>
+              <div class="card-tags"><span class="tag">tool-use</span><span class="tag">self-supervised</span><span class="tag">API</span></div>
+              <div class="approved-bar">
+                <div class="mini-spinner-green"></div>
+                Approved — ingesting into wiki
+                <span class="progress-text">4 / 12 pages</span>
+              </div>
+            </div>
+
+            <!-- Pending -->
+            <div class="card">
+              <div class="card-top">
+                <div class="card-title">ReAct: Synergizing Reasoning and Acting in Language Models</div>
+                <span class="card-relevance rel-high">93%</span>
+              </div>
+              <div class="card-meta"><span>arxiv.org</span><span class="dot"></span><span>Yao et al., 2023</span><span class="dot"></span><span>Paper</span></div>
+              <div class="card-summary">Proposes the ReAct paradigm for interleaving reasoning traces and task-specific actions. Shows that combining chain-of-thought reasoning with action planning overcomes limitations of each in isolation.</div>
+              <div class="card-tags"><span class="tag">reasoning</span><span class="tag">agents</span><span class="tag">chain-of-thought</span></div>
+              <div class="card-actions">
+                <button class="btn-action btn-approve"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,8 7,12 13,4"/></svg> Approve</button>
+                <button class="btn-action btn-skip">Skip</button>
+                <button class="btn-action btn-bookmark"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 2h10v13l-5-3.5L3 15V2z"/></svg> Bookmark</button>
+                <button class="btn-action btn-preview">Preview</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-top">
+                <div class="card-title">Voyager: An Open-Ended Embodied Agent with Large Language Models</div>
+                <span class="card-relevance rel-high">91%</span>
+              </div>
+              <div class="card-meta"><span>arxiv.org</span><span class="dot"></span><span>Wang et al., 2023</span><span class="dot"></span><span>Paper</span></div>
+              <div class="card-summary">First LLM-powered embodied lifelong learning agent in Minecraft that continuously explores, acquires diverse skills, and makes novel discoveries without human intervention.</div>
+              <div class="card-tags"><span class="tag">embodied-agents</span><span class="tag">lifelong-learning</span><span class="tag">exploration</span></div>
+              <div class="card-actions">
+                <button class="btn-action btn-approve"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,8 7,12 13,4"/></svg> Approve</button>
+                <button class="btn-action btn-skip">Skip</button>
+                <button class="btn-action btn-bookmark"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 2h10v13l-5-3.5L3 15V2z"/></svg> Bookmark</button>
+                <button class="btn-action btn-preview">Preview</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-top">
+                <div class="card-title">The Landscape of Emerging AI Agent Architectures: A Survey</div>
+                <span class="card-relevance rel-med">84%</span>
+              </div>
+              <div class="card-meta"><span>semanticscholar.org</span><span class="dot"></span><span>Masterman et al., 2024</span><span class="dot"></span><span>Survey</span></div>
+              <div class="card-summary">Comprehensive survey of emerging AI agent architectures including single-agent, multi-agent, and human-agent collaboration patterns. Covers tool integration, memory systems, and planning.</div>
+              <div class="card-tags"><span class="tag">survey</span><span class="tag">multi-agent</span><span class="tag">architecture</span></div>
+              <div class="card-actions">
+                <button class="btn-action btn-approve"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,8 7,12 13,4"/></svg> Approve</button>
+                <button class="btn-action btn-skip">Skip</button>
+                <button class="btn-action btn-bookmark"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 2h10v13l-5-3.5L3 15V2z"/></svg> Bookmark</button>
+                <button class="btn-action btn-preview">Preview</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-top">
+                <div class="card-title">A Practical Guide to Building AI Agents with LangChain</div>
+                <span class="card-relevance rel-low">72%</span>
+              </div>
+              <div class="card-meta"><span>blog.langchain.dev</span><span class="dot"></span><span>Harrison Chase, 2024</span><span class="dot"></span><span>Blog</span></div>
+              <div class="card-summary">Practical walkthrough for building tool-using AI agents with LangChain. Covers agent types, tool definitions, memory management, and production deployment patterns.</div>
+              <div class="card-tags"><span class="tag">langchain</span><span class="tag">tutorial</span><span class="tag">production</span></div>
+              <div class="card-actions">
+                <button class="btn-action btn-approve"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,8 7,12 13,4"/></svg> Approve</button>
+                <button class="btn-action btn-skip">Skip</button>
+                <button class="btn-action btn-bookmark"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 2h10v13l-5-3.5L3 15V2z"/></svg> Bookmark</button>
+                <button class="btn-action btn-preview">Preview</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast">
+  <div class="toast-icon">
+    <svg viewBox="0 0 16 16" fill="none" stroke="var(--green)" stroke-width="2.5"><polyline points="3,8 7,12 13,4"/></svg>
+  </div>
+  <div class="toast-body">
+    <strong>Ingest complete</strong><br>
+    <span class="toast-sub">The Bitter Lesson — 8 wiki pages updated</span>
+  </div>
+  <span class="toast-x">&times;</span>
+</div>
+
+<script>
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('content-library').classList.toggle('hidden', tab !== 'library');
+  document.getElementById('content-research').classList.toggle('hidden', tab !== 'research');
+}
+
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.dataset.theme === 'dark';
+  html.dataset.theme = isDark ? 'light' : 'dark';
+  document.getElementById('theme-icon-light').classList.toggle('hidden', !isDark);
+  document.getElementById('theme-icon-dark').classList.toggle('hidden', isDark);
+  document.getElementById('theme-label').textContent = isDark ? 'Dark mode' : 'Light mode';
+}
+
+function toggleDropdown() {
+  document.getElementById('projectDropdown').classList.toggle('open');
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.project-switcher') && !e.target.closest('.project-dropdown')) {
+    document.getElementById('projectDropdown').classList.remove('open');
+  }
+});
+</script>
+
+</body>
+</html>
