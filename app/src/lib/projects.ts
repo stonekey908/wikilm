@@ -121,8 +121,10 @@ export function createProjectDirectories(slug: string): void {
   const root = path.join(ROOT, "projects", slug);
   const raw = path.join(root, "raw");
   const wiki = path.join(root, "wiki");
+  const claudeDir = path.join(root, ".claude");
 
   fs.mkdirSync(raw, { recursive: true });
+  fs.mkdirSync(claudeDir, { recursive: true });
   for (const sub of [
     "sources",
     "entities",
@@ -139,6 +141,68 @@ export function createProjectDirectories(slug: string): void {
     `# Wiki Index\n\n> Tip: to link across projects, use \`[[project-slug/page-name]]\`.\n\n## Sources\n\n## Entities\n\n## Concepts\n\n## Comparisons\n\n## Synthesis\n\n## Queries\n`
   );
   fs.writeFileSync(path.join(wiki, "log.md"), `# Wiki Log\n`);
+  fs.writeFileSync(path.join(claudeDir, "CLAUDE.md"), projectClaudeMd(slug));
+}
+
+/**
+ * The CLAUDE.md we scaffold inside each project's own directory. It overrides
+ * the repo-level WikiLM CLAUDE.md so Claude subprocesses spawned inside a
+ * project don't walk up and treat the root `wiki/` as the target. Keep this
+ * small — Claude will load both this one and any ancestors; the project one
+ * just needs to pin the correct local paths.
+ */
+function projectClaudeMd(slug: string): string {
+  return `# Project: ${slug}
+
+You are maintaining the \`${slug}\` WikiLM project. Its scope is this directory only.
+
+## Paths
+
+All wiki paths you use must be **relative to this directory**, not the repo root:
+
+- \`wiki/sources/<slug>.md\` — source summaries
+- \`wiki/entities/<slug>.md\` — entity pages
+- \`wiki/concepts/<slug>.md\` — concept pages
+- \`wiki/comparisons/<slug>.md\` — comparison pages
+- \`wiki/synthesis/project-overview.md\` — project synthesis
+- \`wiki/queries/<slug>.md\` — preserved question answers
+- \`wiki/index.md\` — this project's catalog
+- \`wiki/log.md\` — this project's operation log
+
+## Rules
+
+1. **Never write outside \`./wiki/\`** in this project. Writes to any path outside this directory (e.g. \`../\`, \`../../wiki/\`, absolute repo-root paths) are forbidden.
+2. **Cross-project wikilinks** use the absolute-slug form: \`[[other-project/page-name]]\`. Within this project, bare \`[[page-name]]\` resolves locally.
+3. Apply every other rule from the repo-level WikiLM CLAUDE.md (page types, frontmatter, links) — but scoped to this project's wiki/.
+`;
+}
+
+/**
+ * Backfill per-project .claude/CLAUDE.md for every existing project directory.
+ * Idempotent — skips projects that already have one. Run on server startup
+ * (or when a nesting migration lands) to cure the pre-STO-1763 population.
+ */
+export function backfillProjectClaudeMd(): { created: number; skipped: number } {
+  let created = 0;
+  let skipped = 0;
+  const all = db.select().from(projects).all();
+  for (const p of all) {
+    if (p.id === 1) {
+      // id=1 uses the repo-root CLAUDE.md by design — don't backfill.
+      skipped++;
+      continue;
+    }
+    const claudeDir = path.join(ROOT, "projects", p.slug, ".claude");
+    const claudeFile = path.join(claudeDir, "CLAUDE.md");
+    if (fs.existsSync(claudeFile)) {
+      skipped++;
+      continue;
+    }
+    fs.mkdirSync(claudeDir, { recursive: true });
+    fs.writeFileSync(claudeFile, projectClaudeMd(p.slug));
+    created++;
+  }
+  return { created, skipped };
 }
 
 /** Escape a string for use as a literal in a RegExp. */
