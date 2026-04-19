@@ -12,6 +12,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useToast } from "@/components/toast-provider";
+import { useProject } from "@/components/project-switcher";
 
 interface DashboardNudge {
   id: number;
@@ -76,6 +77,8 @@ const GROUP_META: Record<NudgeGroupKey, GroupMeta> = {
 export function NudgesSection() {
   const router = useRouter();
   const { addToast } = useToast();
+  const { activeProject } = useProject();
+  const activeProjectId = activeProject?.id ?? null;
   const [data, setData] = useState<NudgesResponse | null>(null);
   const [loading, setLoading] = useState(true);
   // Track per-nudge busy + dismissed state so the UI can optimistically hide
@@ -91,8 +94,14 @@ export function NudgesSection() {
   const [conceptBusy, setConceptBusy] = useState(false);
 
   const fetchNudges = useCallback(async () => {
+    // No active project yet = defer the fetch. Returning early here avoids
+    // a momentary flash of the "all projects" unfiltered result while the
+    // project switcher is still hydrating.
+    if (activeProjectId === null) return;
     try {
-      const res = await fetch("/api/dashboard/nudges");
+      const res = await fetch(
+        `/api/dashboard/nudges?projectId=${activeProjectId}`
+      );
       if (res.ok) {
         const json = (await res.json()) as NudgesResponse;
         setData(json);
@@ -102,9 +111,13 @@ export function NudgesSection() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeProjectId]);
 
+  // Re-fetch whenever the active project changes. Hidden + busy state also
+  // resets so stale optimistic-hide state from another project doesn't leak.
   useEffect(() => {
+    setHidden(new Set());
+    setBusy(new Set());
     fetchNudges();
   }, [fetchNudges]);
 
