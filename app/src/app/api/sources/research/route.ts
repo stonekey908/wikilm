@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
-import path from "path";
 import { streamClaude } from "@/lib/claude-runner";
+import { getProject, projectRoot } from "@/lib/projects";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -29,7 +29,12 @@ Output each result as one line: RESULT:{"title":"...","url":"...","domain":"..."
 
 IMPORTANT: Include the actual URL for each source. Find exactly ${maxResults} sources maximum. When done output: DONE`;
 
-  const projectCwd = path.join(process.cwd(), "..");
+  const targetProjectId = body?.projectId ?? 1;
+  const project = getProject(targetProjectId) ?? getProject(1);
+  if (!project) {
+    return Response.json({ error: "No project found" }, { status: 404 });
+  }
+  const projectCwd = projectRoot(project);
   const stream = streamClaude({ prompt, projectCwd, type: "research" });
 
   return new Response(stream, {

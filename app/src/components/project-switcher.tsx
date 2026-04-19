@@ -205,8 +205,11 @@ export function ProjectSwitcher() {
 
   // Auto-expand ancestors of the active project ONCE per active-project
   // change so the active node is visible on switch. Runs only when
-  // activeProject.id genuinely changes, so user's explicit chevron-collapse
-  // on an ancestor is not immediately undone on the next render.
+  // activeProject.id genuinely changes (guarded by the ref), so user's
+  // explicit chevron-collapse on an ancestor is not immediately undone on
+  // the next render. The setState here is a legitimate one-shot init after
+  // an external trigger (project switch); the same pattern is used in
+  // theme-provider + sidebar and is accepted baseline.
   const autoExpandedFor = useRef<number | null>(null);
   useEffect(() => {
     if (!activeProject) return;
@@ -214,6 +217,7 @@ export function ProjectSwitcher() {
     autoExpandedFor.current = activeProject.id;
     const ancestors = ancestorsOf(tree, activeProject.id);
     if (ancestors.length === 0) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCollapsed((prev) => {
       let changed = false;
       const next = new Set(prev);

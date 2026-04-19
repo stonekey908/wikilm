@@ -61,9 +61,14 @@ export async function POST(
     );
   }
 
-  // Reject path traversal — pageSlug lives under wiki/ and must stay there.
-  if (pageSlug.includes("..") || pageSlug.startsWith("/")) {
-    return Response.json({ error: "Invalid pageSlug" }, { status: 400 });
+  // Reject path traversal on both slugs — both flow into filesystem paths.
+  if (
+    pageSlug.includes("..") ||
+    pageSlug.startsWith("/") ||
+    childSlug.includes("..") ||
+    childSlug.startsWith("/")
+  ) {
+    return Response.json({ error: "Invalid slug" }, { status: 400 });
   }
 
   const parent = getProject(parentId);

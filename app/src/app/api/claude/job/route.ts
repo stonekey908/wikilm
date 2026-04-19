@@ -1,9 +1,9 @@
 import { NextRequest } from "next/server";
-import path from "path";
 import { startJob, getRunningJobCount } from "@/lib/claude-runner";
 import { db } from "@/db";
 import { jobs } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
+import { getProject, projectRoot } from "@/lib/projects";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -16,11 +16,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const project = getProject(projectId);
+  if (!project) {
+    return Response.json({ error: "Project not found" }, { status: 404 });
+  }
+
   // Resolve project root server-side
-  const projectCwd = path.join(process.cwd(), "..");
+  const projectCwd = projectRoot(project);
 
   try {
-    const jobId = await startJob({ prompt, projectCwd, projectId, type, title });
+    const jobId = await startJob({ prompt, projectCwd, projectId: project.id, type, title });
     return Response.json({ jobId }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to start job";
