@@ -323,9 +323,10 @@ export function NudgesSection() {
             {(group === "theme" || group === "gap") && (
               <button
                 disabled={isBusy}
-                onClick={() =>
-                  setConceptModal({ nudge, title: nudge.title })
-                }
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setConceptModal({ nudge, title: nudge.title });
+                }}
                 className="inline-flex items-center gap-1 px-2 py-1 text-[11px] font-[500] rounded-md bg-[var(--primary)] text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Lightbulb className="w-3 h-3" />
