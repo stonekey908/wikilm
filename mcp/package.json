@@ -1,0 +1,29 @@
+{
+  "name": "wikilm-mcp",
+  "version": "0.1.0",
+  "description": "WikiLM MCP server — exposes the local WikiLM HTTP API to Claude Code / Claude Desktop over stdio.",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "wikilm-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch"
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.0",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
