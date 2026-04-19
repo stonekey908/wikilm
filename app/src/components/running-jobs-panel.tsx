@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useProject } from "@/components/project-switcher";
 import {
   X,
   Loader2,
@@ -59,18 +60,21 @@ interface RunningJobsPanelProps {
 
 /**
  * Floating panel anchored to the bottom-left of the viewport. Lists every
- * running + queued job across all projects with progress, model, and a
+ * running + queued job for the active project with progress, model, and a
  * per-row cancel button. Polls every 2s while open; stops polling when
  * closed so we don't burn cache misses for nothing.
  */
 export function RunningJobsPanel({ open, onClose }: RunningJobsPanelProps) {
+  const { activeProject } = useProject();
+  const activeProjectId = activeProject?.id ?? null;
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
   const fetchJobs = useCallback(async () => {
+    if (activeProjectId === null) return;
     try {
-      const res = await fetch("/api/claude/job");
+      const res = await fetch(`/api/claude/job?projectId=${activeProjectId}`);
       if (!res.ok) return;
       const data = await res.json();
       const active = (data.jobs ?? []).filter(
@@ -82,7 +86,7 @@ export function RunningJobsPanel({ open, onClose }: RunningJobsPanelProps) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeProjectId]);
 
   // Poll + fetch on open
   useEffect(() => {
