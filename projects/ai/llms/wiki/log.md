@@ -1,5 +1,23 @@
 # Wiki Log
 
+## [2026-04-19] update | Generated output: report (project)
+
+## [2026-04-19] update | Generated output: summary (project)
+
+## [2026-04-19] update | Generated output: infographic (project)
+
+## [2026-04-19] update | Generated output: deck (project)
+
+## [2026-04-19] update | Generated output: infographic (project)
+
+## [2026-04-19] update | Generated output: report (project)
+
+## [2026-04-19] update | Generated output: cheat (project)
+
+## [2026-04-19] update | Generated output: deck (project)
+
+## [2026-04-19] update | Generated output: summary (project)
+
 ## [2026-04-19] update | Synthesis: project-overview
 
 Created `wiki/synthesis/project-overview.md` — covers the full 2026 LLM landscape in under 500 words: MoE dominance, open=proprietary parity, geographic divide, context window race, reasoning as table stakes. Notes contradictions (Zapier's benchmark sourcing) and six knowledge gaps (training costs, fine-tuning, safety, benchmark methodology, audio/video modalities, enterprise adoption breadth). Updated `wiki/index.md` to list the new synthesis page.

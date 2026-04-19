@@ -4,6 +4,8 @@ type: log
 
 # Wiki Log
 
+## [2026-04-19] update | Generated output: cheat (project)
+
 ## [2026-04-17] lint | Fix stale claim — PLMs vs RAG as competing paradigms
 Updated `wiki/sources/personal-ai-digital-twins-article.md` and `wiki/concepts/personal-language-models.md` to clarify that Personal Language Models and Retrieval-Augmented Generation are complementary approaches rather than competitors. PLMs provide continuous, personalized knowledge integration; RAG provides dynamic retrieval of external context at query time. Agentic systems (per Deloitte) use RAG as a core grounding layer — both techniques coexist in modern AI pipelines.
 

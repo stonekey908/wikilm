@@ -332,17 +332,14 @@ function blockToDocx(block: Block): (Paragraph | Table)[] {
 
 // ─── Public API ───────────────────────────────────────────────────────────
 
-export function markdownToDocumentBlob(
-  markdown: string,
-  title = "WikiLM export"
-): Promise<Blob> {
+function buildDocument(markdown: string, title: string): Document {
   const blocks = parseBlocks(markdown);
   const children: (Paragraph | Table)[] = [];
   for (const b of blocks) {
     children.push(...blockToDocx(b));
   }
 
-  const doc = new Document({
+  return new Document({
     title,
     numbering: {
       config: [
@@ -364,8 +361,24 @@ export function markdownToDocumentBlob(
     },
     sections: [{ children }],
   });
+}
 
-  return Packer.toBlob(doc);
+export function markdownToDocumentBlob(
+  markdown: string,
+  title = "WikiLM export"
+): Promise<Blob> {
+  return Packer.toBlob(buildDocument(markdown, title));
+}
+
+/**
+ * Server-side path. Node route handlers can't call `Packer.toBlob` (no DOM),
+ * so this returns a Buffer suitable for `fs.writeFile` / `Response`.
+ */
+export function markdownToDocxBuffer(
+  markdown: string,
+  title = "WikiLM export"
+): Promise<Buffer> {
+  return Packer.toBuffer(buildDocument(markdown, title));
 }
 
 /**

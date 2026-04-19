@@ -124,6 +124,10 @@ export const jobs = sqliteTable("jobs", {
   // auth_failed, rate_limited, timeout, unknown
   errorCode: text("error_code"),
   progress: text("progress"), // JSON: { current: number, total: number }
+  // Model resolved at spawn time — persisted so the /jobs page and the
+  // running-jobs panel can show which LLM drove each job without having to
+  // guess from the (possibly drifted) current setting.
+  model: text("model"),
   startedAt: text("started_at"),
   completedAt: text("completed_at"),
   createdAt: text("created_at")

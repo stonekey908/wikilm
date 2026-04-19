@@ -18,6 +18,8 @@ import {
   X,
   RefreshCw,
   Ban,
+  Sparkles,
+  Layers,
 } from "lucide-react";
 
 interface Job {
@@ -31,6 +33,7 @@ interface Job {
   error: string | null;
   errorCode: string | null;
   progress: string | null;
+  model: string | null;
   startedAt: string | null;
   completedAt: string | null;
   createdAt: string;
@@ -42,6 +45,8 @@ const typeIcons: Record<string, typeof Download> = {
   lint: Beaker,
   fix: Beaker,
   research: Search,
+  synthesis: Layers,
+  output: Sparkles,
 };
 
 const typeColors: Record<string, { color: string; dim: string }> = {
@@ -50,6 +55,8 @@ const typeColors: Record<string, { color: string; dim: string }> = {
   lint: { color: "var(--orange)", dim: "var(--orange-dim)" },
   fix: { color: "var(--green)", dim: "var(--green-dim)" },
   research: { color: "var(--green)", dim: "var(--green-dim)" },
+  synthesis: { color: "var(--chart-4)", dim: "rgba(139,92,246,0.08)" },
+  output: { color: "var(--chart-5)", dim: "rgba(236,72,153,0.08)" },
 };
 
 const statusFilters = ["all", "running", "queued", "completed", "failed", "cancelled"] as const;
@@ -256,8 +263,21 @@ export default function JobsPage() {
                     <div className="text-[13px] font-[500] text-[var(--text-1)] truncate">
                       {job.title}
                     </div>
-                    <div className="text-[11px] text-[var(--text-4)] mt-0.5">
-                      {formatTime(job.startedAt)} &middot; {formatDuration(job.startedAt, job.completedAt)}
+                    <div className="text-[11px] text-[var(--text-4)] mt-0.5 flex items-center gap-1.5">
+                      <span>{formatTime(job.startedAt)}</span>
+                      <span>&middot;</span>
+                      <span>{formatDuration(job.startedAt, job.completedAt)}</span>
+                      {job.model && (
+                        <>
+                          <span>&middot;</span>
+                          <span
+                            className="font-mono px-1.5 py-px rounded bg-[var(--bg-2)] text-[var(--text-3)]"
+                            title="Model used for this job"
+                          >
+                            {job.model}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
 

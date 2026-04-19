@@ -32,6 +32,7 @@ const TYPE_COLORS: Record<string, string> = {
   comparison: "var(--chart-3)",
   synthesis: "var(--chart-4)",
   query: "var(--green)",
+  output: "var(--chart-5)",
   index: "var(--text-3)",
   unknown: "var(--text-4)",
 };

@@ -21,6 +21,18 @@ export function projectRoot(project: Pick<Project, "id" | "slug">): string {
   return path.join(ROOT, "projects", project.slug);
 }
 
+/**
+ * Absolute path to a project's `wiki/outputs/` directory, creating it on
+ * demand. Pre-STO-1766 projects didn't scaffold `outputs/`, so callers writing
+ * generated artifacts must go through this helper to avoid the "no such
+ * directory" error on first generation.
+ */
+export function ensureOutputsDir(project: Pick<Project, "id" | "slug">): string {
+  const dir = path.join(wikiDir(project), "outputs");
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
 /** Normalize a raw name into a slug segment. Does NOT include parent prefix. */
 export function slugifyName(name: string): string {
   return name
@@ -133,13 +145,14 @@ export function createProjectDirectories(slug: string): void {
     "comparisons",
     "synthesis",
     "queries",
+    "outputs",
   ]) {
     fs.mkdirSync(path.join(wiki, sub), { recursive: true });
   }
 
   fs.writeFileSync(
     path.join(wiki, "index.md"),
-    `# Wiki Index\n\n> Tip: to link across projects, use \`[[project-slug/page-name]]\`.\n\n## Sources\n\n## Entities\n\n## Concepts\n\n## Comparisons\n\n## Synthesis\n\n## Queries\n`
+    `# Wiki Index\n\n> Tip: to link across projects, use \`[[project-slug/page-name]]\`.\n\n## Sources\n\n## Entities\n\n## Concepts\n\n## Comparisons\n\n## Synthesis\n\n## Queries\n\n## Outputs\n`
   );
   fs.writeFileSync(path.join(wiki, "log.md"), `# Wiki Log\n`);
   fs.writeFileSync(path.join(claudeDir, "CLAUDE.md"), projectClaudeMd(slug));
@@ -167,6 +180,7 @@ All wiki paths you use must be **relative to this directory**, not the repo root
 - \`wiki/comparisons/<slug>.md\` — comparison pages
 - \`wiki/synthesis/project-overview.md\` — project synthesis
 - \`wiki/queries/<slug>.md\` — preserved question answers
+- \`wiki/outputs/<YYYY-MM-DD>-<type>-<slug>.md\` — generated outputs (reports, decks, cheat sheets, summaries, infographics)
 - \`wiki/index.md\` — this project's catalog
 - \`wiki/log.md\` — this project's operation log
 

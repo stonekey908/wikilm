@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useProject } from "@/components/project-switcher";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { ChildProjects } from "@/components/child-projects";
+import { GenerateOutputModal } from "@/components/generate-output-modal";
 import {
   Search,
   FileText,
@@ -24,6 +25,8 @@ import {
   Loader2,
   RefreshCw,
   ShieldCheck,
+  Sparkles,
+  Trash2,
 } from "lucide-react";
 
 /* ─── Types ─── */
@@ -66,11 +69,12 @@ const TYPE_CONFIG: Record<string, { icon: typeof FileText; label: string; color:
   comparison: { icon: GitCompare, label: "Comparison", color: "var(--chart-3)", dimColor: "rgba(99,102,241,0.08)" },
   synthesis: { icon: Layers, label: "Synthesis", color: "var(--chart-4)", dimColor: "rgba(139,92,246,0.08)" },
   query: { icon: HelpCircle, label: "Query", color: "var(--green)", dimColor: "var(--green-dim)" },
+  output: { icon: Sparkles, label: "Output", color: "var(--chart-5)", dimColor: "rgba(236,72,153,0.08)" },
   index: { icon: FileText, label: "Index", color: "var(--text-3)", dimColor: "var(--bg-2)" },
   unknown: { icon: FileText, label: "Page", color: "var(--text-3)", dimColor: "var(--bg-2)" },
 };
 
-const ALL_TYPES = ["source", "entity", "concept", "comparison", "synthesis", "query"];
+const ALL_TYPES = ["source", "entity", "concept", "comparison", "synthesis", "query", "output"];
 
 const SECTION_LABEL: Record<string, string> = {
   source: "Sources",
@@ -79,6 +83,7 @@ const SECTION_LABEL: Record<string, string> = {
   comparison: "Comparisons",
   synthesis: "Synthesis",
   query: "Queries",
+  output: "Outputs",
 };
 
 /* ─── Markdown Renderer ─── */
@@ -441,6 +446,7 @@ function WikiPageInner() {
   // the coalescing on the server side guarantees at most 2 runs per burst.
   const [parentSyncInFlight, setParentSyncInFlight] = useState(false);
   const [parentLintInFlight, setParentLintInFlight] = useState(false);
+  const [generateOpen, setGenerateOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Restore collapsed state on mount, persist on every change.
@@ -761,6 +767,45 @@ function WikiPageInner() {
     }
   }, [activeProject, parentSyncInFlight]);
 
+  /**
+   * Delete a generated output and every derived format (docx, pdf, pptx,
+   * png, companion .md stub) in one call. The baseSlug is the path segment
+   * after `outputs/`, which the server uses to match `<baseSlug>.*` files.
+   */
+  const handleDeleteOutput = useCallback(
+    async (page: WikiPageMeta) => {
+      const baseSlug = page.slug.replace(/^outputs\//, "");
+      const ok = typeof window !== "undefined"
+        ? window.confirm(
+            `Delete "${page.title}" and all its formats (md, docx, pdf, pptx, png)?\n\nThis cannot be undone.`
+          )
+        : true;
+      if (!ok) return;
+      try {
+        const res = await fetch(
+          `/api/projects/${activeProjectId}/outputs/delete?baseSlug=${encodeURIComponent(
+            baseSlug
+          )}`,
+          { method: "DELETE" }
+        );
+        if (!res.ok) {
+          console.error("Failed to delete output:", await res.text());
+          return;
+        }
+        // If we were viewing the deleted page, close the detail panel.
+        if (selectedSlug === page.slug) {
+          setSelectedSlug(null);
+          setDetail(null);
+          setTrail([]);
+        }
+        fetchPages();
+      } catch (err) {
+        console.error("Delete output failed:", err);
+      }
+    },
+    [activeProjectId, fetchPages, selectedSlug]
+  );
+
   const runParentLint = useCallback(async () => {
     if (!activeProject || parentLintInFlight) return;
     setParentLintInFlight(true);
@@ -797,14 +842,25 @@ function WikiPageInner() {
         }`}
       >
         {/* Header */}
-        <div className="px-5 pt-5 pb-4">
-          <Breadcrumbs project={activeProject} />
-          <h1 className="text-[22px] font-[650] tracking-tight text-[var(--text-1)]">
-            Wiki
-          </h1>
-          <p className="text-sm text-[var(--text-3)] mt-0.5">
-            Browse and search your knowledge base
-          </p>
+        <div className="px-5 pt-5 pb-4 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <Breadcrumbs project={activeProject} />
+            <h1 className="text-[22px] font-[650] tracking-tight text-[var(--text-1)]">
+              Wiki
+            </h1>
+            <p className="text-sm text-[var(--text-3)] mt-0.5">
+              Browse and search your knowledge base
+            </p>
+          </div>
+          <button
+            onClick={() => setGenerateOpen(true)}
+            className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-[600] text-white transition-all hover:opacity-90"
+            style={{ background: "var(--chart-5)" }}
+            title="Generate a report, deck, or one-pager from this wiki"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            Generate output
+          </button>
         </div>
 
         {/* Children — shown when the active project is a parent. Component
@@ -1091,11 +1147,15 @@ function WikiPageInner() {
               const cfg = getTypeConfig(page.type);
               const Icon = cfg.icon;
               const isActive = selectedSlug === page.slug;
+              // Output pages get a trash icon on hover — generated artifacts
+              // pile up after a few regenerations so users need a quick way
+              // to cull.
+              const isOutput = page.type === "output";
               return (
-                <button
+                <div
                   key={page.slug}
                   onClick={() => loadDetail(page.slug)}
-                  className={`w-full text-left px-3 py-2.5 rounded-lg mb-0.5 transition-all cursor-pointer ${
+                  className={`group relative w-full text-left px-3 py-2.5 rounded-lg mb-0.5 transition-all cursor-pointer ${
                     isActive
                       ? "bg-[var(--primary-dim)] border border-[var(--primary)]/20"
                       : "hover:bg-[var(--bg-hover)] border border-transparent"
@@ -1129,8 +1189,20 @@ function WikiPageInner() {
                         ))}
                       </div>
                     </div>
+                    {isOutput && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteOutput(page);
+                        }}
+                        className="shrink-0 p-1 rounded opacity-0 group-hover:opacity-100 text-[var(--text-4)] hover:bg-[var(--red-dim)] hover:text-[var(--red)] transition-all"
+                        title="Delete this output and all its formats"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
-                </button>
+                </div>
               );
             };
 
@@ -1398,6 +1470,14 @@ function WikiPageInner() {
           </div>
         </div>
       )}
+
+      {/* Generate output modal */}
+      <GenerateOutputModal
+        open={generateOpen}
+        projectId={activeProjectId}
+        onClose={() => setGenerateOpen(false)}
+        onGenerated={fetchPages}
+      />
     </div>
   );
 }
