@@ -11,6 +11,7 @@ import {
   rewriteWikilinks,
   wikiDir,
 } from "@/lib/projects";
+import { getAllMdFiles } from "@/lib/wiki-utils";
 
 /**
  * POST /api/projects/:parentId/promote-page
@@ -155,7 +156,7 @@ function rewriteWikilinksInAllProjects(oldSlug: string, newSlug: string): void {
   const allProjects = db.select().from(projects).all();
   for (const p of allProjects) {
     const dir = wikiDir(p);
-    for (const file of listMarkdownFiles(dir)) {
+    for (const file of getAllMdFiles(dir)) {
       let content: string;
       try {
         content = fs.readFileSync(file, "utf-8");
@@ -166,20 +167,5 @@ function rewriteWikilinksInAllProjects(oldSlug: string, newSlug: string): void {
       if (changed) fs.writeFileSync(file, body);
     }
   }
-}
-
-/** Recursively list .md files under dir. */
-function listMarkdownFiles(dir: string): string[] {
-  if (!fs.existsSync(dir)) return [];
-  const out: string[] = [];
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      out.push(...listMarkdownFiles(full));
-    } else if (entry.isFile() && entry.name.endsWith(".md")) {
-      out.push(full);
-    }
-  }
-  return out;
 }
 

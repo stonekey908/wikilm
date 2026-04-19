@@ -25,8 +25,6 @@ import { getProject, projectRoot } from "@/lib/projects";
  * multipart /api/sources/upload endpoint.
  */
 
-const RAW_DIR = path.join(process.cwd(), "..", "raw");
-
 function slugify(input: string): string {
   return input
     .toLowerCase()
@@ -35,10 +33,10 @@ function slugify(input: string): string {
     .slice(0, 80) || "note";
 }
 
-function uniqueFilename(baseSlug: string): string {
+function uniqueFilename(rawDir: string, baseSlug: string): string {
   let candidate = `${baseSlug}.md`;
   let i = 2;
-  while (fs.existsSync(path.join(RAW_DIR, candidate))) {
+  while (fs.existsSync(path.join(rawDir, candidate))) {
     candidate = `${baseSlug}-${i}.md`;
     i++;
   }
@@ -69,6 +67,11 @@ export async function POST(request: NextRequest) {
     ? body.tags.filter((t: unknown): t is string => typeof t === "string")
     : [];
   const projectIdInput = typeof body?.projectId === "number" ? body.projectId : 1;
+  // Per STO-1743 design Q6: default behavior is PENDING — the raw file + source
+  // row land immediately, and the user manually triggers ingest from /sources.
+  // Callers opt in to immediate ingest with `ingest: true` (used by UI flows
+  // that want the "upload + ingest now" experience).
+  const ingestNow = body?.ingest === true;
 
   if (typeof title !== "string" || !title.trim()) {
     return Response.json({ error: "title is required" }, { status: 400 });
@@ -83,11 +86,15 @@ export async function POST(request: NextRequest) {
   }
   const projectId = project.id;
   const projectCwd = projectRoot(project);
+  // Per-project raw dir so markdown lives alongside the project's wiki
+  // instead of polluting the top-level raw/ (which was the previous
+  // behavior and would orphan files for nested projects on ingest).
+  const rawDir = path.join(projectCwd, "raw");
 
-  await mkdir(RAW_DIR, { recursive: true });
+  await mkdir(rawDir, { recursive: true });
 
-  const filename = uniqueFilename(slugify(title));
-  const filePath = path.join(RAW_DIR, filename);
+  const filename = uniqueFilename(rawDir, slugify(title));
+  const filePath = path.join(rawDir, filename);
 
   // If the caller didn't include frontmatter, prepend one so downstream ingest
   // has consistent metadata to work with.
@@ -105,12 +112,21 @@ export async function POST(request: NextRequest) {
       type: "note",
       filePath: `raw/${filename}`,
       meta: JSON.stringify({ tags, programmatic: true }),
-      status: "ingesting",
+      status: ingestNow ? "ingesting" : "pending",
     })
     .returning({ id: sources.id })
     .all();
 
   const sourceId = result[0].id;
+
+  if (!ingestNow) {
+    // Pending path — just captured, not yet ingested. User curates from
+    // /sources (Ingest / Edit / Discard actions).
+    return Response.json(
+      { sourceId, status: "pending", filePath: `raw/${filename}` },
+      { status: 201 }
+    );
+  }
 
   const prompt = `Ingest raw/${filename}`;
 
@@ -134,7 +150,7 @@ export async function POST(request: NextRequest) {
   });
 
   return Response.json(
-    { sourceId, jobId, filePath: `raw/${filename}` },
+    { sourceId, jobId, status: "ingesting", filePath: `raw/${filename}` },
     { status: 201 }
   );
 }

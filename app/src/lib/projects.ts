@@ -3,6 +3,7 @@ import { projects } from "@/db/schema";
 import { eq, like, sql } from "drizzle-orm";
 import fs from "fs";
 import path from "path";
+import { getAllMdFiles } from "@/lib/wiki-utils";
 
 export type Project = typeof projects.$inferSelect;
 
@@ -241,19 +242,14 @@ export function rewriteWikilinks(
   return { body: next, changed };
 }
 
-/** Recursively list .md files under dir. */
+/**
+ * Recursively list .md files under dir. Thin local alias for
+ * `getAllMdFiles` — this module's previous implementation used
+ * `entry.isFile()` as an extra guard, but that's redundant given the
+ * `isDirectory()` branch above it, so behavior matches the shared version.
+ */
 function listMarkdownFiles(dir: string): string[] {
-  if (!fs.existsSync(dir)) return [];
-  const out: string[] = [];
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      out.push(...listMarkdownFiles(full));
-    } else if (entry.isFile() && entry.name.endsWith(".md")) {
-      out.push(full);
-    }
-  }
-  return out;
+  return getAllMdFiles(dir);
 }
 
 export class MoveProjectError extends Error {
