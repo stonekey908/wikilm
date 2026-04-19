@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { createMockStream, getMockResponse } from "@/lib/__mocks__/claude-mock";
 import { runOllamaJob, cancelOllamaJob, hasOllamaJob } from "@/lib/ollama-runner";
 import { runGeminiJob, cancelGeminiJob, hasGeminiJob, isGeminiAvailable } from "@/lib/gemini-runner";
-import { getProject, projectRoot } from "@/lib/projects";
+import { getProject, listChildren, projectRoot } from "@/lib/projects";
 
 export const isMockMode = process.env.MOCK_MODE === "true";
 
@@ -768,11 +768,48 @@ let parentSynthesisPending = false;
 let lastParentProjectCwd: string | null = null;
 let lastParentProjectId: number | null = null;
 
-const PARENT_SYNTHESIS_PROMPT = `Update the PARENT-level synthesis page at wiki/synthesis/project-overview.md.
+/**
+ * Build the parent-synthesis prompt for a specific parent project. Children
+ * are resolved server-side and injected as explicit paths so Claude doesn't
+ * have to guess layout from cwd — the old version assumed a flat
+ * `projects/<child-slug>/` layout which broke for nested projects where
+ * children live at `projects/<parent>/<child>/`.
+ */
+function buildParentSynthesisPrompt(project: {
+  id: number;
+  slug: string;
+}): string {
+  const children = listChildren(project.id);
+  const childPaths = children
+    .map((c) => {
+      const childRoot =
+        c.id === 1
+          ? "wiki/synthesis/project-overview.md"
+          : `projects/${c.slug}/wiki/synthesis/project-overview.md`;
+      return `- ${c.slug} → ${childRoot}`;
+    })
+    .join("\n");
+  const childWikilinks = children
+    .map((c) => `[[${c.slug}/<page-name>]]`)
+    .join(" or ");
+  const noChildrenGuard =
+    children.length === 0
+      ? "\n\n**WARNING:** This project has no direct children; parent synthesis is a no-op. Report that no children exist and exit without rewriting."
+      : "";
 
-You are synthesizing across child projects — NOT this project's own raw sources. Read ONLY the following:
-1. This project's existing wiki/synthesis/project-overview.md, if it exists (you are refining it, not rewriting from scratch).
-2. Each direct child project's wiki/synthesis/project-overview.md. Children live at ../projects/<child-slug>/wiki/synthesis/project-overview.md relative to this project's wiki/, OR if this project is the root (id=1), children live at ./projects/<child-slug>/wiki/synthesis/project-overview.md. Read whichever path exists.
+  return `Update the PARENT-level synthesis page at wiki/synthesis/project-overview.md.
+
+You are synthesizing across child projects — NOT this project's own raw sources.${noChildrenGuard}
+
+## This project
+- id=${project.id}, slug=${project.slug}
+
+## Direct children to read (all paths are relative to the repo root, NOT this project's cwd)
+${childPaths || "(none)"}
+
+Read ONLY the following:
+1. This project's existing \`wiki/synthesis/project-overview.md\` (relative to cwd), if it exists. You are refining it, not rewriting from scratch.
+2. Each child's synthesis at the absolute paths listed above. Use the Read tool with absolute paths rooted at \`${process.cwd().replace(/\/app$/, "")}/\`.
 
 Do NOT read children's raw/ directories. Do NOT read children's source/entity/concept pages. Children's syntheses are your only input — this is a "summary of summaries".
 
@@ -785,12 +822,13 @@ Produce a consolidated parent-level overview that covers:
 
 Constraints:
 - Maximum 600 words in the body (not counting frontmatter)
-- Must include YAML frontmatter: type: synthesis, tags, sources (list the children's synthesis page paths you read, e.g. [projects/child-a/wiki/synthesis/project-overview.md])
-- Use [[wikilinks]] for cross-references to child project pages using the cross-project syntax [[child-slug/page-name]]
+- Must include YAML frontmatter: type: synthesis, tags, sources (list the children's synthesis paths you actually read)
+- Use cross-project wikilinks to reference child pages: ${childWikilinks || "[[child-slug/page-name]]"}
 - Write for someone who wants the "big picture across the whole project tree" in 2-3 minutes of reading
 - Preserve useful framing from the previous parent synthesis where still accurate
 
-After updating, also update wiki/index.md if this synthesis wasn't already listed, and append an entry to wiki/log.md with operation "update" noting this was a parent-level refresh.`;
+After updating, also update \`wiki/index.md\` if this synthesis wasn't already listed, and append an entry to \`wiki/log.md\` with operation "update" noting this was a parent-level refresh.`;
+}
 
 function scheduleParentSynthesisJob(
   projectCwd: string,
@@ -798,8 +836,12 @@ function scheduleParentSynthesisJob(
 ): Promise<number> {
   parentSynthesisInFlight = true;
   parentSynthesisPending = false;
+  const project = getProject(projectId);
+  const prompt = project
+    ? buildParentSynthesisPrompt(project)
+    : "ERROR: project not found";
   return startJob({
-    prompt: PARENT_SYNTHESIS_PROMPT,
+    prompt,
     projectCwd,
     projectId,
     type: "synthesis",
