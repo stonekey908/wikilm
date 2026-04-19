@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { jobs } from "@/db/schema";
 import { desc, inArray } from "drizzle-orm";
 import { getProject, wikiDir } from "@/lib/projects";
+import { getAllMdFiles } from "@/lib/wiki-utils";
 
 interface WikiStats {
   sources: number;
@@ -20,17 +21,9 @@ interface LogEntry {
   details: string;
 }
 
+/** Thin wrapper: we only need the count here, not the paths. */
 function countMarkdownFiles(dir: string): number {
-  if (!fs.existsSync(dir)) return 0;
-  let count = 0;
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (entry.isDirectory()) {
-      count += countMarkdownFiles(path.join(dir, entry.name));
-    } else if (entry.name.endsWith(".md")) {
-      count++;
-    }
-  }
-  return count;
+  return getAllMdFiles(dir).length;
 }
 
 function getStats(wikiPath: string): WikiStats {
