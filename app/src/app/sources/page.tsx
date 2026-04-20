@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useProject } from "@/components/project-switcher";
 import { useToast } from "@/components/toast-provider";
 import { EditorialBreadcrumbs } from "@/components/editorial/wiki/breadcrumbs";
@@ -19,25 +20,31 @@ interface Source {
 }
 
 interface ResearchResult {
+  id: string;
   title: string;
   url: string;
+  relevance: number;
   domain: string;
-  author?: string;
-  type?: string;
+  author: string;
+  type: string;
   summary: string;
-  relevance?: number;
-  tags?: string[];
+  tags: string[];
+  status: "pending" | "approved" | "skipped" | "bookmarked";
 }
 
+type Tab = "library" | "research";
 type KindFilter = "" | "pdf" | "web" | "note";
+
 const KIND_LABEL: Record<"pdf" | "web" | "note", string> = {
   pdf: "PDF",
   web: "URL",
   note: "Note",
 };
 const KIND_ORDER: ("pdf" | "web" | "note")[] = ["pdf", "web", "note"];
-
 const DAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
+
+const RESEARCH_QUERY_KEY = "sb_research_query";
+const RESEARCH_RESULTS_KEY = "sb_research_results";
 
 function parseMeta(meta: string | null): Record<string, unknown> {
   if (!meta) return {};
@@ -68,10 +75,7 @@ function extractFor(s: Source): string {
 }
 
 function externalUrlFor(s: Source): string | null {
-  // For web sources, filePath holds the original URL
-  if (s.type === "web" && s.filePath && /^https?:\/\//.test(s.filePath)) {
-    return s.filePath;
-  }
+  if (s.type === "web" && s.filePath && /^https?:\/\//.test(s.filePath)) return s.filePath;
   const m = parseMeta(s.meta);
   const url = (m.url as string | undefined) ?? (m.source_url as string | undefined);
   if (url && /^https?:\/\//.test(url)) return url;
@@ -79,32 +83,68 @@ function externalUrlFor(s: Source): string | null {
 }
 
 function dayOfWeek(iso: string): number {
-  const d = new Date(iso);
-  return d.getDay();
+  return new Date(iso).getDay();
 }
 
-export default function IntakePage() {
+function relevanceClass(pct: number): string {
+  if (pct >= 85) return "hi";
+  if (pct >= 70) return "mid";
+  return "lo";
+}
+
+function IntakePageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { activeProject } = useProject();
   const { addToast } = useToast();
   const projectId = activeProject?.id ?? null;
 
+  // ── Tab state ────────────────────────────────────────────────────
+  const urlTab = searchParams.get("tab");
+  const [tab, setTab] = useState<Tab>(urlTab === "research" ? "research" : "library");
+
+  // ── Library state ────────────────────────────────────────────────
   const [sources, setSources] = useState<Source[]>([]);
   const [kind, setKind] = useState<KindFilter>("");
   const [approving, setApproving] = useState<Set<number>>(new Set());
   const [slideOut, setSlideOut] = useState<Set<number>>(new Set());
   const [dragActive, setDragActive] = useState(false);
-  const [url, setUrl] = useState("");
-  const [commissionBusy, setCommissionBusy] = useState(false);
+  const [quickUrl, setQuickUrl] = useState("");
+  const [quickBusy, setQuickBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Research stream state
-  const [researchTopic, setResearchTopic] = useState<string>("");
-  const [researchResults, setResearchResults] = useState<ResearchResult[]>([]);
-  const [researchStreaming, setResearchStreaming] = useState(false);
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
-  const [ingestingUrls, setIngestingUrls] = useState<Set<string>>(new Set());
-  const researchAbortRef = useRef<AbortController | null>(null);
+  // ── Research state (persisted) ──────────────────────────────────
+  const [researchQuery, setResearchQuery] = useState<string>(() => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem(RESEARCH_QUERY_KEY) ?? "";
+  });
+  const [results, setResults] = useState<ResearchResult[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      return JSON.parse(localStorage.getItem(RESEARCH_RESULTS_KEY) ?? "[]");
+    } catch {
+      return [];
+    }
+  });
+  const [maxResults, setMaxResults] = useState(8);
+  const [isSearching, setIsSearching] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+  const nextResultId = useRef<number>(0);
 
+  // ── Persistence ──────────────────────────────────────────────────
+  useEffect(() => {
+    try {
+      localStorage.setItem(RESEARCH_RESULTS_KEY, JSON.stringify(results));
+    } catch {}
+  }, [results]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(RESEARCH_QUERY_KEY, researchQuery);
+    } catch {}
+  }, [researchQuery]);
+
+  // ── Sources fetch ────────────────────────────────────────────────
   const fetchSources = useCallback(async () => {
     if (projectId === null) return;
     try {
@@ -118,17 +158,9 @@ export default function IntakePage() {
 
   useEffect(() => {
     fetchSources();
+    const interval = window.setInterval(fetchSources, 4000);
+    return () => window.clearInterval(interval);
   }, [fetchSources]);
-
-  useEffect(() => {
-    try {
-      const q = localStorage.getItem("sb_research_query");
-      if (q) {
-        setUrl(q);
-        localStorage.removeItem("sb_research_query");
-      }
-    } catch {}
-  }, []);
 
   const filtered = useMemo(() => {
     let list = [...sources];
@@ -170,6 +202,7 @@ export default function IntakePage() {
   const weekTotal = weekBuckets.reduce((a, b) => a + b, 0);
   const weekMax = Math.max(1, ...weekBuckets);
 
+  // ── Library actions ─────────────────────────────────────────────
   async function approve(s: Source) {
     if (s.status !== "pending" || approving.has(s.id)) return;
     setApproving((p) => new Set(p).add(s.id));
@@ -235,96 +268,10 @@ export default function IntakePage() {
     fetchSources();
   }
 
-  function clearResearch() {
-    researchAbortRef.current?.abort();
-    setResearchStreaming(false);
-    setResearchResults([]);
-    setResearchTopic("");
-    setDismissed(new Set());
-  }
-
-  async function runResearch(topic: string) {
-    if (!projectId) return;
-    researchAbortRef.current?.abort();
-    const controller = new AbortController();
-    researchAbortRef.current = controller;
-    setResearchTopic(topic);
-    setResearchResults([]);
-    setDismissed(new Set());
-    setResearchStreaming(true);
-
-    try {
-      const res = await fetch("/api/sources/research", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, projectId }),
-        signal: controller.signal,
-      });
-      if (!res.ok || !res.body) throw new Error();
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (trimmed.startsWith("RESULT:")) {
-            try {
-              const json = JSON.parse(trimmed.slice(7).trim()) as ResearchResult;
-              if (json.url && json.title) {
-                setResearchResults((prev) => [...prev, json]);
-              }
-            } catch {}
-          }
-          if (trimmed === "DONE") {
-            // server side; loop will end naturally
-          }
-        }
-      }
-      setResearchStreaming(false);
-      addToast({ type: "success", title: "Research complete" });
-    } catch (err) {
-      if ((err as Error).name !== "AbortError") {
-        addToast({ type: "error", title: "Research failed" });
-      }
-      setResearchStreaming(false);
-    }
-  }
-
-  async function ingestResearchUrl(r: ResearchResult) {
-    if (!projectId || ingestingUrls.has(r.url)) return;
-    setIngestingUrls((p) => new Set(p).add(r.url));
-    try {
-      const res = await fetch("/api/sources/ingest-web", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: r.url, projectId, ingest: false }),
-      });
-      if (!res.ok) throw new Error();
-      addToast({ type: "success", title: `Queued · ${r.domain || r.url}` });
-      setDismissed((p) => new Set(p).add(r.url));
-      fetchSources();
-    } catch {
-      addToast({ type: "error", title: "Couldn't queue" });
-    } finally {
-      setIngestingUrls((p) => {
-        const n = new Set(p);
-        n.delete(r.url);
-        return n;
-      });
-    }
-  }
-
-  async function commission() {
-    const q = url.trim();
+  async function submitQuickUrl() {
+    const q = quickUrl.trim();
     if (!q || !projectId) return;
-    setCommissionBusy(true);
+    setQuickBusy(true);
     try {
       const isUrl = /^https?:\/\//.test(q);
       if (isUrl) {
@@ -335,38 +282,286 @@ export default function IntakePage() {
         });
         if (!res.ok) throw new Error();
         addToast({ type: "success", title: "Web source queued" });
-        setUrl("");
+        setQuickUrl("");
         fetchSources();
       } else {
-        // Research topic — stream results
-        setUrl("");
-        await runResearch(q);
+        // Not a URL → switch to research tab + kick off
+        setQuickUrl("");
+        setResearchQuery(q);
+        setTab("research");
+        router.replace(`/sources?tab=research`);
+        window.setTimeout(() => startResearch(q), 40);
       }
     } catch {
-      addToast({ type: "error", title: "Couldn't commission" });
+      addToast({ type: "error", title: "Couldn't queue" });
     } finally {
-      setCommissionBusy(false);
+      setQuickBusy(false);
     }
   }
 
+  // ── Research: SSE stream ────────────────────────────────────────
+  const runResearch = useCallback(
+    async (topicOverride: string | undefined, append: boolean) => {
+      const topic = (topicOverride ?? researchQuery).trim();
+      if (!topic || isSearching || !projectId) return;
+
+      const seenUrls = new Set<string>(append ? results.map((r) => r.url).filter(Boolean) : []);
+      let addedThisRun = 0;
+
+      if (!append) {
+        setResults([]);
+        nextResultId.current = 0;
+      }
+      setIsSearching(true);
+
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      try {
+        const res = await fetch("/api/sources/research", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            topic,
+            projectId,
+            maxResults,
+            excludeUrls: append ? Array.from(seenUrls) : undefined,
+          }),
+          signal: controller.signal,
+        });
+
+        if (!res.ok || !res.body) {
+          setIsSearching(false);
+          addToast({ type: "error", title: "Research failed to start" });
+          return;
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            // The endpoint emits SSE-framed lines: `data: {json}`
+            // AND/OR raw `RESULT:{json}` lines depending on provider.
+            let payload: string | null = null;
+            if (line.startsWith("data: ")) {
+              payload = line.slice(6);
+            } else if (line.startsWith("data:")) {
+              payload = line.slice(5);
+            } else if (line.startsWith("RESULT:")) {
+              // Raw form — parse the JSON directly
+              try {
+                const json = JSON.parse(line.slice(7));
+                const url = json.url ?? "";
+                if (url && seenUrls.has(url)) continue;
+                if (url) seenUrls.add(url);
+                const r: ResearchResult = {
+                  id: `r${nextResultId.current++}`,
+                  title: json.title ?? "Untitled",
+                  url,
+                  domain: json.domain ?? "",
+                  author: json.author ?? "Unknown",
+                  type: json.type ?? "Article",
+                  summary: json.summary ?? "",
+                  relevance: json.relevance ?? 50,
+                  tags: json.tags ?? [],
+                  status: "pending",
+                };
+                setResults((prev) => [...prev, r]);
+                addedThisRun++;
+              } catch {}
+              continue;
+            } else {
+              continue;
+            }
+
+            try {
+              const evt = JSON.parse(payload);
+              if (evt.type === "content" && typeof evt.text === "string") {
+                const text: string = evt.text;
+                if (text.startsWith("RESULT:")) {
+                  try {
+                    const json = JSON.parse(text.slice(7));
+                    const url = json.url ?? "";
+                    if (url && seenUrls.has(url)) continue;
+                    if (url) seenUrls.add(url);
+                    const r: ResearchResult = {
+                      id: `r${nextResultId.current++}`,
+                      title: json.title ?? "Untitled",
+                      url,
+                      domain: json.domain ?? "",
+                      author: json.author ?? "Unknown",
+                      type: json.type ?? "Article",
+                      summary: json.summary ?? "",
+                      relevance: json.relevance ?? 50,
+                      tags: json.tags ?? [],
+                      status: "pending",
+                    };
+                    setResults((prev) => [...prev, r]);
+                    addedThisRun++;
+                  } catch {}
+                }
+              } else if (evt.type === "done") {
+                // stream will end naturally
+              }
+            } catch {
+              // Not JSON — check if the payload itself contains RESULT: (some providers)
+              if (payload.startsWith("RESULT:")) {
+                try {
+                  const json = JSON.parse(payload.slice(7));
+                  const url = json.url ?? "";
+                  if (url && seenUrls.has(url)) continue;
+                  if (url) seenUrls.add(url);
+                  const r: ResearchResult = {
+                    id: `r${nextResultId.current++}`,
+                    title: json.title ?? "Untitled",
+                    url,
+                    domain: json.domain ?? "",
+                    author: json.author ?? "Unknown",
+                    type: json.type ?? "Article",
+                    summary: json.summary ?? "",
+                    relevance: json.relevance ?? 50,
+                    tags: json.tags ?? [],
+                    status: "pending",
+                  };
+                  setResults((prev) => [...prev, r]);
+                  addedThisRun++;
+                } catch {}
+              }
+            }
+          }
+        }
+
+        if (append && addedThisRun === 0) {
+          addToast({
+            type: "info",
+            title: "No new sources found",
+            description: "The model couldn't turn up anything beyond what's already listed.",
+          });
+        } else if (!append) {
+          addToast({ type: "success", title: `Found ${addedThisRun} source${addedThisRun === 1 ? "" : "s"}` });
+        } else {
+          addToast({ type: "success", title: `Added ${addedThisRun} more` });
+        }
+      } catch (err: unknown) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          // user cancelled
+        } else {
+          addToast({ type: "error", title: "Research failed" });
+        }
+      } finally {
+        setIsSearching(false);
+        abortRef.current = null;
+      }
+    },
+    [researchQuery, isSearching, maxResults, results, projectId, addToast]
+  );
+
+  const startResearch = useCallback(
+    (topicOverride?: string) => runResearch(topicOverride, false),
+    [runResearch]
+  );
+
+  const loadMore = useCallback(() => runResearch(undefined, true), [runResearch]);
+
+  const cancelResearch = useCallback(() => {
+    abortRef.current?.abort();
+    setIsSearching(false);
+  }, []);
+
+  const clearResearch = useCallback(() => {
+    abortRef.current?.abort();
+    setIsSearching(false);
+    setResults([]);
+    setResearchQuery("");
+    try {
+      localStorage.removeItem(RESEARCH_QUERY_KEY);
+      localStorage.removeItem(RESEARCH_RESULTS_KEY);
+    } catch {}
+  }, []);
+
+  // ── Auto-trigger from URL params (Ledger → Intake handoff) ─────
+  const autoRan = useRef(false);
+  useEffect(() => {
+    if (autoRan.current) return;
+    const urlTopic = searchParams.get("topic");
+    if (urlTab === "research") setTab("research");
+    if (urlTopic && projectId !== null) {
+      autoRan.current = true;
+      setResearchQuery(urlTopic);
+      startResearch(urlTopic);
+      router.replace("/sources?tab=research");
+    }
+  }, [searchParams, urlTab, projectId, router, startResearch]);
+
+  // ── Research result actions ─────────────────────────────────────
+  async function setResultStatus(id: string, status: ResearchResult["status"]) {
+    setResults((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
+
+    if (status === "approved") {
+      const result = results.find((r) => r.id === id);
+      if (!result || !projectId) return;
+      try {
+        const res = await fetch("/api/sources/ingest-web", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: result.title,
+            url: result.url,
+            domain: result.domain,
+            author: result.author,
+            type: result.type,
+            summary: result.summary,
+            tags: result.tags,
+            projectId,
+            ingest: false,
+          }),
+        });
+        if (res.ok) {
+          addToast({ type: "success", title: `Queued · ${result.domain || result.url}` });
+          fetchSources();
+        } else {
+          throw new Error();
+        }
+      } catch {
+        addToast({ type: "error", title: "Couldn't queue source" });
+      }
+    }
+  }
+
+  const visibleResults = useMemo(
+    () =>
+      [...results]
+        .filter((r) => r.status !== "skipped")
+        .sort((a, b) => b.relevance - a.relevance),
+    [results]
+  );
+  const approvedCount = results.filter((r) => r.status === "approved").length;
+  const totalCount = results.length;
+
+  // ── Drop handlers ────────────────────────────────────────────────
   function onDrop(e: React.DragEvent) {
     e.preventDefault();
     setDragActive(false);
     uploadFiles(e.dataTransfer.files);
   }
-
   function onDragOver(e: React.DragEvent) {
     e.preventDefault();
     setDragActive(true);
   }
-
   function onDragLeave(e: React.DragEvent) {
     e.preventDefault();
     setDragActive(false);
   }
 
-  const visibleResearch = researchResults.filter((r) => !dismissed.has(r.url));
-
+  // ── Render ───────────────────────────────────────────────────────
   return (
     <div className="pad">
       <EditorialBreadcrumbs tail="Intake" />
@@ -388,245 +583,368 @@ export default function IntakePage() {
         </div>
       </div>
 
-      <div className="sources-layout">
-        <div>
+      <div className="intake-tabs">
+        <button
+          type="button"
+          className={`intake-tab${tab === "library" ? " on" : ""}`}
+          onClick={() => {
+            setTab("library");
+            router.replace("/sources");
+          }}
+        >
+          Library <span className="c">{sources.length}</span>
+        </button>
+        <button
+          type="button"
+          className={`intake-tab${tab === "research" ? " on" : ""}`}
+          onClick={() => {
+            setTab("research");
+            router.replace("/sources?tab=research");
+          }}
+        >
+          Research {totalCount > 0 && <span className="c">{totalCount}</span>}
+        </button>
+      </div>
+
+      {tab === "library" ? (
+        <div className="sources-layout">
+          <div>
+            <div className="drop-tools">
+              <div className="drop-url">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6">
+                  <path d="M6.5 9.5a2 2 0 012.83 0l2 2a2 2 0 010 2.83l-1.5 1.5a2 2 0 01-2.83 0l-.5-.5M9.5 6.5a2 2 0 00-2.83 0l-2 2a2 2 0 000 2.83l.5.5" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Paste a URL to ingest, or type a topic → Research tab"
+                  value={quickUrl}
+                  onChange={(e) => setQuickUrl(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") submitQuickUrl();
+                  }}
+                  disabled={quickBusy}
+                />
+              </div>
+              <button className="btn primary" onClick={submitQuickUrl} disabled={quickBusy || !quickUrl.trim()}>
+                {quickBusy ? "Queueing…" : "Commission →"}
+              </button>
+            </div>
+
+            <div
+              className={`drop${dragActive ? " drag" : ""}`}
+              onClick={() => fileInputRef.current?.click()}
+              onDrop={onDrop}
+              onDragOver={onDragOver}
+              onDragLeave={onDragLeave}
+            >
+              <h4>
+                Drop <em>any</em> file, or click to upload.
+              </h4>
+              <p>PDF, Markdown, text, audio, image — anything lands here as a pending source.</p>
+              <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => uploadFiles(e.target.files)} />
+            </div>
+
+            <div className="intake">
+              {filtered.length === 0 ? (
+                <div
+                  style={{
+                    fontFamily: "var(--font-inst)",
+                    fontStyle: "italic",
+                    fontSize: 15,
+                    color: "var(--ink-3)",
+                    padding: "28px 0",
+                  }}
+                >
+                  {kind ? `No ${KIND_LABEL[kind]} sources yet.` : "No sources in this project yet — drop one above."}
+                </div>
+              ) : (
+                filtered.map((s, i) => {
+                  const isPending = s.status === "pending";
+                  const isApproved = approving.has(s.id);
+                  const isSliding = slideOut.has(s.id);
+                  const rowClass = `intake-row${isApproved ? " approved" : ""}${isSliding ? " slide-out" : ""}`;
+                  const kindLbl = KIND_LABEL[s.type as "pdf" | "web" | "note"] ?? s.type.toUpperCase();
+                  const extUrl = externalUrlFor(s);
+                  return (
+                    <div key={s.id} className={rowClass}>
+                      <div className="num">{String(i + 1).padStart(3, "0")}</div>
+                      <div className="stamp-card">
+                        <div className="k">{kindLbl}</div>
+                        <div className="s">{s.id}</div>
+                      </div>
+                      <div className="body">
+                        <div className="t">
+                          {extUrl ? (
+                            <a href={extUrl} target="_blank" rel="noreferrer noopener" style={{ color: "inherit", textDecoration: "none" }}>
+                              {s.title}
+                            </a>
+                          ) : (
+                            s.title
+                          )}
+                        </div>
+                        <div className="sub">
+                          {extUrl ? (
+                            <a className="link" href={extUrl} target="_blank" rel="noreferrer noopener">
+                              {subtitleFor(s)}
+                            </a>
+                          ) : (
+                            subtitleFor(s)
+                          )}
+                        </div>
+                        <div className="ext">{extractFor(s)}</div>
+                      </div>
+                      <div className="acts">
+                        <span className={`seal ${isPending ? "acc" : s.status === "failed" ? "red" : "ghost"}`}>
+                          {s.status}
+                        </span>
+                        {isPending && !isApproved && (
+                          <button className="btn primary" onClick={() => approve(s)}>
+                            Approve
+                          </button>
+                        )}
+                        <button className="btn red" onClick={() => remove(s)} disabled={isApproved}>
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          <aside>
+            <div className="fr-card">
+              <h4>Filter by kind</h4>
+              <button type="button" className={`fr-row${kind === "" ? " on" : ""}`} onClick={() => setKind("")}>
+                <span className="d" />
+                <span>All</span>
+                <span className="c">{sources.length}</span>
+              </button>
+              {KIND_ORDER.map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  className={`fr-row${kind === k ? " on" : ""}`}
+                  onClick={() => setKind(k)}
+                >
+                  <span className="d" />
+                  <span>{KIND_LABEL[k]}</span>
+                  <span className="c">{kindCounts[k] ?? 0}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="fr-card">
+              <h4>This week</h4>
+              <div className="fr-chart">
+                {weekBuckets.map((v, i) => (
+                  <div
+                    key={i}
+                    className={`bar${v === weekMax && weekMax > 0 ? " peak" : ""}`}
+                    style={{ height: `${(v / weekMax) * 100}%` }}
+                    title={`${v} source${v === 1 ? "" : "s"}`}
+                  />
+                ))}
+              </div>
+              <div className="fr-chart-labels">
+                {(() => {
+                  const labels: string[] = [];
+                  const today = new Date().getDay();
+                  for (let i = 1; i <= 7; i++) labels.push(DAY_LABELS[(today + i) % 7]);
+                  return labels.map((l, i) => <span key={i}>{l}</span>);
+                })()}
+              </div>
+            </div>
+
+            <div className="fr-card">
+              <h4>Queue health</h4>
+              <div className="fr-stat">
+                <span>Pending</span>
+                <span className="v">{statusCounts.pending}</span>
+              </div>
+              <div className="fr-stat">
+                <span>Ingesting</span>
+                <span className="v">{statusCounts.ingesting}</span>
+              </div>
+              <div className="fr-stat">
+                <span>Failed</span>
+                <span className="v">{statusCounts.failed}</span>
+              </div>
+            </div>
+          </aside>
+        </div>
+      ) : (
+        // ── Research tab ──────────────────────────────────────────
+        <div style={{ paddingTop: 28, maxWidth: 960 }}>
+          <div className="research-hero">
+            <div>
+              <h2>
+                {researchQuery ? (
+                  <>
+                    Research · <em>{researchQuery}</em>
+                  </>
+                ) : (
+                  <>
+                    <em>Research.</em>
+                  </>
+                )}
+              </h2>
+              <div className="subtitle">
+                {totalCount === 0
+                  ? "Commission a topic — Claude searches the web for candidate sources."
+                  : `${totalCount} candidate${totalCount === 1 ? "" : "s"} · ${approvedCount} queued`}
+              </div>
+            </div>
+            <div className="counts">
+              <div>
+                Found <b>{totalCount}</b>
+              </div>
+              <div>
+                Queued <b>{approvedCount}</b>
+              </div>
+              <div>
+                Remaining <b>{totalCount - approvedCount}</b>
+              </div>
+            </div>
+          </div>
+
           <div className="drop-tools">
             <div className="drop-url">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6">
-                <path d="M6.5 9.5a2 2 0 012.83 0l2 2a2 2 0 010 2.83l-1.5 1.5a2 2 0 01-2.83 0l-.5-.5M9.5 6.5a2 2 0 00-2.83 0l-2 2a2 2 0 000 2.83l.5.5" />
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <circle cx="7" cy="7" r="5" />
+                <line x1="10.5" y1="10.5" x2="14" y2="14" />
               </svg>
               <input
                 type="text"
-                placeholder="Paste a URL to ingest, or type a research topic to commission…"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
+                placeholder="A topic, an open question, a name…"
+                value={researchQuery}
+                onChange={(e) => setResearchQuery(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") commission();
+                  if (e.key === "Enter" && !isSearching) startResearch();
                 }}
-                disabled={commissionBusy}
+                disabled={isSearching}
               />
             </div>
-            <button className="btn primary" onClick={commission} disabled={commissionBusy || !url.trim()}>
-              {commissionBusy ? "Queueing…" : "Commission →"}
+            <button
+              className="btn primary"
+              onClick={() => startResearch()}
+              disabled={!researchQuery.trim() || isSearching}
+            >
+              {isSearching ? "Searching…" : totalCount > 0 ? "New search →" : "Commission →"}
             </button>
           </div>
 
-          {(researchStreaming || researchResults.length > 0) && (
-            <div className="research-panel">
-              <div className="research-panel-head">
-                <span className="n">§ Research</span>
-                <h3>
-                  <em>{researchTopic}</em>
-                </h3>
-                <span className={`pill${!researchStreaming ? " done" : ""}`}>
-                  <span className="d" />
-                  {researchStreaming ? "Streaming" : `${visibleResearch.length} results`}
-                </span>
-                <button className="btn sm ghost" onClick={clearResearch}>
-                  {researchStreaming ? "Stop" : "Clear"}
+          <div className="research-controls">
+            {totalCount > 0 && (
+              <>
+                <button className="btn" onClick={loadMore} disabled={isSearching || !researchQuery.trim()}>
+                  + Load {maxResults} more
                 </button>
-              </div>
-              <div className="research-panel-body">
-                {visibleResearch.length === 0 && !researchStreaming ? (
-                  <div className="research-empty">No candidates — try a different topic.</div>
-                ) : visibleResearch.length === 0 ? (
-                  <div className="research-empty">Searching the web…</div>
-                ) : (
-                  visibleResearch.map((r, i) => (
-                    <div key={r.url} className="research-row">
-                      <div className="num">{String(i + 1).padStart(2, "0")}</div>
-                      <div className="body">
-                        <div className="t">
-                          <a href={r.url} target="_blank" rel="noreferrer noopener">
-                            {r.title}
-                          </a>
-                        </div>
-                        <div className="sub">
-                          {r.domain || new URL(r.url).hostname}
-                          {r.type ? ` · ${r.type}` : ""}
-                          {typeof r.relevance === "number" && <span className="rel">{r.relevance}%</span>}
-                        </div>
-                        <div className="ext">{r.summary}</div>
-                      </div>
-                      <div className="acts">
-                        <button
-                          className="btn primary"
-                          onClick={() => ingestResearchUrl(r)}
-                          disabled={ingestingUrls.has(r.url)}
-                        >
-                          {ingestingUrls.has(r.url) ? "Queueing…" : "Ingest"}
-                        </button>
-                        <button
-                          className="btn ghost"
-                          onClick={() =>
-                            setDismissed((p) => new Set(p).add(r.url))
-                          }
-                        >
-                          Dismiss
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
+                <button className="btn ghost" onClick={clearResearch} disabled={isSearching}>
+                  Clear results
+                </button>
+              </>
+            )}
+            {isSearching && (
+              <button className="btn red" onClick={cancelResearch}>
+                Stop streaming
+              </button>
+            )}
+            <div className="max-sel">
+              <span>Per run</span>
+              <select
+                value={maxResults}
+                onChange={(e) => setMaxResults(Number(e.target.value))}
+                disabled={isSearching}
+              >
+                <option value={4}>4</option>
+                <option value={8}>8</option>
+                <option value={12}>12</option>
+                <option value={20}>20</option>
+              </select>
             </div>
-          )}
-
-          <div
-            className={`drop${dragActive ? " drag" : ""}`}
-            onClick={() => fileInputRef.current?.click()}
-            onDrop={onDrop}
-            onDragOver={onDragOver}
-            onDragLeave={onDragLeave}
-          >
-            <h4>
-              Drop <em>any</em> file, or click to upload.
-            </h4>
-            <p>PDF, Markdown, text, audio, image — anything lands here as a pending source.</p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              hidden
-              onChange={(e) => uploadFiles(e.target.files)}
-            />
           </div>
 
-          <div className="intake">
-            {filtered.length === 0 ? (
-              <div
-                style={{
-                  fontFamily: "var(--font-inst)",
-                  fontStyle: "italic",
-                  fontSize: 15,
-                  color: "var(--ink-3)",
-                  padding: "28px 0",
-                }}
-              >
-                {kind ? `No ${KIND_LABEL[kind]} sources yet.` : "No sources in this project yet — drop one above."}
-              </div>
-            ) : (
-              filtered.map((s, i) => {
-                const isPending = s.status === "pending";
-                const isApproved = approving.has(s.id);
-                const isSliding = slideOut.has(s.id);
-                const rowClass = `intake-row${isApproved ? " approved" : ""}${isSliding ? " slide-out" : ""}`;
-                const kindLbl = KIND_LABEL[s.type as "pdf" | "web" | "note"] ?? s.type.toUpperCase();
-                const extUrl = externalUrlFor(s);
+          {visibleResults.length === 0 && !isSearching ? (
+            <div className="research-empty">
+              {totalCount === 0
+                ? "No results yet. Enter a topic above and commission."
+                : "All candidates handled. Load more to continue."}
+            </div>
+          ) : (
+            <div>
+              {visibleResults.map((r, i) => {
+                const isApproved = r.status === "approved";
+                const isBookmarked = r.status === "bookmarked";
                 return (
-                  <div key={s.id} className={rowClass}>
-                    <div className="num">{String(i + 1).padStart(3, "0")}</div>
-                    <div className="stamp-card">
-                      <div className="k">{kindLbl}</div>
-                      <div className="s">{s.id}</div>
-                    </div>
+                  <div key={r.id} className={`research-row${isApproved ? " approved" : ""}`}>
+                    <div className="num">{String(i + 1).padStart(2, "0")}</div>
                     <div className="body">
                       <div className="t">
-                        {extUrl ? (
-                          <a
-                            href={extUrl}
-                            target="_blank"
-                            rel="noreferrer noopener"
-                            style={{ color: "inherit", textDecoration: "none" }}
-                          >
-                            {s.title}
-                          </a>
-                        ) : (
-                          s.title
-                        )}
+                        <a href={r.url} target="_blank" rel="noreferrer noopener">
+                          {r.title}
+                        </a>
                       </div>
                       <div className="sub">
-                        {extUrl ? (
-                          <a className="link" href={extUrl} target="_blank" rel="noreferrer noopener">
-                            {subtitleFor(s)}
-                          </a>
-                        ) : (
-                          subtitleFor(s)
-                        )}
+                        <span className={`rel-pill ${relevanceClass(r.relevance)}`}>{r.relevance}%</span>
+                        {r.domain || (() => {
+                          try {
+                            return new URL(r.url).hostname;
+                          } catch {
+                            return r.url;
+                          }
+                        })()}
+                        {r.author && r.author !== "Unknown" && ` · ${r.author}`}
+                        {r.type && ` · ${r.type}`}
                       </div>
-                      <div className="ext">{extractFor(s)}</div>
+                      <div className="ext">{r.summary}</div>
+                      {r.tags && r.tags.length > 0 && (
+                        <div className="research-tags">
+                          {r.tags.slice(0, 5).map((t) => (
+                            <span key={t} className="tag">
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div className="acts">
-                      <span className={`seal ${isPending ? "acc" : s.status === "failed" ? "red" : "ghost"}`}>
-                        {s.status}
-                      </span>
-                      {isPending && !isApproved && (
-                        <button className="btn primary" onClick={() => approve(s)}>
+                      {isApproved ? (
+                        <span className="seal acc">Queued</span>
+                      ) : (
+                        <button className="btn primary" onClick={() => setResultStatus(r.id, "approved")}>
                           Approve
                         </button>
                       )}
-                      <button className="btn red" onClick={() => remove(s)} disabled={isApproved}>
-                        Delete
+                      <button
+                        className="btn ghost"
+                        onClick={() => setResultStatus(r.id, isBookmarked ? "pending" : "bookmarked")}
+                      >
+                        {isBookmarked ? "Unmark" : "Bookmark"}
+                      </button>
+                      <button className="btn red" onClick={() => setResultStatus(r.id, "skipped")}>
+                        Skip
                       </button>
                     </div>
                   </div>
                 );
-              })
-            )}
-          </div>
+              })}
+              {isSearching && (
+                <div className="research-empty">Streaming more candidates…</div>
+              )}
+            </div>
+          )}
         </div>
-
-        <aside>
-          <div className="fr-card">
-            <h4>Filter by kind</h4>
-            <button type="button" className={`fr-row${kind === "" ? " on" : ""}`} onClick={() => setKind("")}>
-              <span className="d" />
-              <span>All</span>
-              <span className="c">{sources.length}</span>
-            </button>
-            {KIND_ORDER.map((k) => (
-              <button
-                key={k}
-                type="button"
-                className={`fr-row${kind === k ? " on" : ""}`}
-                onClick={() => setKind(k)}
-              >
-                <span className="d" />
-                <span>{KIND_LABEL[k]}</span>
-                <span className="c">{kindCounts[k] ?? 0}</span>
-              </button>
-            ))}
-          </div>
-
-          <div className="fr-card">
-            <h4>This week</h4>
-            <div className="fr-chart">
-              {weekBuckets.map((v, i) => (
-                <div
-                  key={i}
-                  className={`bar${v === weekMax && weekMax > 0 ? " peak" : ""}`}
-                  style={{ height: `${(v / weekMax) * 100}%` }}
-                  title={`${v} source${v === 1 ? "" : "s"}`}
-                />
-              ))}
-            </div>
-            <div className="fr-chart-labels">
-              {(() => {
-                const labels: string[] = [];
-                const today = new Date().getDay();
-                for (let i = 1; i <= 7; i++) labels.push(DAY_LABELS[(today + i) % 7]);
-                return labels.map((l, i) => <span key={i}>{l}</span>);
-              })()}
-            </div>
-          </div>
-
-          <div className="fr-card">
-            <h4>Queue health</h4>
-            <div className="fr-stat">
-              <span>Pending</span>
-              <span className="v">{statusCounts.pending}</span>
-            </div>
-            <div className="fr-stat">
-              <span>Ingesting</span>
-              <span className="v">{statusCounts.ingesting}</span>
-            </div>
-            <div className="fr-stat">
-              <span>Failed</span>
-              <span className="v">{statusCounts.failed}</span>
-            </div>
-          </div>
-        </aside>
-      </div>
+      )}
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={null}>
+      <IntakePageInner />
+    </Suspense>
   );
 }

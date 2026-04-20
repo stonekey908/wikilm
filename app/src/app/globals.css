@@ -1018,6 +1018,38 @@ body::after {
 }
 .sec-head .rail-meta b { color: var(--ink); }
 
+.intake-tabs {
+  display: flex; border-bottom: 2.5px solid var(--rule);
+  margin-top: 24px; gap: 0;
+  position: relative;
+}
+.intake-tabs::before {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -6px;
+  border-bottom: 1px solid var(--rule);
+}
+.intake-tab {
+  padding: 14px 22px;
+  font-family: var(--font-mono); font-size: 11px;
+  font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-4); cursor: pointer;
+  border: none; background: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2.5px;
+  display: inline-flex; align-items: center; gap: 8px;
+  transition: color 140ms, border-color 140ms;
+}
+.intake-tab:hover { color: var(--ink-2); }
+.intake-tab.on { color: var(--ink); border-bottom-color: var(--ink); }
+.intake-tab .c {
+  padding: 1px 7px;
+  font-family: var(--font-mono); font-size: 9.5px; font-weight: 700;
+  background: var(--paper-2); border: 1px solid var(--rule-faint);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+}
+.intake-tab.on .c { color: var(--paper); background: var(--ink); border-color: var(--ink); }
+
 .sources-layout {
   display: grid; grid-template-columns: 1fr 280px; gap: 42px;
   padding-top: 28px;
@@ -1180,6 +1212,74 @@ body::after {
 .research-empty {
   font-family: var(--font-inst); font-style: italic; font-size: 14px;
   color: var(--ink-3); padding: 14px 0;
+}
+.research-row.approved { opacity: 0.55; }
+.research-row.approved .body .t a { text-decoration: line-through; text-decoration-color: var(--rule-faint); }
+.research-row .body .rel-pill {
+  display: inline-flex; align-items: center;
+  font-family: var(--font-mono); font-size: 9.5px; font-weight: 700;
+  letter-spacing: 0.1em;
+  padding: 2px 6px; margin-right: 8px;
+  border: 1px solid currentColor;
+}
+.research-row .body .rel-pill.hi { color: var(--green); }
+.research-row .body .rel-pill.mid { color: var(--blue); }
+.research-row .body .rel-pill.lo { color: var(--ink-4); }
+.research-tags { display: inline-flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+.research-tags .tag {
+  font-family: var(--font-mono); font-size: 9.5px;
+  color: var(--ink-4); background: var(--paper-2);
+  border: 1px solid var(--rule-faint);
+  padding: 1px 6px; letter-spacing: 0.06em;
+}
+
+.research-hero {
+  display: grid; grid-template-columns: 1fr auto; gap: 16px;
+  align-items: end;
+  padding: 24px 0 18px;
+  border-bottom: 1px dashed var(--rule-faint);
+  margin-bottom: 22px;
+}
+.research-hero h2 {
+  font-family: var(--font-serif); font-weight: 400; font-size: 44px;
+  letter-spacing: -0.035em; line-height: 1; margin-bottom: 8px;
+  font-variation-settings: "opsz" 144;
+}
+.research-hero h2 em { font-family: var(--font-inst); font-style: italic; color: var(--accent); }
+.research-hero .subtitle {
+  font-family: var(--font-inst); font-style: italic; font-size: 16px;
+  color: var(--ink-3);
+}
+.research-hero .counts {
+  display: flex; flex-direction: column; gap: 4px;
+  font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ink-3); text-align: right; line-height: 1.7;
+}
+.research-hero .counts b { color: var(--ink); font-weight: 700; }
+
+.research-controls {
+  display: flex; gap: 10px; align-items: center;
+  padding: 16px 0 22px;
+  flex-wrap: wrap;
+}
+.research-controls .btn { padding: 10px 18px; font-size: 11px; }
+.research-controls .max-sel {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink-4); margin-left: auto;
+}
+.research-controls .max-sel select {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink); background: var(--paper);
+  border: 1.5px solid var(--rule);
+  padding: 6px 24px 6px 10px; cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 16 16'><path d='M4 6l4 4 4-4' stroke='currentColor' stroke-width='1.5' fill='none'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
 }
 .intake-row .acts { display: flex; flex-direction: column; gap: 6px; align-items: stretch; min-width: 96px; }
 .intake-row .acts .seal { justify-content: center; padding: 4px 10px; height: 26px; box-sizing: border-box; }
