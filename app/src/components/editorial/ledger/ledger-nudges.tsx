@@ -267,7 +267,7 @@ export function LedgerMarginalia() {
               style={{
                 width: "100%",
                 padding: "8px 10px",
-                fontSize: "calc(13px * var(--fs-scale, 1))",
+                fontSize: 13,
                 border: "1px solid var(--rule)",
                 background: "var(--paper-2)",
                 outline: "none",

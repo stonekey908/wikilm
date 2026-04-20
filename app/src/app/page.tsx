@@ -188,7 +188,7 @@ export default function LedgerPage() {
               style={{
                 fontFamily: "var(--font-inst)",
                 fontStyle: "italic",
-                fontSize: "calc(13px * var(--fs-scale, 1))",
+                fontSize: 13,
                 color: "var(--ink-3)",
                 padding: "8px 0",
               }}
