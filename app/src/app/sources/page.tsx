@@ -18,6 +18,17 @@ interface Source {
   createdAt: string;
 }
 
+interface ResearchResult {
+  title: string;
+  url: string;
+  domain: string;
+  author?: string;
+  type?: string;
+  summary: string;
+  relevance?: number;
+  tags?: string[];
+}
+
 type KindFilter = "" | "pdf" | "web" | "note";
 const KIND_LABEL: Record<"pdf" | "web" | "note", string> = {
   pdf: "PDF",
@@ -42,7 +53,7 @@ function subtitleFor(s: Source): string {
   if (s.author) return s.author;
   const domain = m.domain as string | undefined;
   if (domain) return domain;
-  const label = KIND_LABEL[(s.type as "pdf" | "web" | "note")] ?? s.type.toUpperCase();
+  const label = KIND_LABEL[s.type as "pdf" | "web" | "note"] ?? s.type.toUpperCase();
   const d = new Date(s.createdAt);
   return `${label} · ${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
 }
@@ -54,6 +65,17 @@ function extractFor(s: Source): string {
   if (s.type === "web") return "Web source · awaiting ingestion.";
   if (s.type === "note") return "Captured note · awaiting ingestion.";
   return "Pending source · awaiting ingestion.";
+}
+
+function externalUrlFor(s: Source): string | null {
+  // For web sources, filePath holds the original URL
+  if (s.type === "web" && s.filePath && /^https?:\/\//.test(s.filePath)) {
+    return s.filePath;
+  }
+  const m = parseMeta(s.meta);
+  const url = (m.url as string | undefined) ?? (m.source_url as string | undefined);
+  if (url && /^https?:\/\//.test(url)) return url;
+  return null;
 }
 
 function dayOfWeek(iso: string): number {
@@ -72,8 +94,16 @@ export default function IntakePage() {
   const [slideOut, setSlideOut] = useState<Set<number>>(new Set());
   const [dragActive, setDragActive] = useState(false);
   const [url, setUrl] = useState("");
-  const [urlBusy, setUrlBusy] = useState(false);
+  const [commissionBusy, setCommissionBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Research stream state
+  const [researchTopic, setResearchTopic] = useState<string>("");
+  const [researchResults, setResearchResults] = useState<ResearchResult[]>([]);
+  const [researchStreaming, setResearchStreaming] = useState(false);
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [ingestingUrls, setIngestingUrls] = useState<Set<string>>(new Set());
+  const researchAbortRef = useRef<AbortController | null>(null);
 
   const fetchSources = useCallback(async () => {
     if (projectId === null) return;
@@ -91,12 +121,14 @@ export default function IntakePage() {
   }, [fetchSources]);
 
   useEffect(() => {
-    // Preload research topic from Ledger
     try {
       const q = localStorage.getItem("sb_research_query");
-      if (q && !url) setUrl(q);
+      if (q) {
+        setUrl(q);
+        localStorage.removeItem("sb_research_query");
+      }
     } catch {}
-  }, [url]);
+  }, []);
 
   const filtered = useMemo(() => {
     let list = [...sources];
@@ -112,13 +144,12 @@ export default function IntakePage() {
   }, [sources]);
 
   const weekBuckets = useMemo(() => {
-    const days: number[] = [0, 0, 0, 0, 0, 0, 0]; // Sun..Sat
+    const days: number[] = [0, 0, 0, 0, 0, 0, 0];
     const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
     for (const s of sources) {
       const t = new Date(s.createdAt).getTime();
       if (t >= cutoff) days[dayOfWeek(s.createdAt)] += 1;
     }
-    // Rotate so today is rightmost
     const today = new Date().getDay();
     const rotated: number[] = [];
     for (let i = 1; i <= 7; i++) rotated.push(days[(today + i) % 7]);
@@ -142,7 +173,6 @@ export default function IntakePage() {
   async function approve(s: Source) {
     if (s.status !== "pending" || approving.has(s.id)) return;
     setApproving((p) => new Set(p).add(s.id));
-    // Flash seal immediately
     try {
       const res = await fetch(`/api/sources/${s.id}`, {
         method: "POST",
@@ -151,10 +181,7 @@ export default function IntakePage() {
       });
       if (!res.ok) throw new Error();
       addToast({ type: "success", title: "Approved · page synthesized", description: s.title });
-      // 1.1s → start slide out; 1.6s → remove from list
-      window.setTimeout(() => {
-        setSlideOut((p) => new Set(p).add(s.id));
-      }, 1100);
+      window.setTimeout(() => setSlideOut((p) => new Set(p).add(s.id)), 1100);
       window.setTimeout(() => {
         setSources((p) => p.filter((x) => x.id !== s.id));
         setApproving((p) => {
@@ -208,38 +235,117 @@ export default function IntakePage() {
     fetchSources();
   }
 
-  async function commissionUrl() {
+  function clearResearch() {
+    researchAbortRef.current?.abort();
+    setResearchStreaming(false);
+    setResearchResults([]);
+    setResearchTopic("");
+    setDismissed(new Set());
+  }
+
+  async function runResearch(topic: string) {
+    if (!projectId) return;
+    researchAbortRef.current?.abort();
+    const controller = new AbortController();
+    researchAbortRef.current = controller;
+    setResearchTopic(topic);
+    setResearchResults([]);
+    setDismissed(new Set());
+    setResearchStreaming(true);
+
+    try {
+      const res = await fetch("/api/sources/research", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic, projectId }),
+        signal: controller.signal,
+      });
+      if (!res.ok || !res.body) throw new Error();
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith("RESULT:")) {
+            try {
+              const json = JSON.parse(trimmed.slice(7).trim()) as ResearchResult;
+              if (json.url && json.title) {
+                setResearchResults((prev) => [...prev, json]);
+              }
+            } catch {}
+          }
+          if (trimmed === "DONE") {
+            // server side; loop will end naturally
+          }
+        }
+      }
+      setResearchStreaming(false);
+      addToast({ type: "success", title: "Research complete" });
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") {
+        addToast({ type: "error", title: "Research failed" });
+      }
+      setResearchStreaming(false);
+    }
+  }
+
+  async function ingestResearchUrl(r: ResearchResult) {
+    if (!projectId || ingestingUrls.has(r.url)) return;
+    setIngestingUrls((p) => new Set(p).add(r.url));
+    try {
+      const res = await fetch("/api/sources/ingest-web", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: r.url, projectId, ingest: false }),
+      });
+      if (!res.ok) throw new Error();
+      addToast({ type: "success", title: `Queued · ${r.domain || r.url}` });
+      setDismissed((p) => new Set(p).add(r.url));
+      fetchSources();
+    } catch {
+      addToast({ type: "error", title: "Couldn't queue" });
+    } finally {
+      setIngestingUrls((p) => {
+        const n = new Set(p);
+        n.delete(r.url);
+        return n;
+      });
+    }
+  }
+
+  async function commission() {
     const q = url.trim();
     if (!q || !projectId) return;
-    setUrlBusy(true);
+    setCommissionBusy(true);
     try {
-      // If it looks like a URL, ingest-web directly; otherwise do research
       const isUrl = /^https?:\/\//.test(q);
       if (isUrl) {
         const res = await fetch("/api/sources/ingest-web", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: q, projectId }),
+          body: JSON.stringify({ url: q, projectId, ingest: false }),
         });
         if (!res.ok) throw new Error();
         addToast({ type: "success", title: "Web source queued" });
+        setUrl("");
+        fetchSources();
       } else {
-        await fetch("/api/sources/research", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ topic: q, projectId }),
-        });
-        addToast({ type: "success", title: `Commissioning · ${q}` });
+        // Research topic — stream results
+        setUrl("");
+        await runResearch(q);
       }
-      setUrl("");
-      try {
-        localStorage.removeItem("sb_research_query");
-      } catch {}
-      fetchSources();
     } catch {
-      addToast({ type: "error", title: "Couldn't queue" });
+      addToast({ type: "error", title: "Couldn't commission" });
     } finally {
-      setUrlBusy(false);
+      setCommissionBusy(false);
     }
   }
 
@@ -258,6 +364,8 @@ export default function IntakePage() {
     e.preventDefault();
     setDragActive(false);
   }
+
+  const visibleResearch = researchResults.filter((r) => !dismissed.has(r.url));
 
   return (
     <div className="pad">
@@ -284,28 +392,85 @@ export default function IntakePage() {
         <div>
           <div className="drop-tools">
             <div className="drop-url">
-              <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6">
                 <path d="M6.5 9.5a2 2 0 012.83 0l2 2a2 2 0 010 2.83l-1.5 1.5a2 2 0 01-2.83 0l-.5-.5M9.5 6.5a2 2 0 00-2.83 0l-2 2a2 2 0 000 2.83l.5.5" />
               </svg>
               <input
                 type="text"
-                placeholder="Paste a URL or type a research topic…"
+                placeholder="Paste a URL to ingest, or type a research topic to commission…"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") commissionUrl();
+                  if (e.key === "Enter") commission();
                 }}
-                disabled={urlBusy}
+                disabled={commissionBusy}
               />
             </div>
-            <button
-              className="btn primary sm"
-              onClick={commissionUrl}
-              disabled={urlBusy || !url.trim()}
-            >
-              {urlBusy ? "Queueing…" : "Commission →"}
+            <button className="btn primary" onClick={commission} disabled={commissionBusy || !url.trim()}>
+              {commissionBusy ? "Queueing…" : "Commission →"}
             </button>
           </div>
+
+          {(researchStreaming || researchResults.length > 0) && (
+            <div className="research-panel">
+              <div className="research-panel-head">
+                <span className="n">§ Research</span>
+                <h3>
+                  <em>{researchTopic}</em>
+                </h3>
+                <span className={`pill${!researchStreaming ? " done" : ""}`}>
+                  <span className="d" />
+                  {researchStreaming ? "Streaming" : `${visibleResearch.length} results`}
+                </span>
+                <button className="btn sm ghost" onClick={clearResearch}>
+                  {researchStreaming ? "Stop" : "Clear"}
+                </button>
+              </div>
+              <div className="research-panel-body">
+                {visibleResearch.length === 0 && !researchStreaming ? (
+                  <div className="research-empty">No candidates — try a different topic.</div>
+                ) : visibleResearch.length === 0 ? (
+                  <div className="research-empty">Searching the web…</div>
+                ) : (
+                  visibleResearch.map((r, i) => (
+                    <div key={r.url} className="research-row">
+                      <div className="num">{String(i + 1).padStart(2, "0")}</div>
+                      <div className="body">
+                        <div className="t">
+                          <a href={r.url} target="_blank" rel="noreferrer noopener">
+                            {r.title}
+                          </a>
+                        </div>
+                        <div className="sub">
+                          {r.domain || new URL(r.url).hostname}
+                          {r.type ? ` · ${r.type}` : ""}
+                          {typeof r.relevance === "number" && <span className="rel">{r.relevance}%</span>}
+                        </div>
+                        <div className="ext">{r.summary}</div>
+                      </div>
+                      <div className="acts">
+                        <button
+                          className="btn primary"
+                          onClick={() => ingestResearchUrl(r)}
+                          disabled={ingestingUrls.has(r.url)}
+                        >
+                          {ingestingUrls.has(r.url) ? "Queueing…" : "Ingest"}
+                        </button>
+                        <button
+                          className="btn ghost"
+                          onClick={() =>
+                            setDismissed((p) => new Set(p).add(r.url))
+                          }
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
 
           <div
             className={`drop${dragActive ? " drag" : ""}`}
@@ -315,14 +480,13 @@ export default function IntakePage() {
             onDragLeave={onDragLeave}
           >
             <h4>
-              Drop a <em>PDF</em>, <em>note</em>, or click to upload.
+              Drop <em>any</em> file, or click to upload.
             </h4>
-            <p>Files land here as pending sources — approve them below.</p>
+            <p>PDF, Markdown, text, audio, image — anything lands here as a pending source.</p>
             <input
               ref={fileInputRef}
               type="file"
               multiple
-              accept=".pdf,.md,.markdown,.txt"
               hidden
               onChange={(e) => uploadFiles(e.target.files)}
             />
@@ -347,8 +511,8 @@ export default function IntakePage() {
                 const isApproved = approving.has(s.id);
                 const isSliding = slideOut.has(s.id);
                 const rowClass = `intake-row${isApproved ? " approved" : ""}${isSliding ? " slide-out" : ""}`;
-                const kindLbl =
-                  KIND_LABEL[s.type as "pdf" | "web" | "note"] ?? s.type.toUpperCase();
+                const kindLbl = KIND_LABEL[s.type as "pdf" | "web" | "note"] ?? s.type.toUpperCase();
+                const extUrl = externalUrlFor(s);
                 return (
                   <div key={s.id} className={rowClass}>
                     <div className="num">{String(i + 1).padStart(3, "0")}</div>
@@ -357,8 +521,29 @@ export default function IntakePage() {
                       <div className="s">{s.id}</div>
                     </div>
                     <div className="body">
-                      <div className="t">{s.title}</div>
-                      <div className="sub">{subtitleFor(s)}</div>
+                      <div className="t">
+                        {extUrl ? (
+                          <a
+                            href={extUrl}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            style={{ color: "inherit", textDecoration: "none" }}
+                          >
+                            {s.title}
+                          </a>
+                        ) : (
+                          s.title
+                        )}
+                      </div>
+                      <div className="sub">
+                        {extUrl ? (
+                          <a className="link" href={extUrl} target="_blank" rel="noreferrer noopener">
+                            {subtitleFor(s)}
+                          </a>
+                        ) : (
+                          subtitleFor(s)
+                        )}
+                      </div>
                       <div className="ext">{extractFor(s)}</div>
                     </div>
                     <div className="acts">
@@ -366,11 +551,11 @@ export default function IntakePage() {
                         {s.status}
                       </span>
                       {isPending && !isApproved && (
-                        <button className="btn sm primary" onClick={() => approve(s)}>
+                        <button className="btn primary" onClick={() => approve(s)}>
                           Approve
                         </button>
                       )}
-                      <button className="btn sm red" onClick={() => remove(s)} disabled={isApproved}>
+                      <button className="btn red" onClick={() => remove(s)} disabled={isApproved}>
                         Delete
                       </button>
                     </div>
@@ -384,11 +569,7 @@ export default function IntakePage() {
         <aside>
           <div className="fr-card">
             <h4>Filter by kind</h4>
-            <button
-              type="button"
-              className={`fr-row${kind === "" ? " on" : ""}`}
-              onClick={() => setKind("")}
-            >
+            <button type="button" className={`fr-row${kind === "" ? " on" : ""}`} onClick={() => setKind("")}>
               <span className="d" />
               <span>All</span>
               <span className="c">{sources.length}</span>
