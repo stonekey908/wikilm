@@ -260,11 +260,25 @@ body::after {
   padding: 6px 8px; margin: 1px 0;
   font-size: 12px; color: var(--ink-2); cursor: pointer;
   border: 1px solid transparent;
+  width: 100%; text-align: left; background: none; font-family: inherit;
 }
 .proj:hover { background: var(--paper-2); }
+.proj.active { background: var(--ink); color: var(--paper); }
+.proj.active .c { color: var(--paper); opacity: 0.6; }
 .proj .dot { width: 8px; height: 8px; border-radius: 50%; border: 1px solid var(--ink); flex-shrink: 0; }
+.proj.active .dot { border-color: var(--paper); }
 .proj .t { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.proj .c { font-family: var(--font-mono); font-size: 10px; color: var(--ink-4); }
+.proj .c { font-family: var(--font-mono); font-size: 10px; color: var(--ink-4); font-variant-numeric: tabular-nums; }
+
+.proj-chev {
+  width: 12px; height: 12px; display: grid; place-items: center;
+  color: var(--ink-4); cursor: pointer; flex-shrink: 0;
+  transition: transform 140ms, color 140ms;
+}
+.proj-chev:hover { color: var(--ink-2); }
+.proj-chev.open svg { transform: rotate(90deg); }
+.proj.active .proj-chev { color: var(--paper); opacity: 0.7; }
+.proj-spacer { width: 12px; flex-shrink: 0; }
 
 .side-foot {
   border-top: 1.5px solid var(--rule);

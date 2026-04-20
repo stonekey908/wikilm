@@ -2,8 +2,8 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useTweaks } from "./tweaks-provider";
 import { FOLIO, VIEW_ORDER, viewFromPath, type EditorialView } from "./folio-map";
+import { EditorialProjectTree } from "./editorial-project-tree";
 
 const NAV_ICONS: Record<EditorialView, React.ReactNode> = {
   dashboard: (
@@ -59,7 +59,6 @@ const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "
 export function EditorialSidebar() {
   const router = useRouter();
   const pathname = usePathname();
-  const { state, setTweak } = useTweaks();
   const [dateLabel, setDateLabel] = useState<string>("");
 
   useEffect(() => {
@@ -69,8 +68,6 @@ export function EditorialSidebar() {
 
   const active = viewFromPath(pathname);
   const go = (view: EditorialView) => router.push(FOLIO[view].path);
-  const toggleSidebar = () =>
-    setTweak("sidebar", state.sidebar === "open" ? "collapsed" : "open");
 
   return (
     <aside className="side">
@@ -88,12 +85,6 @@ export function EditorialSidebar() {
           <span>v0.4.2</span>
         </div>
       </div>
-
-      <button className="side-toggle" onClick={toggleSidebar} aria-label="Toggle sidebar">
-        <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M10 4L6 8l4 4" />
-        </svg>
-      </button>
 
       <nav className="side-nav">
         <div className="sb-lab">Sections</div>
@@ -115,36 +106,7 @@ export function EditorialSidebar() {
         })}
 
         <div className="sb-lab">Projects</div>
-        <div className="proj">
-          <span className="dot" style={{ background: "var(--accent)" }}></span>
-          <span className="t">ai / agents</span>
-          <span className="c">42</span>
-        </div>
-        <div className="proj">
-          <span className="dot" style={{ background: "var(--blue)" }}></span>
-          <span className="t">design-systems</span>
-          <span className="c">18</span>
-        </div>
-        <div className="proj">
-          <span className="dot" style={{ background: "var(--amber)" }}></span>
-          <span className="t">distributed</span>
-          <span className="c">7</span>
-        </div>
-        <div className="proj">
-          <span className="dot" style={{ background: "var(--green)" }}></span>
-          <span className="t">biology / notes</span>
-          <span className="c">23</span>
-        </div>
-
-        <div className="sb-lab">Pinned</div>
-        <div className="proj" onClick={() => go("wiki")}>
-          <span className="dot" style={{ background: "var(--ink)" }}></span>
-          <span className="t">Tool use in LLMs</span>
-        </div>
-        <div className="proj" onClick={() => go("wiki")}>
-          <span className="dot" style={{ background: "var(--ink)" }}></span>
-          <span className="t">Agent memory</span>
-        </div>
+        <EditorialProjectTree />
       </nav>
 
       <div className="side-foot">
