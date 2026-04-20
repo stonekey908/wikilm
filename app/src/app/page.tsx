@@ -188,7 +188,7 @@ export default function LedgerPage() {
               style={{
                 fontFamily: "var(--font-inst)",
                 fontStyle: "italic",
-                fontSize: 13,
+                fontSize: "calc(13px * var(--fs-scale, 1))",
                 color: "var(--ink-3)",
                 padding: "8px 0",
               }}
@@ -204,7 +204,7 @@ export default function LedgerPage() {
                 onClick={() => router.push(`/wiki?slug=${encodeURIComponent(p.slug)}`)}
               >
                 <span className="n">{roman(i)}</span>
-                <span>
+                <span className="entry-body">
                   <span className="t">{p.title}</span>
                   <span className="sub">
                     {p.type} · {p.slug}
