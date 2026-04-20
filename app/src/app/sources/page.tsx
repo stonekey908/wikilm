@@ -34,6 +34,7 @@ interface ResearchResult {
 
 type Tab = "library" | "research";
 type KindFilter = "" | "pdf" | "web" | "note";
+type SortMode = "relevance" | "stream";
 
 const KIND_LABEL: Record<"pdf" | "web" | "note", string> = {
   pdf: "PDF",
@@ -43,8 +44,11 @@ const KIND_LABEL: Record<"pdf" | "web" | "note", string> = {
 const KIND_ORDER: ("pdf" | "web" | "note")[] = ["pdf", "web", "note"];
 const DAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 
-const RESEARCH_QUERY_KEY = "sb_research_query";
-const RESEARCH_RESULTS_KEY = "sb_research_results";
+/** Project-scoped research persistence — each project keeps its own
+ *  query + candidate list in localStorage, so switching projects
+ *  preserves work-in-progress on both sides. */
+const researchQueryKey = (projectId: number) => `sb_research:${projectId}:query`;
+const researchResultsKey = (projectId: number) => `sb_research:${projectId}:results`;
 
 function parseMeta(meta: string | null): Record<string, unknown> {
   if (!meta) return {};
@@ -113,36 +117,47 @@ function IntakePageInner() {
   const [quickBusy, setQuickBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // ── Research state (persisted) ──────────────────────────────────
-  const [researchQuery, setResearchQuery] = useState<string>(() => {
-    if (typeof window === "undefined") return "";
-    return localStorage.getItem(RESEARCH_QUERY_KEY) ?? "";
-  });
-  const [results, setResults] = useState<ResearchResult[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      return JSON.parse(localStorage.getItem(RESEARCH_RESULTS_KEY) ?? "[]");
-    } catch {
-      return [];
-    }
-  });
+  // ── Research state (project-scoped persistence) ─────────────────
+  const [researchQuery, setResearchQuery] = useState<string>("");
+  const [results, setResults] = useState<ResearchResult[]>([]);
   const [maxResults, setMaxResults] = useState(8);
+  const [sortMode, setSortMode] = useState<SortMode>("relevance");
   const [isSearching, setIsSearching] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const nextResultId = useRef<number>(0);
 
-  // ── Persistence ──────────────────────────────────────────────────
+  // ── Load project-scoped research state when project changes ─────
   useEffect(() => {
+    if (projectId === null) return;
     try {
-      localStorage.setItem(RESEARCH_RESULTS_KEY, JSON.stringify(results));
+      const q = localStorage.getItem(researchQueryKey(projectId)) ?? "";
+      const rRaw = localStorage.getItem(researchResultsKey(projectId));
+      const r: ResearchResult[] = rRaw ? JSON.parse(rRaw) : [];
+      setResearchQuery(q);
+      setResults(r);
+      // Bump the id counter past any persisted ids so new results don't collide
+      const maxId = r
+        .map((x) => Number(x.id.replace(/^r/, "")))
+        .filter((n) => Number.isFinite(n))
+        .reduce((a, b) => Math.max(a, b), -1);
+      nextResultId.current = maxId + 1;
     } catch {}
-  }, [results]);
+  }, [projectId]);
+
+  // ── Persist on change (scoped to current project) ───────────────
+  useEffect(() => {
+    if (projectId === null) return;
+    try {
+      localStorage.setItem(researchResultsKey(projectId), JSON.stringify(results));
+    } catch {}
+  }, [results, projectId]);
 
   useEffect(() => {
+    if (projectId === null) return;
     try {
-      localStorage.setItem(RESEARCH_QUERY_KEY, researchQuery);
+      localStorage.setItem(researchQueryKey(projectId), researchQuery);
     } catch {}
-  }, [researchQuery]);
+  }, [researchQuery, projectId]);
 
   // ── Sources fetch ────────────────────────────────────────────────
   const fetchSources = useCallback(async () => {
@@ -481,11 +496,13 @@ function IntakePageInner() {
     setIsSearching(false);
     setResults([]);
     setResearchQuery("");
-    try {
-      localStorage.removeItem(RESEARCH_QUERY_KEY);
-      localStorage.removeItem(RESEARCH_RESULTS_KEY);
-    } catch {}
-  }, []);
+    if (projectId !== null) {
+      try {
+        localStorage.removeItem(researchQueryKey(projectId));
+        localStorage.removeItem(researchResultsKey(projectId));
+      } catch {}
+    }
+  }, [projectId]);
 
   // ── Auto-trigger from URL params (Ledger → Intake handoff) ─────
   const autoRan = useRef(false);
@@ -536,13 +553,14 @@ function IntakePageInner() {
     }
   }
 
-  const visibleResults = useMemo(
-    () =>
-      [...results]
-        .filter((r) => r.status !== "skipped")
-        .sort((a, b) => b.relevance - a.relevance),
-    [results]
-  );
+  const visibleResults = useMemo(() => {
+    const list = results.filter((r) => r.status !== "skipped");
+    if (sortMode === "relevance") {
+      // Stable sort: relevance desc, ties keep insertion order
+      return [...list].sort((a, b) => b.relevance - a.relevance);
+    }
+    return list;
+  }, [results, sortMode]);
   const approvedCount = results.filter((r) => r.status === "approved").length;
   const totalCount = results.length;
 
@@ -810,7 +828,7 @@ function IntakePageInner() {
                   + Load {maxResults} more
                 </button>
                 <button className="btn ghost" onClick={clearResearch}>
-                  Clear results
+                  Clear
                 </button>
               </>
             )}
@@ -829,6 +847,18 @@ function IntakePageInner() {
               <span className="research-count">
                 <b>{totalCount}</b> candidates · <b>{approvedCount}</b> queued
               </span>
+            )}
+            {totalCount > 0 && (
+              <div className="max-sel">
+                <span>Sort</span>
+                <select
+                  value={sortMode}
+                  onChange={(e) => setSortMode(e.target.value as SortMode)}
+                >
+                  <option value="relevance">Relevance</option>
+                  <option value="stream">Stream order</option>
+                </select>
+              </div>
             )}
             <div className="max-sel">
               <span>Per run</span>
