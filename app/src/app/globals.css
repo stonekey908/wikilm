@@ -98,12 +98,24 @@
 [data-size="lg"] { --fs-scale: 1.14; }
 
 /* ── Display font face (Tweaks: Face) ──
-   Default is Fraunces. Each data-font override re-points --font-serif to a
-   different next/font CSS var. --font-inst stays Instrument Serif for italic
-   accents (identity element), --font-mono stays JetBrains Mono for chrome. */
-[data-font="playfair"]  { --font-serif: var(--font-playfair), "Playfair Display", serif; }
-[data-font="crimson"]   { --font-serif: var(--font-crimson), "Crimson Pro", serif; }
-[data-font="garamond"]  { --font-serif: var(--font-garamond), "EB Garamond", serif; }
+   Default (Signature) keeps the editorial trio: Fraunces display + Instrument
+   Serif italic + JetBrains Mono chrome. Every other face applies the chosen
+   family to ALL three slots so the whole UI takes on that typographic voice. */
+[data-font="playfair"] {
+  --font-serif: var(--font-playfair), "Playfair Display", serif;
+  --font-inst: var(--font-playfair), "Playfair Display", serif;
+  --font-mono: var(--font-playfair), "Playfair Display", serif;
+}
+[data-font="crimson"] {
+  --font-serif: var(--font-crimson), "Crimson Pro", serif;
+  --font-inst: var(--font-crimson), "Crimson Pro", serif;
+  --font-mono: var(--font-crimson), "Crimson Pro", serif;
+}
+[data-font="garamond"] {
+  --font-serif: var(--font-garamond), "EB Garamond", serif;
+  --font-inst: var(--font-garamond), "EB Garamond", serif;
+  --font-mono: var(--font-garamond), "EB Garamond", serif;
+}
 
 /* ── Tailwind theme bridge (v4 @theme inline) ── */
 @theme inline {
@@ -410,6 +422,9 @@ body::after {
   padding: 12px 0; border-bottom: 1px dotted var(--rule-faint); font-size: 12px;
 }
 .tw-row:last-child { border-bottom: none; }
+.tw-row.stack { grid-template-columns: 1fr; row-gap: 8px; }
+.tw-row.stack .seg { display: grid; grid-template-columns: repeat(var(--seg-cols, 4), 1fr); width: 100%; }
+.tw-row.stack .seg button { padding: 6px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tw-label {
   font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.1em;
   text-transform: uppercase; color: var(--ink-3); font-weight: 700;

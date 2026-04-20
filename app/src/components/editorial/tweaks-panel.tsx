@@ -100,7 +100,7 @@ export function TweaksPanel() {
           </div>
         </div>
 
-        <div className="tw-row">
+        <div className="tw-row stack">
           <span className="tw-label">Face</span>
           <div className="seg">
             {FACES.map((f) => (
