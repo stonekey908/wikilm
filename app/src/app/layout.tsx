@@ -1,5 +1,12 @@
 import type { Metadata } from "next";
-import { Fraunces, Instrument_Serif, JetBrains_Mono } from "next/font/google";
+import {
+  Crimson_Pro,
+  EB_Garamond,
+  Fraunces,
+  Instrument_Serif,
+  JetBrains_Mono,
+  Playfair_Display,
+} from "next/font/google";
 import { ProjectProvider } from "@/components/project-switcher";
 import { ToastProvider } from "@/components/toast-provider";
 import { TweaksProvider } from "@/components/editorial/tweaks-provider";
@@ -12,6 +19,30 @@ const fraunces = Fraunces({
   style: ["normal", "italic"],
   weight: "variable",
   axes: ["opsz"],
+  display: "swap",
+});
+
+const playfair = Playfair_Display({
+  variable: "--font-playfair",
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  weight: "variable",
+  display: "swap",
+});
+
+const crimson = Crimson_Pro({
+  variable: "--font-crimson",
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  weight: "variable",
+  display: "swap",
+});
+
+const garamond = EB_Garamond({
+  variable: "--font-garamond",
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  weight: "variable",
   display: "swap",
 });
 
@@ -43,7 +74,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${fraunces.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable}`}
+      className={`${fraunces.variable} ${playfair.variable} ${crimson.variable} ${garamond.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >
       <body>

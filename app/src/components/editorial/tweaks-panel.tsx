@@ -1,12 +1,19 @@
 "use client";
 
-import { useTweaks, type Theme, type Accent, type Density } from "./tweaks-provider";
+import {
+  useTweaks,
+  type Accent,
+  type Density,
+  type FontFace,
+  type Size,
+  type Theme,
+} from "./tweaks-provider";
 
 const THEMES: { v: Theme; label: string }[] = [
   { v: "paper", label: "Cream" },
   { v: "stone", label: "Stone" },
   { v: "celadon", label: "Celadon" },
-  { v: "carbon", label: "Carbon" },
+  { v: "night", label: "Night" },
 ];
 
 const ACCENTS: { v: Accent; color: string }[] = [
@@ -21,6 +28,19 @@ const DENSITIES: { v: Density; label: string }[] = [
   { v: "cozy", label: "Dense" },
   { v: "comfy", label: "Text" },
   { v: "airy", label: "Loose" },
+];
+
+const SIZES: { v: Size; label: string }[] = [
+  { v: "sm", label: "Sm" },
+  { v: "md", label: "Md" },
+  { v: "lg", label: "Lg" },
+];
+
+const FACES: { v: FontFace; label: string }[] = [
+  { v: "fraunces", label: "Signature" },
+  { v: "playfair", label: "Masthead" },
+  { v: "crimson", label: "Book" },
+  { v: "garamond", label: "Classic" },
 ];
 
 export function TweaksPanel() {
@@ -76,6 +96,38 @@ export function TweaksPanel() {
                 tabIndex={0}
                 aria-label={`Accent ${a.v}`}
               />
+            ))}
+          </div>
+        </div>
+
+        <div className="tw-row">
+          <span className="tw-label">Face</span>
+          <div className="seg">
+            {FACES.map((f) => (
+              <button
+                key={f.v}
+                type="button"
+                className={state.font === f.v ? "on" : ""}
+                onClick={() => setTweak("font", f.v)}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="tw-row">
+          <span className="tw-label">Size</span>
+          <div className="seg">
+            {SIZES.map((s) => (
+              <button
+                key={s.v}
+                type="button"
+                className={state.size === s.v ? "on" : ""}
+                onClick={() => setTweak("size", s.v)}
+              >
+                {s.label}
+              </button>
             ))}
           </div>
         </div>
