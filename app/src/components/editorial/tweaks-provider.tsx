@@ -2,15 +2,19 @@
 
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
 
-export type Theme = "paper" | "stone" | "celadon" | "carbon";
+export type Theme = "paper" | "stone" | "celadon" | "night";
 export type Accent = "red" | "blue" | "green" | "amber" | "ink";
 export type Density = "cozy" | "comfy" | "airy";
+export type Size = "sm" | "md" | "lg";
+export type FontFace = "fraunces" | "playfair" | "crimson" | "garamond";
 export type SidebarState = "open" | "collapsed";
 
 export type TweakState = {
   theme: Theme;
   accent: Accent;
   density: Density;
+  size: Size;
+  font: FontFace;
   sidebar: SidebarState;
   grain: boolean;
 };
@@ -19,6 +23,8 @@ const DEFAULTS: TweakState = {
   theme: "paper",
   accent: "green",
   density: "comfy",
+  size: "md",
+  font: "fraunces",
   sidebar: "open",
   grain: true,
 };
@@ -48,6 +54,8 @@ function applyToBody(state: TweakState) {
   b.dataset.theme = state.theme;
   b.dataset.accent = state.accent;
   b.dataset.density = state.density;
+  b.dataset.size = state.size;
+  b.dataset.font = state.font;
   b.dataset.side = state.sidebar;
   b.dataset.grain = String(state.grain);
 }
@@ -61,8 +69,10 @@ export function TweaksProvider({ children }: { children: ReactNode }) {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
-        const parsed = JSON.parse(raw) as Partial<TweakState>;
-        setState((s) => ({ ...s, ...parsed }));
+        const parsedRaw = JSON.parse(raw) as Record<string, unknown>;
+        // Migrate legacy "carbon" → "night" silently
+        if (parsedRaw.theme === "carbon") parsedRaw.theme = "night";
+        setState((s) => ({ ...s, ...(parsedRaw as Partial<TweakState>) }));
       }
     } catch {}
     setHydrated(true);
