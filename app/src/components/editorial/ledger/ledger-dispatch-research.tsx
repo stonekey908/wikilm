@@ -49,9 +49,6 @@ export function LedgerDispatchResearch({ activeJobs }: Props) {
     if (!q) return;
     setBusy(true);
     try {
-      try {
-        localStorage.setItem(RESEARCH_KEY, q);
-      } catch {}
       addToast({ type: "success", title: `Commissioning · ${q}` });
       setTopic("");
       router.push(`/sources?tab=research&topic=${encodeURIComponent(q)}`);
