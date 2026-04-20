@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
 import { useProject } from "@/components/project-switcher";
 
@@ -37,12 +38,13 @@ function jobRowClass(status: string): string {
 }
 
 export function LedgerDispatchResearch({ activeJobs }: Props) {
+  const router = useRouter();
   const { addToast } = useToast();
   const { activeProject } = useProject();
   const [topic, setTopic] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function commission() {
+  function commission() {
     const q = topic.trim();
     if (!q) return;
     setBusy(true);
@@ -50,8 +52,9 @@ export function LedgerDispatchResearch({ activeJobs }: Props) {
       try {
         localStorage.setItem(RESEARCH_KEY, q);
       } catch {}
-      addToast({ type: "success", title: `Commissioning · ${q}`, description: "Visit the Intake to see results." });
+      addToast({ type: "success", title: `Commissioning · ${q}` });
       setTopic("");
+      router.push(`/sources?tab=research&topic=${encodeURIComponent(q)}`);
     } finally {
       setBusy(false);
     }
