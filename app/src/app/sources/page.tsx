@@ -777,38 +777,6 @@ function IntakePageInner() {
       ) : (
         // ── Research tab ──────────────────────────────────────────
         <div style={{ paddingTop: 28, maxWidth: 960 }}>
-          <div className="research-hero">
-            <div>
-              <h2>
-                {researchQuery ? (
-                  <>
-                    Research · <em>{researchQuery}</em>
-                  </>
-                ) : (
-                  <>
-                    <em>Research.</em>
-                  </>
-                )}
-              </h2>
-              <div className="subtitle">
-                {totalCount === 0
-                  ? "Commission a topic — Claude searches the web for candidate sources."
-                  : `${totalCount} candidate${totalCount === 1 ? "" : "s"} · ${approvedCount} queued`}
-              </div>
-            </div>
-            <div className="counts">
-              <div>
-                Found <b>{totalCount}</b>
-              </div>
-              <div>
-                Queued <b>{approvedCount}</b>
-              </div>
-              <div>
-                Remaining <b>{totalCount - approvedCount}</b>
-              </div>
-            </div>
-          </div>
-
           <div className="drop-tools">
             <div className="drop-url">
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -836,20 +804,31 @@ function IntakePageInner() {
           </div>
 
           <div className="research-controls">
-            {totalCount > 0 && (
+            {totalCount > 0 && !isSearching && (
               <>
-                <button className="btn" onClick={loadMore} disabled={isSearching || !researchQuery.trim()}>
+                <button className="btn" onClick={loadMore} disabled={!researchQuery.trim()}>
                   + Load {maxResults} more
                 </button>
-                <button className="btn ghost" onClick={clearResearch} disabled={isSearching}>
+                <button className="btn ghost" onClick={clearResearch}>
                   Clear results
                 </button>
               </>
             )}
             {isSearching && (
-              <button className="btn red" onClick={cancelResearch}>
-                Stop streaming
-              </button>
+              <>
+                <span className="research-live">
+                  <span className="d" />
+                  Streaming · {totalCount} found
+                </span>
+                <button className="btn red" onClick={cancelResearch}>
+                  Stop
+                </button>
+              </>
+            )}
+            {!isSearching && totalCount > 0 && (
+              <span className="research-count">
+                <b>{totalCount}</b> candidates · <b>{approvedCount}</b> queued
+              </span>
             )}
             <div className="max-sel">
               <span>Per run</span>
@@ -866,6 +845,8 @@ function IntakePageInner() {
             </div>
           </div>
 
+          {isSearching && <div className="research-shimmer" />}
+
           {visibleResults.length === 0 && !isSearching ? (
             <div className="research-empty">
               {totalCount === 0
@@ -876,7 +857,6 @@ function IntakePageInner() {
             <div>
               {visibleResults.map((r, i) => {
                 const isApproved = r.status === "approved";
-                const isBookmarked = r.status === "bookmarked";
                 return (
                   <div key={r.id} className={`research-row${isApproved ? " approved" : ""}`}>
                     <div className="num">{String(i + 1).padStart(2, "0")}</div>
@@ -917,12 +897,6 @@ function IntakePageInner() {
                           Approve
                         </button>
                       )}
-                      <button
-                        className="btn ghost"
-                        onClick={() => setResultStatus(r.id, isBookmarked ? "pending" : "bookmarked")}
-                      >
-                        {isBookmarked ? "Unmark" : "Bookmark"}
-                      </button>
                       <button className="btn red" onClick={() => setResultStatus(r.id, "skipped")}>
                         Skip
                       </button>
@@ -931,7 +905,12 @@ function IntakePageInner() {
                 );
               })}
               {isSearching && (
-                <div className="research-empty">Streaming more candidates…</div>
+                <div className="research-empty" style={{ textAlign: "center", paddingTop: 22 }}>
+                  <span className="research-live">
+                    <span className="d" />
+                    Streaming more candidates…
+                  </span>
+                </div>
               )}
             </div>
           )}

@@ -1233,30 +1233,55 @@ body::after {
   padding: 1px 6px; letter-spacing: 0.06em;
 }
 
-.research-hero {
-  display: grid; grid-template-columns: 1fr auto; gap: 16px;
-  align-items: end;
-  padding: 24px 0 18px;
-  border-bottom: 1px dashed var(--rule-faint);
-  margin-bottom: 22px;
+/* Streaming shimmer bar + live pill */
+.research-shimmer {
+  height: 2px; position: relative; overflow: hidden;
+  background: var(--rule-faint);
+  margin: 14px 0 10px;
 }
-.research-hero h2 {
-  font-family: var(--font-serif); font-weight: 400; font-size: 44px;
-  letter-spacing: -0.035em; line-height: 1; margin-bottom: 8px;
-  font-variation-settings: "opsz" 144;
+.research-shimmer::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--accent) 50%,
+    transparent 100%
+  );
+  background-size: 40% 100%;
+  animation: shim-sweep 1.4s linear infinite;
 }
-.research-hero h2 em { font-family: var(--font-inst); font-style: italic; color: var(--accent); }
-.research-hero .subtitle {
-  font-family: var(--font-inst); font-style: italic; font-size: 16px;
+@keyframes shim-sweep {
+  from { background-position: -40% 0; }
+  to { background-position: 140% 0; }
+}
+
+.research-live {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--accent);
+  padding: 4px 10px; border: 1px solid currentColor;
+  background: var(--accent-wash);
+}
+.research-live .d {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: currentColor; animation: pulse 1.4s infinite;
+}
+.research-count {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase;
   color: var(--ink-3);
 }
-.research-hero .counts {
-  display: flex; flex-direction: column; gap: 4px;
-  font-family: var(--font-mono); font-size: 10px;
-  letter-spacing: 0.12em; text-transform: uppercase;
-  color: var(--ink-3); text-align: right; line-height: 1.7;
+.research-count b { color: var(--ink); }
+
+/* Fade-in animation on new result rows */
+.research-row {
+  animation: row-in 320ms cubic-bezier(.2, .7, .2, 1) both;
 }
-.research-hero .counts b { color: var(--ink); font-weight: 700; }
+@keyframes row-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
 
 .research-controls {
   display: flex; gap: 10px; align-items: center;
