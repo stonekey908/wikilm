@@ -97,17 +97,6 @@ export function TweaksPanel() {
         </div>
 
         <div className="tw-row">
-          <span className="tw-label">Sidebar</span>
-          <div
-            className={`switch${state.sidebar === "open" ? " on" : ""}`}
-            onClick={() => setTweak("sidebar", state.sidebar === "open" ? "collapsed" : "open")}
-            role="button"
-            tabIndex={0}
-            aria-label="Toggle sidebar"
-          />
-        </div>
-
-        <div className="tw-row">
           <span className="tw-label">Grain</span>
           <div
             className={`switch${state.grain ? " on" : ""}`}
