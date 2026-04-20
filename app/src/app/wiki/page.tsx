@@ -10,6 +10,7 @@ import {
   type RenderOpts,
 } from "@/components/editorial/wiki/markdown-renderer";
 import { useWikiPreview } from "@/components/editorial/wiki/wiki-preview";
+import { EditorialBreadcrumbs } from "@/components/editorial/wiki/breadcrumbs";
 
 interface Backlink {
   slug: string;
@@ -31,11 +32,25 @@ interface WikiPage {
 interface WikiIndexEntry {
   title: string;
   type: string;
+  tags: string[];
   slug: string;
+  filePath: string;
   updatedAt: string;
 }
 
 const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+const TYPE_ORDER = ["synthesis", "concept", "entity", "source", "comparison", "query", "output"];
+const TYPE_LABEL: Record<string, string> = {
+  synthesis: "Synthesis",
+  concept: "Concepts",
+  entity: "Entities",
+  source: "Sources",
+  comparison: "Comparisons",
+  query: "Queries",
+  output: "Outputs",
+  unknown: "Other",
+};
 
 function formatRev(iso: string | undefined): string {
   if (!iso) return "";
@@ -79,6 +94,8 @@ function extractSources(body: string): string[] {
   return Array.from(out);
 }
 
+type SortKey = "recent" | "title" | "type";
+
 function WikiPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -90,9 +107,13 @@ function WikiPageInner() {
   const [loading, setLoading] = useState(false);
   const [allPages, setAllPages] = useState<WikiIndexEntry[]>([]);
 
+  // Picker state
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState<string>("");
+  const [sortKey, setSortKey] = useState<SortKey>("recent");
+
   const { onHover, onLeave, PreviewCard } = useWikiPreview(projectId);
 
-  // Fetch article when slug changes
   useEffect(() => {
     if (!slug || projectId === null) {
       setPage(null);
@@ -116,7 +137,6 @@ function WikiPageInner() {
     };
   }, [slug, projectId]);
 
-  // Fetch page index when no slug — for the picker mode
   useEffect(() => {
     if (slug || projectId === null) return;
     let cancelled = false;
@@ -124,11 +144,7 @@ function WikiPageInner() {
       .then((r) => r.json())
       .then((d: { pages: WikiIndexEntry[] }) => {
         if (!cancelled) {
-          setAllPages(
-            (d.pages ?? [])
-              .filter((p) => !["index", "log"].includes(p.slug))
-              .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-          );
+          setAllPages((d.pages ?? []).filter((p) => !["index", "log"].includes(p.slug)));
         }
       })
       .catch(() => {});
@@ -139,9 +155,7 @@ function WikiPageInner() {
 
   const go = useCallback(
     (target: string) => {
-      // Target might be "slug", "slug|display", "project/slug"
       const raw = target.split("|")[0].trim();
-      // If it starts with a known project slug, switch project + navigate
       const parts = raw.split("/");
       if (parts.length > 1) {
         const maybeProjectSlug = parts[0];
@@ -149,7 +163,6 @@ function WikiPageInner() {
           (p) => p.slug === maybeProjectSlug || p.slug.endsWith(`/${maybeProjectSlug}`)
         );
         if (match) {
-          // switch to that project and navigate to the sub-path
           const subSlug = parts.slice(1).join("/");
           router.push(`/wiki?slug=${encodeURIComponent(subSlug)}`);
           return;
@@ -177,93 +190,183 @@ function WikiPageInner() {
   const sources = useMemo(() => (page ? extractSources(page.body) : []), [page]);
   const wordCount = useMemo(() => (page ? countWords(page.body) : 0), [page]);
 
-  // ── No slug: page picker view ──────────────────────────────────
+  // Picker: filtered + sorted pages
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    let list = allPages;
+    if (typeFilter) list = list.filter((p) => p.type === typeFilter);
+    if (q) {
+      list = list.filter((p) => {
+        const blob = `${p.title} ${p.slug} ${(p.tags ?? []).join(" ")}`.toLowerCase();
+        return blob.includes(q);
+      });
+    }
+    const sorted = [...list];
+    sorted.sort((a, b) => {
+      if (sortKey === "title") return a.title.localeCompare(b.title);
+      if (sortKey === "type") {
+        const ta = TYPE_ORDER.indexOf(a.type);
+        const tb = TYPE_ORDER.indexOf(b.type);
+        const ra = ta === -1 ? 99 : ta;
+        const rb = tb === -1 ? 99 : tb;
+        if (ra !== rb) return ra - rb;
+        return a.title.localeCompare(b.title);
+      }
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
+    return sorted;
+  }, [allPages, search, typeFilter, sortKey]);
+
+  const grouped = useMemo(() => {
+    if (typeFilter || search || sortKey !== "type") return null;
+    const groups = new Map<string, WikiIndexEntry[]>();
+    for (const t of TYPE_ORDER) groups.set(t, []);
+    for (const p of filtered) {
+      const key = TYPE_ORDER.includes(p.type) ? p.type : "unknown";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(p);
+    }
+    return Array.from(groups.entries()).filter(([, v]) => v.length > 0);
+  }, [filtered, typeFilter, search, sortKey]);
+
+  const typeCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const p of allPages) counts.set(p.type, (counts.get(p.type) ?? 0) + 1);
+    return counts;
+  }, [allPages]);
+
+  // ── No slug: picker view ──────────────────────────────────────────
   if (!slug) {
+    const renderRow = (p: WikiIndexEntry, i: number) => (
+      <button key={p.slug} type="button" className="entry" onClick={() => go(p.slug)}>
+        <span className="n">{(i + 1).toString().padStart(2, "0")}</span>
+        <span className="entry-body">
+          <span className="t">{p.title}</span>
+          <span className="sub">
+            {p.type} · {p.slug}
+            {p.tags && p.tags.length > 0 ? ` · ${p.tags.slice(0, 3).join(" · ")}` : ""}
+          </span>
+        </span>
+        <span className="when">{formatRev(p.updatedAt)}</span>
+      </button>
+    );
+
     return (
-      <div className="pad" style={{ paddingTop: 36 }}>
-        <div
-          style={{
-            fontFamily: "var(--font-mono)",
-            fontSize: "calc(10.5px * var(--fs-scale, 1))",
-            letterSpacing: "0.12em",
-            textTransform: "uppercase",
-            color: "var(--ink-4)",
-            marginBottom: 18,
-          }}
-        >
-          Section 02 · The Wiki
-        </div>
+      <div className="pad">
+        <EditorialBreadcrumbs tail="Index" />
+
         <h1
           style={{
             fontFamily: "var(--font-serif)",
             fontWeight: 300,
-            fontSize: "calc(84px * var(--fs-scale, 1))",
+            fontSize: 84,
             letterSpacing: "-0.045em",
             lineHeight: 0.9,
             fontVariationSettings: '"opsz" 144',
-            marginBottom: 28,
+            marginBottom: 10,
           }}
         >
-          The <em style={{ fontFamily: "var(--font-inst)", fontStyle: "italic", color: "var(--accent)", fontWeight: 400 }}>Wiki.</em>
-        </h1>
-        <div
-          style={{
-            borderTop: "2.5px solid var(--rule)",
-            paddingTop: 18,
-            marginBottom: 26,
-          }}
-        >
-          <div
+          The{" "}
+          <em
             style={{
               fontFamily: "var(--font-inst)",
               fontStyle: "italic",
-              fontSize: "calc(18px * var(--fs-scale, 1))",
-              color: "var(--ink-3)",
-              marginBottom: 18,
+              color: "var(--accent)",
+              fontWeight: 400,
             }}
           >
-            Pick a page, or jump to one from the Ledger.
-          </div>
-          {allPages.length === 0 ? (
-            <div style={{ fontFamily: "var(--font-inst)", fontStyle: "italic", fontSize: "calc(13px * var(--fs-scale, 1))", color: "var(--ink-3)" }}>
-              No pages in this project yet.
-            </div>
-          ) : (
-            allPages.slice(0, 30).map((p, i) => (
-              <button
-                key={p.slug}
-                type="button"
-                className="entry"
-                onClick={() => go(p.slug)}
-              >
-                <span className="n">{(i + 1).toString().padStart(2, "0")}</span>
-                <span className="entry-body">
-                  <span className="t">{p.title}</span>
-                  <span className="sub">
-                    {p.type} · {p.slug}
-                  </span>
-                </span>
-                <span className="when">{formatRev(p.updatedAt)}</span>
-              </button>
-            ))
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // ── Slug present: article view ──────────────────────────────────
-  if (loading && !page) {
-    return (
-      <div className="pad" style={{ paddingTop: 60 }}>
+            Wiki.
+          </em>
+        </h1>
         <div
           style={{
             fontFamily: "var(--font-inst)",
             fontStyle: "italic",
-            fontSize: "calc(18px * var(--fs-scale, 1))",
+            fontSize: 18,
             color: "var(--ink-3)",
+            marginBottom: 10,
           }}
         >
+          {allPages.length} page{allPages.length === 1 ? "" : "s"} in {activeProject?.name ?? ""}.
+        </div>
+
+        <div className="picker-toolbar">
+          <div className="picker-search">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <circle cx="7" cy="7" r="5" />
+              <line x1="10.5" y1="10.5" x2="14" y2="14" />
+            </svg>
+            <input
+              type="text"
+              placeholder="Search title, slug, tag…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {search && (
+              <button type="button" className="clear" onClick={() => setSearch("")} aria-label="Clear search">
+                ✕
+              </button>
+            )}
+          </div>
+          <div className="picker-types">
+            <button type="button" className={typeFilter === "" ? "on" : ""} onClick={() => setTypeFilter("")}>
+              All {allPages.length > 0 ? `· ${allPages.length}` : ""}
+            </button>
+            {TYPE_ORDER.map((t) => {
+              const count = typeCounts.get(t) ?? 0;
+              if (count === 0) return null;
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  className={typeFilter === t ? "on" : ""}
+                  onClick={() => setTypeFilter(t)}
+                >
+                  {t} · {count}
+                </button>
+              );
+            })}
+          </div>
+          <div className="picker-sort">
+            <span>Sort</span>
+            <select value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)}>
+              <option value="recent">Recent</option>
+              <option value="title">Title</option>
+              <option value="type">Type</option>
+            </select>
+          </div>
+        </div>
+
+        {filtered.length === 0 ? (
+          <div className="picker-empty">
+            {search || typeFilter
+              ? "No pages match the current filters."
+              : "No pages in this project yet."}
+          </div>
+        ) : grouped ? (
+          grouped.map(([type, pages]) => (
+            <div key={type} className="picker-group">
+              <div className="picker-group-head">
+                <span className="lab">
+                  <em>{TYPE_LABEL[type] ?? type}</em>
+                </span>
+                <span className="c">{pages.length}</span>
+              </div>
+              {pages.map((p, i) => renderRow(p, i))}
+            </div>
+          ))
+        ) : (
+          filtered.map(renderRow)
+        )}
+      </div>
+    );
+  }
+
+  // ── Slug present: article view ────────────────────────────────────
+  if (loading && !page) {
+    return (
+      <div className="pad" style={{ paddingTop: 60 }}>
+        <div style={{ fontFamily: "var(--font-inst)", fontStyle: "italic", fontSize: 18, color: "var(--ink-3)" }}>
           Loading…
         </div>
       </div>
@@ -273,21 +376,11 @@ function WikiPageInner() {
   if (!page) {
     return (
       <div className="pad" style={{ paddingTop: 60 }}>
-        <div
-          style={{
-            fontFamily: "var(--font-serif)",
-            fontWeight: 400,
-            fontSize: "calc(32px * var(--fs-scale, 1))",
-            color: "var(--ink)",
-            marginBottom: 10,
-          }}
-        >
+        <EditorialBreadcrumbs showBack tail="Not found" />
+        <div style={{ fontFamily: "var(--font-serif)", fontWeight: 400, fontSize: 32, color: "var(--ink)", marginBottom: 10 }}>
           Page not found.
         </div>
-        <button
-          className="btn sm ghost"
-          onClick={() => router.push("/wiki")}
-        >
+        <button className="btn sm ghost" onClick={() => router.push("/wiki")}>
           ← Back to index
         </button>
       </div>
@@ -298,10 +391,13 @@ function WikiPageInner() {
   const revLabel = formatRev((page.meta.updatedAt as string | undefined) ?? (page.meta.date as string | undefined));
   const tagRow = (page.tags ?? []).slice(0, 2).join(" · ").toUpperCase();
   const deck = (page.meta.deck as string | undefined) ?? (page.meta.description as string | undefined) ?? null;
-  const deckFallback = page.type && page.type !== "unknown" ? `A ${page.type} page in ${activeProject?.slug ?? ""}.` : null;
+  const deckFallback =
+    page.type && page.type !== "unknown" ? `A ${page.type} page in ${activeProject?.slug ?? ""}.` : null;
 
   return (
     <div className="pad">
+      <EditorialBreadcrumbs showBack tail={page.type.toUpperCase()} />
+
       <div className="art-masthead">
         <div className="kicker">
           <span className="path">{activeProject?.slug ?? ""}</span>
@@ -385,7 +481,9 @@ function WikiPageInner() {
                 >
                   <span>
                     <span className="t">{b.title}</span>
-                    <span className="p" style={{ display: "block" }}>{b.projectSlug}</span>
+                    <span className="p" style={{ display: "block" }}>
+                      {b.projectSlug}
+                    </span>
                   </span>
                   <span className="n">→</span>
                 </button>
@@ -397,15 +495,12 @@ function WikiPageInner() {
             <div className="card">
               <h4>Sources</h4>
               {sources.slice(0, 8).map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  className="bklink"
-                  onClick={() => go(s)}
-                >
+                <button key={s} type="button" className="bklink" onClick={() => go(s)}>
                   <span>
                     <span className="t">{s.split("/").pop()?.replace(/-/g, " ")}</span>
-                    <span className="p" style={{ display: "block" }}>{s}</span>
+                    <span className="p" style={{ display: "block" }}>
+                      {s}
+                    </span>
                   </span>
                   <span className="n">→</span>
                 </button>
@@ -414,7 +509,9 @@ function WikiPageInner() {
           )}
         </div>
 
-        <div className="rail">{page.type.toUpperCase()} · {activeProject?.slug?.toUpperCase() ?? ""}</div>
+        <div className="rail">
+          {page.type.toUpperCase()} · {activeProject?.slug?.toUpperCase() ?? ""}
+        </div>
       </div>
 
       <PreviewCard />
