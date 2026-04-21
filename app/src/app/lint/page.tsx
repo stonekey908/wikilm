@@ -267,7 +267,7 @@ function EditInner() {
     router.push(`/sources?tab=research&topic=${encodeURIComponent(topic)}`);
   }
 
-  async function promote(f: Finding) {
+  async function promote(f: Finding, mode: "move" | "copy" = "move") {
     if (!f.targetPage) {
       addToast({ type: "error", title: "No target page", description: "This finding has nothing to promote." });
       return;
@@ -285,13 +285,20 @@ function EditInner() {
       const res = await fetch(`/api/projects/${f.projectId}/promote-page`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ findingId: f.id, childSlug, pageSlug }),
+        body: JSON.stringify({ findingId: f.id, childSlug, pageSlug, mode }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error ?? "promote failed");
       }
-      addToast({ type: "success", title: "Promoted to parent" });
+      addToast({
+        type: "success",
+        title: mode === "copy" ? "Copied to parent" : "Promoted to parent",
+        description:
+          mode === "copy"
+            ? "Child keeps its copy; both locations remain valid"
+            : "Child page moved; wikilinks rewritten everywhere",
+      });
       setGone((p) => new Set(p).add(f.id));
       window.setTimeout(() => {
         setFindings((p) => p.filter((x) => x.id !== f.id));
@@ -313,17 +320,44 @@ function EditInner() {
     if (!conceptModal) return;
     setConceptBusy(true);
     try {
+      // Derive evidencing slugs from the finding's target_page + description.
+      // target_page format from lint findings is "<slug>" or "<childSlug>:<slug>".
+      const f = conceptModal.finding;
+      const evidencingSlugs: string[] = [];
+      if (f.targetPage) {
+        const colon = f.targetPage.lastIndexOf(":");
+        const slug = colon === -1 ? f.targetPage : f.targetPage.slice(colon + 1);
+        if (slug && !evidencingSlugs.includes(slug)) evidencingSlugs.push(slug);
+      }
+      // Pull any [[wikilinks]] mentioned in the description
+      const re = /\[\[([^\]]+)\]\]/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(f.description)) !== null) {
+        const s = m[1].split("|")[0].trim();
+        if (s && !evidencingSlugs.includes(s)) evidencingSlugs.push(s);
+      }
       const res = await fetch("/api/wiki/concept-scaffold", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          projectId: conceptModal.finding.projectId,
+          projectId: f.projectId,
           title: conceptModal.title,
-          findingId: conceptModal.finding.id,
+          findingId: f.id,
+          evidencingSlugs,
         }),
       });
-      if (!res.ok) throw new Error();
-      addToast({ type: "success", title: `Concept scaffolded · ${conceptModal.title}` });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? "scaffold failed");
+      }
+      const d = await res.json();
+      addToast({
+        type: "success",
+        title: `Concept drafting · ${conceptModal.title}`,
+        description: d.fillJobId
+          ? "Skeleton written; Claude is populating the page — watch Dispatch."
+          : "Skeleton written (fill job didn't queue — edit manually).",
+      });
       setGone((p) => new Set(p).add(conceptModal.finding.id));
       const closedId = conceptModal.finding.id;
       setConceptModal(null);
@@ -494,14 +528,24 @@ function EditInner() {
                           </button>
                         )}
                         {f.status === "open" && f.category === "promotion_candidate" && f.targetPage && (
-                          <button
-                            className="btn primary"
-                            onClick={() => promote(f)}
-                            disabled={isFixing}
-                            title="Promote this child page to the parent wiki"
-                          >
-                            {isFixing ? "Promoting…" : "Promote"}
-                          </button>
+                          <>
+                            <button
+                              className="btn primary"
+                              onClick={() => promote(f, "move")}
+                              disabled={isFixing}
+                              title="Move this child page to the parent wiki (wikilinks get rewritten)"
+                            >
+                              {isFixing ? "Promoting…" : "Promote (move)"}
+                            </button>
+                            <button
+                              className="btn"
+                              onClick={() => promote(f, "copy")}
+                              disabled={isFixing}
+                              title="Copy to parent — both locations remain valid"
+                            >
+                              Copy to parent
+                            </button>
+                          </>
                         )}
                         {f.status === "open" && (f.category === "recurring_theme" || f.category === "parent_gap") && (
                           <button

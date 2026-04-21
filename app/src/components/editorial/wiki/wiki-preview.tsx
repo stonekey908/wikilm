@@ -123,9 +123,35 @@ export function useWikiPreview(projectId: number | null) {
     clearShow();
     currentTarget.current = null;
     clearHide();
+    // Short delay so the card can persist while the pointer crosses the gap
+    // between the link and the card — the card itself sets pointer-events:
+    // auto when .show so hovering it re-triggers onHover via the card (no),
+    // we keep it simple: always hide after the grace window.
     hideTimer.current = window.setTimeout(() => {
       setState((s) => ({ ...s, visible: false }));
-    }, 180);
+    }, 120);
+  }, []);
+
+  // Global fallback — if the pointer leaves the viewport or any unrelated
+  // scroll / click fires, forcibly hide. The old implementation relied on
+  // the link's onMouseLeave firing, which can miss when the link is inside
+  // a scrolling container or when the element unmounts mid-hover.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hideNow = () => {
+      clearShow();
+      clearHide();
+      currentTarget.current = null;
+      setState((s) => ({ ...s, visible: false }));
+    };
+    window.addEventListener("scroll", hideNow, true);
+    window.addEventListener("pointerdown", hideNow, true);
+    document.addEventListener("mouseleave", hideNow);
+    return () => {
+      window.removeEventListener("scroll", hideNow, true);
+      window.removeEventListener("pointerdown", hideNow, true);
+      document.removeEventListener("mouseleave", hideNow);
+    };
   }, []);
 
   useEffect(() => {

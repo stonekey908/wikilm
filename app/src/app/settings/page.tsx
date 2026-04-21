@@ -24,6 +24,7 @@ const JOB_TYPES = [
   { key: "fix", label: "Fix", desc: "Applying suggested fixes" },
   { key: "output", label: "Output", desc: "Artifact generation (deck, report, etc.)" },
   { key: "note-summary", label: "Note summary", desc: "Summarise chat as note" },
+  { key: "concept-fill", label: "Concept drafting", desc: "Populate scaffolded concept pages from the wiki" },
 ];
 
 const CLAUDE_MODELS = [
@@ -161,7 +162,7 @@ export default function SettingsPage() {
 
   const saveModel = useCallback(
     async (jobType: string, value: string) => {
-      const key = `model:${jobType}`;
+      const key = `model_${jobType}`;
       setModelSettings((prev) => ({ ...prev, [key]: value }));
       setSaving(jobType);
       try {
@@ -229,7 +230,7 @@ export default function SettingsPage() {
             </span>
           </div>
           {JOB_TYPES.map((t) => {
-            const current = modelSettings[`model:${t.key}`] ?? "sonnet";
+            const current = modelSettings[`model_${t.key}`] ?? "sonnet";
             return (
               <div className="setting-row" key={t.key}>
                 <div>
