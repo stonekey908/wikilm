@@ -496,9 +496,8 @@ function WikiPageInner() {
 
       {page.type === "output" && projectId && (() => {
         const baseName = page.slug.split("/").pop() ?? page.slug;
-        const href = (ext: string) =>
-          `/api/projects/${projectId}/outputs/download?file=${encodeURIComponent(baseName + "." + ext)}`;
-        // Best-guess derivatives by primary extension inferred from meta or slug
+        const href = (ext: string, forceDownload = false) =>
+          `/api/projects/${projectId}/outputs/download?file=${encodeURIComponent(baseName + "." + ext)}${forceDownload ? "&download=1" : ""}`;
         const family = (page.meta.output_type as string | undefined) ?? "";
         const derived =
           family === "deck"
@@ -507,45 +506,87 @@ function WikiPageInner() {
               ? ["html", "png"]
               : family === "report" || family === "summary" || family === "cheat"
                 ? ["md", "docx"]
-                : ["md", "docx", "pdf", "pptx", "html", "png"]; // fallback: try anything
+                : ["md", "docx", "pdf", "pptx", "html", "png"];
         return (
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              flexWrap: "wrap",
-              padding: "16px 0 4px",
-              borderBottom: "1px dashed var(--rule-faint)",
-              marginBottom: 12,
-            }}
-          >
-            <span
+          <>
+            {/* Infographic preview: inline PNG + open-HTML button. Clicking
+                the PNG opens the full interactive HTML in a new tab. */}
+            {family === "infographic" && (
+              <div
+                style={{
+                  padding: "16px 0",
+                  borderBottom: "1px dashed var(--rule-faint)",
+                  marginBottom: 12,
+                }}
+              >
+                <a
+                  href={href("html")}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  title="Click to open the interactive HTML in a new tab"
+                  style={{ display: "block" }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={href("png")}
+                    alt={page.title}
+                    style={{
+                      width: "100%",
+                      maxWidth: 900,
+                      border: "1.5px solid var(--ink)",
+                      boxShadow: "6px 6px 0 var(--ink)",
+                      display: "block",
+                    }}
+                  />
+                </a>
+                <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
+                  <a
+                    className="btn sm primary"
+                    href={href("html")}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                  >
+                    Open interactive HTML ↗
+                  </a>
+                </div>
+              </div>
+            )}
+            <div
               style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: "0.14em",
-                textTransform: "uppercase",
-                color: "var(--ink-4)",
-                alignSelf: "center",
-                marginRight: 8,
+                display: "flex",
+                gap: 8,
+                flexWrap: "wrap",
+                padding: "16px 0 4px",
+                borderBottom: "1px dashed var(--rule-faint)",
+                marginBottom: 12,
               }}
             >
-              Download
-            </span>
-            {derived.map((ext) => (
-              <a
-                key={ext}
-                className="btn sm ghost"
-                href={href(ext)}
-                target="_blank"
-                rel="noreferrer noopener"
-                style={{ textTransform: "uppercase" }}
+              <span
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  color: "var(--ink-4)",
+                  alignSelf: "center",
+                  marginRight: 8,
+                }}
               >
-                {ext}
-              </a>
-            ))}
-          </div>
+                Download
+              </span>
+              {derived.map((ext) => (
+                <a
+                  key={ext}
+                  className="btn sm ghost"
+                  href={href(ext, true)}
+                  style={{ textTransform: "uppercase" }}
+                >
+                  {ext}
+                </a>
+              ))}
+            </div>
+          </>
         );
       })()}
 
