@@ -137,11 +137,28 @@ export function runGeminiJob(
       return;
     }
     const finalStatus = code === 0 ? "completed" : "failed";
+    // Classify common Gemini CLI failures into structured error codes so
+    // /jobs shows a friendly message instead of a raw stack trace.
+    let errorCode: "model_not_found" | "rate_limited" | "auth_failed" | null = null;
+    let cleaned: string | null = error || null;
+    if (finalStatus === "failed" && error) {
+      if (/ModelNotFoundError|Requested entity was not found|code:\s*404/i.test(error)) {
+        errorCode = "model_not_found";
+        cleaned = `Gemini model "${options.model}" not found. Current preview models: gemini-3-flash-preview, gemini-3.1-pro-preview.`;
+      } else if (/Too Many Requests|status:\s*429|RESOURCE_EXHAUSTED/i.test(error)) {
+        errorCode = "rate_limited";
+        cleaned = "Gemini API rate-limited. Wait a minute and retry, or switch to Flash (higher quota).";
+      } else if (/PERMISSION_DENIED|UNAUTHENTICATED|status:\s*401|status:\s*403/i.test(error)) {
+        errorCode = "auth_failed";
+        cleaned = "Gemini auth failed. Run `gemini` once to re-authenticate.";
+      }
+    }
     db.update(jobs)
       .set({
         status: finalStatus,
         output,
-        error: error || null,
+        error: cleaned,
+        errorCode,
         completedAt: new Date().toISOString(),
       })
       .where(eq(jobs.id, jobId))
