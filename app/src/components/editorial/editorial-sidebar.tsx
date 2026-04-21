@@ -35,6 +35,12 @@ const NAV_ICONS: Record<EditorialView, React.ReactNode> = {
       <line x1="5" y1="8.5" x2="9" y2="8.5" />
     </svg>
   ),
+  lint: (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M2 13l4-1 7-7-3-3-7 7z" />
+      <line x1="11" y1="3" x2="13" y2="5" />
+    </svg>
+  ),
   jobs: (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
       <circle cx="8" cy="8" r="6" />
