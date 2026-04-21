@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useProject } from "@/components/project-switcher";
 import { useToast } from "@/components/toast-provider";
 import { EditorialBreadcrumbs } from "@/components/editorial/wiki/breadcrumbs";
+import { formatJobError } from "@/lib/error-codes";
 
 type OutputTypeId = "report" | "cheat" | "summary" | "deck" | "infographic";
 type Scope = "project" | "subtree";
@@ -320,7 +321,8 @@ export default function DictationPage() {
             <>
               <h4>Dictation failed.</h4>
               <p>
-                <b>{job.errorCode ?? "Unknown"}</b> — {job.error ?? "The subprocess returned a non-zero exit."}
+                <b>{formatJobError(job.errorCode, job.error).title}.</b>{" "}
+                {formatJobError(job.errorCode, job.error).description}
               </p>
               <div className="artifact-actions">
                 <button className="btn primary" onClick={commission}>

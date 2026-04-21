@@ -329,6 +329,7 @@ function SalonInner() {
       const decoder = new TextDecoder();
       let buffer = "";
       let assembled = "";
+      let streamError: string | null = null;
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -346,14 +347,22 @@ function SalonInner() {
               // their line boundaries and render correctly.
               assembled += evt.text + "\n";
               setStreamText(assembled);
+            } else if (evt.type === "error" && typeof evt.text === "string") {
+              // Surface provider errors (e.g. "Ollama streaming isn't supported
+              // for chat — pick Claude or Gemini") instead of dropping them.
+              streamError = evt.text;
             }
           } catch {}
         }
       }
-      const assistantMsg: Message = { role: "assistant", content: assembled };
-      setMessages((p) => [...p, assistantMsg]);
-      setStreamText("");
-      persistMessage(sid, "assistant", assembled);
+      if (streamError && !assembled.trim()) {
+        addToast({ type: "error", title: "Chat unavailable", description: streamError });
+      } else {
+        const assistantMsg: Message = { role: "assistant", content: assembled };
+        setMessages((p) => [...p, assistantMsg]);
+        setStreamText("");
+        persistMessage(sid, "assistant", assembled);
+      }
     } catch (err: unknown) {
       if (!(err instanceof DOMException && err.name === "AbortError")) {
         addToast({ type: "error", title: "Chat stream failed" });
