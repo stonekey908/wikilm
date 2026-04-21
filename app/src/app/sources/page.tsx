@@ -292,10 +292,18 @@ function IntakePageInner() {
     try {
       const isUrl = /^https?:\/\//.test(q);
       if (isUrl) {
+        // Derive a title from the URL so the endpoint's title+url guard passes
+        let parsed: URL | null = null;
+        try { parsed = new URL(q); } catch {}
+        const host = parsed?.hostname?.replace(/^www\./, "") ?? q;
+        const lastPath = (parsed?.pathname ?? "").split("/").filter(Boolean).slice(-1)[0] ?? "";
+        const derivedTitle = lastPath
+          ? `${host} · ${lastPath.replace(/[-_]+/g, " ")}`
+          : host;
         const res = await fetch("/api/sources/ingest-web", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url: q, projectId, ingest: false }),
+          body: JSON.stringify({ url: q, title: derivedTitle, domain: host, projectId, ingest: false }),
         });
         if (!res.ok) throw new Error();
         addToast({ type: "success", title: "Web source queued" });
