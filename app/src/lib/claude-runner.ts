@@ -33,6 +33,9 @@ function drainQueue() {
     const next = jobQueue.shift()!;
     startJobProcess(next.jobId, next.options);
   }
+  // Once the queue is truly idle, flush any pending synthesis that's been
+  // waiting for all prior work to finish.
+  flushSynthesisIfIdle();
 }
 
 /**
@@ -691,16 +694,34 @@ function parseProgress(output: string): { current: number; total: number } | nul
 }
 
 // ─── Synthesis coalescing ──────────────────────────────────────────────────
-// Multiple ingests finishing in quick succession shouldn't spawn N synthesis
-// jobs — one is enough to capture the current state. We track a single
-// in-flight synthesis and a "pending" flag. Any trigger while one is in-flight
-// flips the flag; on completion, if pending, we fire exactly one more run to
-// capture anything that finished during the in-flight read. This converges
-// to at most 2 runs regardless of how many ingests completed in a burst.
+// Synthesis is the expensive "re-read the whole wiki" job. We never want to
+// run it while other work is still in flight — running it mid-batch wastes
+// tokens on a snapshot that's about to change. So every completed ingest /
+// fix / etc. just FLAGS that a synthesis is wanted; the real scheduling
+// happens in flushSynthesisIfIdle(), which fires only when the queue is
+// fully drained. This collapses any number of back-to-back batches into a
+// single synthesis at the very end.
 let synthesisInFlight = false;
 let synthesisPending = false;
 let lastProjectCwd: string | null = null;
 let lastProjectId: number | null = null;
+
+/**
+ * Fire a queued synthesis only when there is no other work left to do.
+ * Called from drainQueue() (every time a non-synthesis job finishes) and
+ * from synthesis's own onComplete (to catch triggers that arrived during
+ * the synthesis run itself).
+ */
+function flushSynthesisIfIdle() {
+  if (synthesisInFlight) return;
+  if (!synthesisPending) return;
+  if (lastProjectCwd == null || lastProjectId == null) return;
+  if (jobQueue.length > 0) return;
+  if (runningProcesses.size + inFlightOllamaCount + inFlightGeminiCount > 0) return;
+  scheduleSynthesisJob(lastProjectCwd, lastProjectId).catch((err) => {
+    console.error("[synthesis] scheduled run failed:", err);
+  });
+}
 
 const SYNTHESIS_PROMPT = `Update the project-wide synthesis page at wiki/synthesis/project-overview.md.
 
@@ -741,12 +762,10 @@ function scheduleSynthesisJob(projectCwd: string, projectId: number): Promise<nu
     title: "Update project synthesis",
     onComplete: (status) => {
       synthesisInFlight = false;
-      // If any ingest finished during this run, fire exactly one more pass
-      if (synthesisPending && lastProjectCwd && lastProjectId !== null) {
-        scheduleSynthesisJob(lastProjectCwd, lastProjectId).catch((err) => {
-          console.error("[synthesis] follow-up run failed:", err);
-        });
-      }
+      // Triggers that arrived during this run left synthesisPending=true.
+      // Defer to flushSynthesisIfIdle so the follow-up also waits for any
+      // other work that might have queued up in the meantime.
+      flushSynthesisIfIdle();
       // Auto-sync parent synthesis — only when the child synthesis actually
       // succeeded, the setting is enabled, and this project has a parent.
       // The parent trigger coalesces independently, so multiple children
@@ -773,26 +792,27 @@ function scheduleSynthesisJob(projectCwd: string, projectId: number): Promise<nu
 }
 
 /**
- * Trigger a synthesis update. Coalesces rapid-fire triggers so at most one
- * synthesis is queued/running at any time, plus at most one follow-up to
- * capture ingests that completed during the in-flight run.
+ * Flag that a synthesis update is wanted. The actual run is deferred until
+ * the entire job queue is idle — no pending ingests, no running jobs — so a
+ * burst of ingests produces exactly one synthesis at the end rather than
+ * multiple snapshots of a still-changing wiki.
  *
- * Returns the jobId of the newly scheduled synthesis, or null if the caller
- * was coalesced into an already-in-flight run.
+ * Always returns null now; callers used the returned jobId only for
+ * logging (none rely on it synchronously).
  */
 export async function triggerSynthesisUpdate(
   projectCwd: string,
   projectId: number
 ): Promise<number | null> {
-  // Remember the latest project — the follow-up run uses these
   lastProjectCwd = projectCwd;
   lastProjectId = projectId;
-
-  if (synthesisInFlight) {
-    synthesisPending = true;
-    return null;
-  }
-  return scheduleSynthesisJob(projectCwd, projectId);
+  synthesisPending = true;
+  // If the queue happens to already be idle (rare — usually this is called
+  // from an onComplete while other jobs are still running), fire straight
+  // away. Otherwise drainQueue's tail-call to flushSynthesisIfIdle will
+  // pick it up when the last non-synthesis job finishes.
+  flushSynthesisIfIdle();
+  return null;
 }
 
 // ─── Parent synthesis coalescing ───────────────────────────────────────────

@@ -124,9 +124,14 @@ export function runGeminiJob(
     db.update(jobs).set({ output }).where(eq(jobs.id, jobId)).run();
   });
 
+  // Buffer stderr in memory but DO NOT persist it to jobs.error while the
+  // process is still running. Gemini's -y flag emits a "YOLO mode is
+  // enabled..." banner to stderr on every run — on success, persisting it
+  // mid-stream makes the UI display a spurious "job failed" error even
+  // when the job exits 0. Only commit stderr to jobs.error on close, and
+  // only when the exit code is non-zero.
   proc.stderr.on("data", (chunk: Buffer) => {
     error += chunk.toString();
-    db.update(jobs).set({ error }).where(eq(jobs.id, jobId)).run();
   });
 
   proc.on("close", (code) => {
@@ -140,7 +145,7 @@ export function runGeminiJob(
     // Classify common Gemini CLI failures into structured error codes so
     // /jobs shows a friendly message instead of a raw stack trace.
     let errorCode: "model_not_found" | "rate_limited" | "auth_failed" | null = null;
-    let cleaned: string | null = error || null;
+    let cleaned: string | null = finalStatus === "failed" ? error || null : null;
     if (finalStatus === "failed" && error) {
       if (/ModelNotFoundError|Requested entity was not found|code:\s*404/i.test(error)) {
         errorCode = "model_not_found";
