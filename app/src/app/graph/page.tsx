@@ -78,6 +78,10 @@ export default function MapPage() {
   const [rawEdges, setRawEdges] = useState<GraphEdge[]>([]);
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [activeType, setActiveType] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const dragStart = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
 
   useEffect(() => {
@@ -209,8 +213,39 @@ export default function MapPage() {
           <>
             <svg
               ref={svgRef}
-              viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+              viewBox={`${-pan.x} ${-pan.y} ${WIDTH / zoom} ${HEIGHT / zoom}`}
               preserveAspectRatio="xMidYMid meet"
+              style={{ cursor: dragging ? "grabbing" : "grab" }}
+              onMouseDown={(e) => {
+                setDragging(true);
+                dragStart.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
+              }}
+              onMouseMove={(e) => {
+                if (!dragging || !dragStart.current) return;
+                const dx = e.clientX - dragStart.current.x;
+                const dy = e.clientY - dragStart.current.y;
+                const rect = svgRef.current?.getBoundingClientRect();
+                if (!rect) return;
+                const scale = WIDTH / zoom / rect.width;
+                setPan({
+                  x: dragStart.current.panX + dx * scale,
+                  y: dragStart.current.panY + dy * scale,
+                });
+              }}
+              onMouseUp={() => {
+                setDragging(false);
+                dragStart.current = null;
+              }}
+              onMouseLeave={() => {
+                setDragging(false);
+                dragStart.current = null;
+              }}
+              onWheel={(e) => {
+                if (!e.ctrlKey && !e.metaKey) return;
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? 0.9 : 1.1;
+                setZoom((z) => Math.max(0.5, Math.min(4, z * delta)));
+              }}
             >
               {/* edges */}
               {edges.map((e, i) => {
@@ -292,6 +327,35 @@ export default function MapPage() {
                 );
               })}
             </svg>
+
+            <div className="map-controls">
+              <button
+                type="button"
+                title="Zoom in"
+                onClick={() => setZoom((z) => Math.min(4, z * 1.25))}
+                disabled={zoom >= 4}
+              >
+                +
+              </button>
+              <button
+                type="button"
+                title="Zoom out"
+                onClick={() => setZoom((z) => Math.max(0.5, z * 0.8))}
+                disabled={zoom <= 0.5}
+              >
+                −
+              </button>
+              <button
+                type="button"
+                title="Recenter"
+                onClick={() => {
+                  setZoom(1);
+                  setPan({ x: 0, y: 0 });
+                }}
+              >
+                ⌖
+              </button>
+            </div>
 
             <div className={`map-overlay${activeType ? " active" : ""}`}>
               <h5>

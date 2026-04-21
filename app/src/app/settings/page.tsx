@@ -7,6 +7,12 @@ import { useTweaks, type Theme, type Accent, type Density, type Size, type FontF
 
 interface OllamaModel { name: string; size?: number }
 interface GeminiModel { name: string; label?: string }
+interface BackupStatus {
+  running: boolean;
+  lastStartedAt?: string | null;
+  lastCompletedAt?: string | null;
+  lastError?: string | null;
+}
 
 const JOB_TYPES = [
   { key: "ingest", label: "Ingestion", desc: "Processing raw sources into wiki pages" },
@@ -70,6 +76,8 @@ export default function SettingsPage() {
   const [geminiModels, setGeminiModels] = useState<GeminiModel[]>([]);
   const [geminiAvailable, setGeminiAvailable] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
+  const [backupStatus, setBackupStatus] = useState<BackupStatus>({ running: false });
+  const [backupRunning, setBackupRunning] = useState(false);
 
   // Load settings + provider availability
   useEffect(() => {
@@ -91,7 +99,65 @@ export default function SettingsPage() {
         setGeminiAvailable((d.models ?? []).length > 0);
       })
       .catch(() => {});
+    fetchBackupStatus();
   }, []);
+
+  const fetchBackupStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/backup/status");
+      if (res.ok) {
+        const d: BackupStatus = await res.json();
+        setBackupStatus(d);
+        return d;
+      }
+    } catch {}
+    return null;
+  }, []);
+
+  // Poll while backup is running
+  useEffect(() => {
+    if (!backupRunning && !backupStatus.running) return;
+    const i = window.setInterval(async () => {
+      const d = await fetchBackupStatus();
+      if (d && !d.running && backupRunning) {
+        setBackupRunning(false);
+        if (d.lastError) {
+          addToast({ type: "error", title: "Backup failed", description: d.lastError });
+        } else {
+          addToast({ type: "success", title: "Backup complete" });
+        }
+      }
+    }, 2000);
+    return () => window.clearInterval(i);
+  }, [backupRunning, backupStatus.running, fetchBackupStatus, addToast]);
+
+  async function runBackup() {
+    setBackupRunning(true);
+    addToast({ type: "success", title: "Backup started" });
+    try {
+      const res = await fetch("/api/backup/run", { method: "POST" });
+      if (!res.ok) throw new Error();
+      fetchBackupStatus();
+    } catch {
+      setBackupRunning(false);
+      addToast({ type: "error", title: "Backup failed to start" });
+    }
+  }
+
+  function fmtAgo(iso: string | null | undefined): string {
+    if (!iso) return "never";
+    const t = new Date(iso).getTime();
+    if (!Number.isFinite(t)) return "never";
+    const diff = Date.now() - t;
+    const sec = Math.round(diff / 1000);
+    if (sec < 60) return `${sec}s ago`;
+    const min = Math.floor(sec / 60);
+    if (min < 60) return `${min}m ago`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${hr}h ago`;
+    const d = Math.floor(hr / 24);
+    return `${d}d ago`;
+  }
 
   const saveModel = useCallback(
     async (jobType: string, value: string) => {
@@ -311,21 +377,17 @@ export default function SettingsPage() {
           <div className="setting-row">
             <div>
               <div className="k">Run backup now</div>
-              <div className="desc">Snapshots wiki/ + projects/ to backups/ as a tarball</div>
+              <div className="desc">
+                Snapshots wiki/ + projects/ to backups/ as a tarball · Last: <b>{fmtAgo(backupStatus.lastCompletedAt)}</b>
+                {backupStatus.lastError ? ` · last error: ${backupStatus.lastError}` : ""}
+              </div>
             </div>
             <button
               className="btn primary"
-              onClick={async () => {
-                try {
-                  const res = await fetch("/api/backup/run", { method: "POST" });
-                  if (!res.ok) throw new Error();
-                  addToast({ type: "success", title: "Backup started" });
-                } catch {
-                  addToast({ type: "error", title: "Backup failed" });
-                }
-              }}
+              onClick={runBackup}
+              disabled={backupRunning || backupStatus.running}
             >
-              Run backup
+              {backupRunning || backupStatus.running ? "Running…" : "Run backup"}
             </button>
           </div>
           <div className="setting-row">

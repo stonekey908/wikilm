@@ -1,10 +1,9 @@
 "use client";
 
 import { useRouter, usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { FOLIO, VIEW_ORDER, viewFromPath, type EditorialView } from "./folio-map";
-import { EditorialProjectTree } from "./editorial-project-tree";
+import { ProjectSwitcherDropdown } from "./project-switcher-dropdown";
 import { ChatSessionsSidebar } from "./chat-sessions-sidebar";
 
 const NAV_ICONS: Record<EditorialView, React.ReactNode> = {
@@ -83,6 +82,7 @@ export function EditorialSidebar() {
 
   const active = viewFromPath(pathname);
   const go = (view: EditorialView) => router.push(FOLIO[view].path);
+  const [chatCollapsed, setChatCollapsed] = useState(false);
 
   return (
     <aside className="side">
@@ -100,6 +100,8 @@ export function EditorialSidebar() {
           <span>v0.4.2</span>
         </div>
       </div>
+
+      <ProjectSwitcherDropdown />
 
       <nav className="side-nav">
         <div className="sb-lab">Sections</div>
@@ -120,22 +122,21 @@ export function EditorialSidebar() {
           );
         })}
 
-        <div className="sb-lab">Projects</div>
-        <EditorialProjectTree />
-
-        <div className="sb-lab">Conversations</div>
-        <Suspense fallback={null}>
-          <ChatSessionsSidebar />
-        </Suspense>
+        <button
+          type="button"
+          className={`sb-lab collapsible${chatCollapsed ? " collapsed" : ""}`}
+          onClick={() => setChatCollapsed((v) => !v)}
+        >
+          <span>Conversations</span>
+          <span className="chev-sm">▾</span>
+        </button>
+        <div className={`sb-collapsed-body${chatCollapsed ? "" : " open"}`}>
+          <Suspense fallback={null}>
+            <ChatSessionsSidebar />
+          </Suspense>
+        </div>
       </nav>
 
-      <div className="side-foot">
-        <div className="stamp">EL</div>
-        <div className="who">
-          <b>Ellie Larimer</b>
-          <small>Editor · Personal</small>
-        </div>
-      </div>
     </aside>
   );
 }

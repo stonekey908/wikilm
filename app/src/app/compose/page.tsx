@@ -150,10 +150,22 @@ export default function DictationPage() {
           Dictate a brief, grounded in <em>{activeProject?.slug ?? "the active project"}</em>.
         </div>
 
+        <div
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 10,
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
+            color: "var(--ink-4)",
+            margin: "0 0 6px 2px",
+          }}
+        >
+          Focus (optional) · steers what the output emphasises
+        </div>
         <div className="compose-input">
           <span className="sigil">§</span>
           <textarea
-            placeholder="A question, a theme, or leave blank for a general overview…"
+            placeholder="Leave blank for a general overview, or steer it: “the ethical angle”, “executive-ready only”, “compare to X”…"
             value={nudge}
             onChange={(e) => setNudge(e.target.value)}
             onKeyDown={(e) => {
