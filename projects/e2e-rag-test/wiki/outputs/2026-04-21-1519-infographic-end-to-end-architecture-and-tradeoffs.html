@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1200" />
+  <meta name="wikilm" content='{"output_type":"infographic","scope":"project","project_slug":"e2e-rag-test","generated_at":"2026-04-21","model":"sonnet","nudge":"end-to-end architecture and tradeoffs","sources":["sources/rag-comprehensive-survey-2506-00054","sources/rag-comprehensive-survey-2410-12837","sources/retrieval-augmented-generation-klesel-wittmann-2025","concepts/retrieval-augmented-generation","concepts/blinkered-chunk-effect","concepts/graphrag","synthesis/project-overview"]}' />
+  <title>End-to-End RAG Architecture &amp; Tradeoffs</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 1200px;
+      min-height: 1800px;
+      margin: 0;
+      background: #F7F4F0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      color: #1A1A2E;
+    }
+
+    /* ── PALETTE ──────────────────────────────────── */
+    /* Navy  #1A1A2E  |  Red  #E63946  |  Steel  #457B9D */
+
+    /* ── 1. TITLE BAND ───────────────────────────── */
+    .title-band {
+      width: 1200px;
+      height: 150px;
+      background: #1A1A2E;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 0 56px;
+      position: relative;
+    }
+    .title-band::after {
+      content: "";
+      position: absolute;
+      bottom: 0; left: 0;
+      width: 100%; height: 4px;
+      background: #E63946;
+    }
+    .title-band h1 {
+      font-size: 36px;
+      font-weight: 700;
+      color: #FFFFFF;
+      letter-spacing: -0.5px;
+      line-height: 1.15;
+    }
+    .title-band p {
+      font-size: 15px;
+      color: #9BA8BA;
+      margin-top: 6px;
+      letter-spacing: 0.3px;
+    }
+
+    /* ── 2. STATS ROW ────────────────────────────── */
+    .stats-row {
+      width: 1200px;
+      height: 220px;
+      display: flex;
+      align-items: stretch;
+      background: #FFFFFF;
+      border-bottom: 1px solid #E2DDD8;
+    }
+    .stat {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 24px 18px;
+      border-right: 1px solid #E2DDD8;
+      position: relative;
+    }
+    .stat:last-child { border-right: none; }
+    .stat-value {
+      font-size: 52px;
+      font-weight: 800;
+      color: #E63946;
+      line-height: 1;
+      letter-spacing: -2px;
+    }
+    .stat-value.blue { color: #457B9D; }
+    .stat-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #1A1A2E;
+      margin-top: 10px;
+      line-height: 1.35;
+      max-width: 160px;
+    }
+    .stat-source {
+      font-size: 10px;
+      color: #9BA8BA;
+      margin-top: 8px;
+      line-height: 1.3;
+    }
+
+    /* ── 3. MAIN DIAGRAM ─────────────────────────── */
+    .diagram-section {
+      width: 1200px;
+      height: 600px;
+      background: #F7F4F0;
+      padding: 36px 48px;
+      display: flex;
+      flex-direction: column;
+    }
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.8px;
+      color: #9BA8BA;
+      text-transform: uppercase;
+      margin-bottom: 18px;
+    }
+    .diagram-section svg {
+      width: 100%;
+      flex: 1;
+    }
+
+    /* ── 4. CALLOUTS ─────────────────────────────── */
+    .callouts-section {
+      width: 1200px;
+      min-height: 500px;
+      background: #FFFFFF;
+      padding: 40px 48px;
+      border-top: 1px solid #E2DDD8;
+    }
+    .callouts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 24px;
+      margin-top: 20px;
+    }
+    .card {
+      background: #F7F4F0;
+      border-radius: 4px;
+      padding: 22px 20px;
+      border-top: 3px solid #1A1A2E;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .card.accent { border-top-color: #E63946; }
+    .card.blue   { border-top-color: #457B9D; }
+    .card h3 {
+      font-size: 13px;
+      font-weight: 700;
+      color: #1A1A2E;
+      letter-spacing: 0.1px;
+      line-height: 1.3;
+    }
+    .card p {
+      font-size: 12.5px;
+      color: #3A3A4E;
+      line-height: 1.6;
+    }
+    .card-source {
+      font-size: 10.5px;
+      color: #9BA8BA;
+      margin-top: auto;
+    }
+
+    /* ── 5. FOOTER ───────────────────────────────── */
+    .footer {
+      width: 1200px;
+      height: 80px;
+      background: #1A1A2E;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 56px;
+    }
+    .footer span {
+      font-size: 12px;
+      color: #6B7587;
+    }
+    .footer strong { color: #9BA8BA; }
+  </style>
+</head>
+<body>
+
+  <!-- ── 1. TITLE BAND ── -->
+  <div class="title-band">
+    <h1>End-to-End RAG Architecture &amp; Tradeoffs</h1>
+    <p>How Retrieval-Augmented Generation pipelines are structured, where they break, and how the field has responded — synthesised from three 2024–2025 surveys</p>
+  </div>
+
+  <!-- ── 2. STATS ROW ── -->
+  <div class="stats-row">
+    <div class="stat">
+      <div class="stat-value">800%+</div>
+      <div class="stat-label">Multi-hop QA gain over raw LLM (HotpotQA, RQ-RAG)</div>
+      <div class="stat-source">Sharma 2025 · rag-comprehensive-survey-2506-00054</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">64%</div>
+      <div class="stat-label">Hallucination reduction via context filtering (FILCO, +8.6 EM)</div>
+      <div class="stat-source">Sharma 2025 · rag-comprehensive-survey-2506-00054</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value blue">9.25×</div>
+      <div class="stat-label">Context size reduction with +13.5 F1 gain (SEER faithfulness filter)</div>
+      <div class="stat-source">Sharma 2025 · rag-comprehensive-survey-2506-00054</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value">18–30%</div>
+      <div class="stat-label">Hallucination reduction from KG-RAG / GraphRAG over text-only RAG</div>
+      <div class="stat-source">Sharma 2025 · rag-comprehensive-survey-2506-00054</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value blue">~15%</div>
+      <div class="stat-label">Redundant retrieval calls pruned by adaptive triggering (DRAGIN / FLARE)</div>
+      <div class="stat-source">Sharma 2025 · rag-comprehensive-survey-2506-00054</div>
+    </div>
+  </div>
+
+  <!-- ── 3. MAIN DIAGRAM ── -->
+  <div class="diagram-section">
+    <div class="section-label">End-to-End Pipeline &amp; Paradigm Layers</div>
+
+    <svg viewBox="0 0 1104 490" xmlns="http://www.w3.org/2000/svg" aria-label="RAG end-to-end architecture diagram">
+
+      <!-- Background lanes for three paradigm tiers -->
+      <!-- Naive RAG band -->
+      <rect x="0" y="0" width="1104" height="490" fill="#F7F4F0" rx="4"/>
+
+      <!-- Paradigm tier labels (left axis) -->
+      <!-- NAIVE -->
+      <rect x="0" y="40" width="8" height="80" fill="#9BA8BA" rx="2"/>
+      <text x="16" y="68" font-size="10" font-weight="700" fill="#9BA8BA" letter-spacing="1.5" font-family="sans-serif">NAIVE RAG</text>
+      <text x="16" y="82" font-size="10" fill="#9BA8BA" font-family="sans-serif">Retrieve → Generate</text>
+
+      <!-- ADVANCED -->
+      <rect x="0" y="170" width="8" height="80" fill="#457B9D" rx="2"/>
+      <text x="16" y="198" font-size="10" font-weight="700" fill="#457B9D" letter-spacing="1.5" font-family="sans-serif">ADVANCED RAG</text>
+      <text x="16" y="212" font-size="10" fill="#457B9D" font-family="sans-serif">Pre/Post-Retrieval Optimization</text>
+
+      <!-- MODULAR / HYBRID -->
+      <rect x="0" y="300" width="8" height="80" fill="#E63946" rx="2"/>
+      <text x="16" y="328" font-size="10" font-weight="700" fill="#E63946" letter-spacing="1.5" font-family="sans-serif">MODULAR / HYBRID</text>
+      <text x="16" y="342" font-size="10" fill="#E63946" font-family="sans-serif">Reconfigurable · Co-adaptive · Agentic</text>
+
+      <!-- Separator lines -->
+      <line x1="0" y1="150" x2="1104" y2="150" stroke="#E2DDD8" stroke-width="1" stroke-dasharray="4,4"/>
+      <line x1="0" y1="280" x2="1104" y2="280" stroke="#E2DDD8" stroke-width="1" stroke-dasharray="4,4"/>
+      <line x1="0" y1="410" x2="1104" y2="410" stroke="#E2DDD8" stroke-width="1" stroke-dasharray="4,4"/>
+
+      <!-- ── PIPELINE NODES (top row, shared infrastructure) ── -->
+      <!-- We draw a horizontal pipeline across the top third showing the five stages -->
+
+      <!-- Stage columns X positions -->
+      <!-- 1=Source Docs  2=Chunking  3=Embedding  4=Vector DB  5=Retrieval  6=Generator  7=Response -->
+      <!-- X centers: 130, 270, 390, 510, 650, 800, 980 -->
+
+      <!-- ── NODE BOXES ── -->
+      <!-- Source Docs -->
+      <rect x="68" y="42" width="116" height="56" rx="6" fill="#1A1A2E"/>
+      <text x="126" y="65" text-anchor="middle" font-size="11" font-weight="700" fill="#FFF" font-family="sans-serif">Source</text>
+      <text x="126" y="80" text-anchor="middle" font-size="11" fill="#9BA8BA" font-family="sans-serif">Documents</text>
+
+      <!-- Chunking -->
+      <rect x="220" y="42" width="116" height="56" rx="6" fill="#1A1A2E"/>
+      <text x="278" y="65" text-anchor="middle" font-size="11" font-weight="700" fill="#FFF" font-family="sans-serif">Chunking</text>
+      <text x="278" y="80" text-anchor="middle" font-size="11" fill="#9BA8BA" font-family="sans-serif">Segmentation</text>
+
+      <!-- Embedding -->
+      <rect x="370" y="42" width="116" height="56" rx="6" fill="#1A1A2E"/>
+      <text x="428" y="65" text-anchor="middle" font-size="11" font-weight="700" fill="#FFF" font-family="sans-serif">Embedding</text>
+      <text x="428" y="80" text-anchor="middle" font-size="11" fill="#9BA8BA" font-family="sans-serif">Encoder</text>
+
+      <!-- Vector DB -->
+      <rect x="520" y="42" width="116" height="56" rx="6" fill="#1A1A2E"/>
+      <text x="578" y="65" text-anchor="middle" font-size="11" font-weight="700" fill="#FFF" font-family="sans-serif">Vector DB</text>
+      <text x="578" y="80" text-anchor="middle" font-size="11" fill="#9BA8BA" font-family="sans-serif">Non-parametric</text>
+
+      <!-- Retriever -->
+      <rect x="670" y="42" width="116" height="56" rx="6" fill="#1A1A2E"/>
+      <text x="728" y="65" text-anchor="middle" font-size="11" font-weight="700" fill="#FFF" font-family="sans-serif">Retriever</text>
+      <text x="728" y="80" text-anchor="middle" font-size="11" fill="#9BA8BA" font-family="sans-serif">Dense / Sparse / Hybrid</text>
+
+      <!-- Generator -->
+      <rect x="820" y="42" width="116" height="56" rx="6" fill="#1A1A2E"/>
+      <text x="878" y="65" text-anchor="middle" font-size="11" font-weight="700" fill="#FFF" font-family="sans-serif">Generator</text>
+      <text x="878" y="80" text-anchor="middle" font-size="11" fill="#9BA8BA" font-family="sans-serif">LLM (T5, GPT…)</text>
+
+      <!-- Response -->
+      <rect x="970" y="42" width="116" height="56" rx="6" fill="#E63946"/>
+      <text x="1028" y="65" text-anchor="middle" font-size="11" font-weight="700" fill="#FFF" font-family="sans-serif">Response</text>
+      <text x="1028" y="80" text-anchor="middle" font-size="11" fill="rgba(255,255,255,0.8)" font-family="sans-serif">Grounded output</text>
+
+      <!-- ── ARROWS between nodes ── -->
+      <defs>
+        <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#1A1A2E"/>
+        </marker>
+        <marker id="arr-red" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#E63946"/>
+        </marker>
+        <marker id="arr-blue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#457B9D"/>
+        </marker>
+      </defs>
+
+      <line x1="184" y1="70" x2="218" y2="70" stroke="#1A1A2E" stroke-width="2" marker-end="url(#arr)"/>
+      <line x1="336" y1="70" x2="368" y2="70" stroke="#1A1A2E" stroke-width="2" marker-end="url(#arr)"/>
+      <line x1="486" y1="70" x2="518" y2="70" stroke="#1A1A2E" stroke-width="2" marker-end="url(#arr)"/>
+      <line x1="636" y1="70" x2="668" y2="70" stroke="#1A1A2E" stroke-width="2" marker-end="url(#arr)"/>
+      <line x1="786" y1="70" x2="818" y2="70" stroke="#1A1A2E" stroke-width="2" marker-end="url(#arr)"/>
+      <line x1="936" y1="70" x2="968" y2="70" stroke="#E63946" stroke-width="2" marker-end="url(#arr-red)"/>
+
+      <!-- Query input arrow -->
+      <line x1="728" y1="0" x2="728" y2="40" stroke="#E63946" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#arr-red)"/>
+      <text x="738" y="20" font-size="10" fill="#E63946" font-family="sans-serif" font-weight="600">Query</text>
+
+      <!-- ── ADVANCED RAG LAYER (middle) ── -->
+
+      <!-- Query Rewriting bubble -->
+      <rect x="210" y="170" width="140" height="44" rx="20" fill="#457B9D"/>
+      <text x="280" y="189" text-anchor="middle" font-size="11" font-weight="700" fill="#FFF" font-family="sans-serif">Query Rewriting</text>
+      <text x="280" y="205" text-anchor="middle" font-size="10" fill="rgba(255,255,255,0.85)" font-family="sans-serif">HyDE · Sub-question</text>
+
+      <!-- Reranking bubble -->
+      <rect x="660" y="170" width="130" height="44" rx="20" fill="#457B9D"/>
+      <text x="725" y="189" text-anchor="middle" font-size="11" font-weight="700" fill="#FFF" font-family="sans-serif">Reranking</text>
+      <text x="725" y="205" text-anchor="middle" font-size="10" fill="rgba(255,255,255,0.85)" font-family="sans-serif">Cross-encoder, MMR</text>
+
+      <!-- Context Filtering bubble -->
+      <rect x="820" y="170" width="140" height="44" rx="20" fill="#457B9D"/>
+      <text x="890" y="189" text-anchor="middle" font-size="11" font-weight="700" fill="#FFF" font-family="sans-serif">Context Filtering</text>
+      <text x="890" y="205" text-anchor="middle" font-size="10" fill="rgba(255,255,255,0.85)" font-family="sans-serif">FILCO · SEER</text>
+
+      <!-- Dashed connectors from pipeline to advanced layer -->
+      <line x1="278" y1="98" x2="278" y2="168" stroke="#457B9D" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr-blue)"/>
+      <line x1="725" y1="98" x2="725" y2="168" stroke="#457B9D" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr-blue)"/>
+      <line x1="878" y1="98" x2="878" y2="168" stroke="#457B9D" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr-blue)"/>
+
+      <!-- ── MODULAR / HYBRID LAYER (bottom) ── -->
+
+      <!-- Adaptive Retrieval -->
+      <rect x="60" y="300" width="155" height="52" rx="6" fill="none" stroke="#E63946" stroke-width="2"/>
+      <text x="138" y="322" text-anchor="middle" font-size="11" font-weight="700" fill="#E63946" font-family="sans-serif">Adaptive Retrieval</text>
+      <text x="138" y="338" text-anchor="middle" font-size="10" fill="#3A3A4E" font-family="sans-serif">DRAGIN · FLARE · TA-ARE</text>
+
+      <!-- Self-RAG -->
+      <rect x="242" y="300" width="155" height="52" rx="6" fill="none" stroke="#E63946" stroke-width="2"/>
+      <text x="320" y="322" text-anchor="middle" font-size="11" font-weight="700" fill="#E63946" font-family="sans-serif">Self-Critique Loop</text>
+      <text x="320" y="338" text-anchor="middle" font-size="10" fill="#3A3A4E" font-family="sans-serif">SELF-RAG · CRAG</text>
+
+      <!-- GraphRAG -->
+      <rect x="424" y="300" width="155" height="52" rx="6" fill="none" stroke="#E63946" stroke-width="2"/>
+      <text x="502" y="322" text-anchor="middle" font-size="11" font-weight="700" fill="#E63946" font-family="sans-serif">GraphRAG</text>
+      <text x="502" y="338" text-anchor="middle" font-size="10" fill="#3A3A4E" font-family="sans-serif">KG-RAG · KRAGEN</text>
+
+      <!-- RAPTOR -->
+      <rect x="606" y="300" width="155" height="52" rx="6" fill="none" stroke="#E63946" stroke-width="2"/>
+      <text x="684" y="322" text-anchor="middle" font-size="11" font-weight="700" fill="#E63946" font-family="sans-serif">RAPTOR</text>
+      <text x="684" y="338" text-anchor="middle" font-size="10" fill="#3A3A4E" font-family="sans-serif">Hierarchical summary trees</text>
+
+      <!-- Multi-Agent RL -->
+      <rect x="788" y="300" width="155" height="52" rx="6" fill="none" stroke="#E63946" stroke-width="2"/>
+      <text x="866" y="322" text-anchor="middle" font-size="11" font-weight="700" fill="#E63946" font-family="sans-serif">Multi-Agent RL</text>
+      <text x="866" y="338" text-anchor="middle" font-size="10" fill="#3A3A4E" font-family="sans-serif">IM-RAG · M-RAG · Stochastic</text>
+
+      <!-- Robustness -->
+      <rect x="960" y="300" width="130" height="52" rx="6" fill="none" stroke="#E63946" stroke-width="2"/>
+      <text x="1025" y="322" text-anchor="middle" font-size="11" font-weight="700" fill="#E63946" font-family="sans-serif">Robustness</text>
+      <text x="1025" y="338" text-anchor="middle" font-size="10" fill="#3A3A4E" font-family="sans-serif">RAAT · RAGTruth</text>
+
+      <!-- ── DESIGN TENSIONS (bottom annotations) ── -->
+      <!-- Tension 1 -->
+      <rect x="60" y="420" width="290" height="52" rx="4" fill="rgba(230,57,70,0.08)"/>
+      <text x="75" y="441" font-size="11" font-weight="700" fill="#E63946" font-family="sans-serif">Precision vs. Flexibility</text>
+      <text x="75" y="458" font-size="10" fill="#3A3A4E" font-family="sans-serif">Tighter retrieval constrains generation expressiveness</text>
+
+      <!-- Tension 2 -->
+      <rect x="370" y="420" width="280" height="52" rx="4" fill="rgba(69,123,157,0.08)"/>
+      <text x="385" y="441" font-size="11" font-weight="700" fill="#457B9D" font-family="sans-serif">Efficiency vs. Faithfulness</text>
+      <text x="385" y="458" font-size="10" fill="#3A3A4E" font-family="sans-serif">Caching &amp; compression can sacrifice grounding</text>
+
+      <!-- Tension 3 -->
+      <rect x="668" y="420" width="280" height="52" rx="4" fill="rgba(26,26,46,0.06)"/>
+      <text x="683" y="441" font-size="11" font-weight="700" fill="#1A1A2E" font-family="sans-serif">Modularity vs. Coordination</text>
+      <text x="683" y="458" font-size="10" fill="#3A3A4E" font-family="sans-serif">Modular pipelines trade performance for interpretability</text>
+
+      <!-- Tension label -->
+      <text x="60" y="414" font-size="9" font-weight="700" letter-spacing="1.5" fill="#9BA8BA" font-family="sans-serif">CORE DESIGN TENSIONS</text>
+
+    </svg>
+  </div>
+
+  <!-- ── 4. CALLOUT CARDS ── -->
+  <div class="callouts-section">
+    <div class="section-label">Key Insights from the Literature</div>
+    <div class="callouts-grid">
+
+      <div class="card">
+        <h3>Naive → Advanced → Modular: Three Generations</h3>
+        <p>Gupta et al. trace RAG as a historical progression. Naive RAG (simple retrieve-then-generate) exposed retrieval quality limits, motivating Advanced RAG's pre/post-retrieval optimisations, then Modular RAG's fully reconfigurable pipelines — now the dominant paradigm in production.</p>
+        <div class="card-source">From sources/rag-comprehensive-survey-2410-12837</div>
+      </div>
+
+      <div class="card accent">
+        <h3>Blinkered Chunk Effect — The Named Failure Mode</h3>
+        <p>Klesel &amp; Wittmann coin this term for the context collapse that happens when a chunk is stripped from its surrounding document. A correctly retrieved chunk can still cause hallucination if the LLM cannot reconstruct the conditions, jargon, or references that gave it meaning.</p>
+        <div class="card-source">From sources/retrieval-augmented-generation-klesel-wittmann-2025</div>
+      </div>
+
+      <div class="card blue">
+        <h3>Hybrid Systems Dominate Complex Tasks</h3>
+        <p>On multi-hop QA (HotpotQA), RQ-RAG achieves 800%+ improvement over raw LLM. IM-RAG adds +5.3 F1 / +7.2 EM. Tightly coupled hybrid systems outperform modular pipelines on complex tasks, though at a cost to interpretability and deployability.</p>
+        <div class="card-source">From sources/rag-comprehensive-survey-2506-00054</div>
+      </div>
+
+      <div class="card blue">
+        <h3>GraphRAG Supplies Relational Context</h3>
+        <p>By extracting entity-relationship knowledge graphs from source corpora, GraphRAG enables multi-hop traversal that pure vector similarity cannot achieve. Dual-Pathway KG-RAG reduces hallucinations 18%; KRAGEN reduces them 20–30% versus text-only RAG baselines.</p>
+        <div class="card-source">From sources/rag-comprehensive-survey-2506-00054 · concepts/graphrag</div>
+      </div>
+
+      <div class="card">
+        <h3>RAG Is Not a Hallucination Silver Bullet</h3>
+        <p>Gupta et al. warn that RAG can amplify corpus bias — if the underlying knowledge store is skewed or noisy, retrieval surfaces that skew reliably. Adversarial corpus poisoning (BadRAG, TrojanRAG) represents a further attack surface with sparse defences as of 2025.</p>
+        <div class="card-source">From sources/rag-comprehensive-survey-2410-12837 · concepts/adversarial-rag-attacks</div>
+      </div>
+
+      <div class="card accent">
+        <h3>Data Governance Is First-Class Infrastructure</h3>
+        <p>Klesel &amp; Wittmann are the only surveyed authors to frame data quality and governance as a first-class AI infrastructure concern — not a precondition assumed away. Their research agenda asks whether RAG measurably improves organisational performance; no empirical answer exists yet.</p>
+        <div class="card-source">From sources/retrieval-augmented-generation-klesel-wittmann-2025</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── 5. FOOTER ── -->
+  <div class="footer">
+    <span>Generated by <strong>WikiLM</strong> &nbsp;·&nbsp; project: <strong>e2e-rag-test</strong> &nbsp;·&nbsp; 2026-04-21 &nbsp;·&nbsp; model: sonnet</span>
+    <span>Sources: rag-comprehensive-survey-2506-00054 · rag-comprehensive-survey-2410-12837 · retrieval-augmented-generation-klesel-wittmann-2025</span>
+  </div>
+
+</body>
+</html>
