@@ -293,11 +293,24 @@ function SalonInner() {
     }
 
     const userMsg: Message = { role: "user", content: text };
-    setMessages((p) => [...p, userMsg]);
+    const history = [...messages, userMsg];
+    setMessages(history);
     setInput("");
     setStreamText("");
     setStreaming(true);
     persistMessage(sid, "user", text);
+
+    // Build a multi-turn prompt from the conversation so WikiLM has the
+    // prior context. First turn gets a system-like framing; follow-ups
+    // are simple Human/Assistant alternation.
+    const CONTEXT_LIMIT = 12; // last N turns to keep the prompt under control
+    const kept = history.slice(-CONTEXT_LIMIT);
+    const transcript = kept
+      .map((m) => (m.role === "user" ? `Human: ${m.content}` : `Assistant: ${m.content}`))
+      .join("\n\n");
+    const wrappedPrompt = kept.length === 1
+      ? text
+      : `You are continuing an ongoing conversation. The full prior transcript is below — treat every Human turn as what the user said and every Assistant turn as what you (the assistant) previously said. Continue the conversation naturally, grounded in the active wiki project.\n\n${transcript}\n\nAssistant:`;
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -306,7 +319,7 @@ function SalonInner() {
       const res = await fetch("/api/claude/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: text, projectId, type: "chat" }),
+        body: JSON.stringify({ prompt: wrappedPrompt, projectId, type: "chat" }),
         signal: controller.signal,
       });
       if (!res.ok || !res.body) throw new Error();
@@ -419,7 +432,7 @@ function SalonInner() {
         <div className="salon-input">
           <span className="sig">§</span>
           <textarea
-            placeholder="Ask Claude about this project…"
+            placeholder="Ask WikiLM about this project…"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
