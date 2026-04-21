@@ -104,6 +104,8 @@ function EditInner() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const autoFiredRef = useState({ done: false })[0];
   const autoRun = searchParams.get("run") === "1";
+  const [conceptModal, setConceptModal] = useState<{ finding: Finding; title: string } | null>(null);
+  const [conceptBusy, setConceptBusy] = useState(false);
 
   const fetchFindings = useCallback(async () => {
     if (projectId === null) return;
@@ -265,6 +267,82 @@ function EditInner() {
     router.push(`/sources?tab=research&topic=${encodeURIComponent(topic)}`);
   }
 
+  async function promote(f: Finding) {
+    if (!f.targetPage) {
+      addToast({ type: "error", title: "No target page", description: "This finding has nothing to promote." });
+      return;
+    }
+    // target_page format from parent-lint: "<childSlug>:<pageSlug>"
+    const colon = f.targetPage.lastIndexOf(":");
+    if (colon === -1) {
+      addToast({ type: "error", title: "Invalid target", description: `Expected "<childSlug>:<pageSlug>", got ${f.targetPage}` });
+      return;
+    }
+    const childSlug = f.targetPage.slice(0, colon);
+    const pageSlug = f.targetPage.slice(colon + 1);
+    mark(f.id, true);
+    try {
+      const res = await fetch(`/api/projects/${f.projectId}/promote-page`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ findingId: f.id, childSlug, pageSlug }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? "promote failed");
+      }
+      addToast({ type: "success", title: "Promoted to parent" });
+      setGone((p) => new Set(p).add(f.id));
+      window.setTimeout(() => {
+        setFindings((p) => p.filter((x) => x.id !== f.id));
+        setGone((p) => {
+          const n = new Set(p);
+          n.delete(f.id);
+          return n;
+        });
+        fetchFindings();
+      }, 300);
+    } catch (err: unknown) {
+      addToast({ type: "error", title: err instanceof Error ? err.message : "Couldn't promote" });
+    } finally {
+      mark(f.id, false);
+    }
+  }
+
+  async function createConcept() {
+    if (!conceptModal) return;
+    setConceptBusy(true);
+    try {
+      const res = await fetch("/api/wiki/concept-scaffold", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: conceptModal.finding.projectId,
+          title: conceptModal.title,
+          findingId: conceptModal.finding.id,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      addToast({ type: "success", title: `Concept scaffolded · ${conceptModal.title}` });
+      setGone((p) => new Set(p).add(conceptModal.finding.id));
+      const closedId = conceptModal.finding.id;
+      setConceptModal(null);
+      window.setTimeout(() => {
+        setFindings((p) => p.filter((x) => x.id !== closedId));
+        setGone((p) => {
+          const n = new Set(p);
+          n.delete(closedId);
+          return n;
+        });
+        fetchFindings();
+      }, 300);
+    } catch {
+      addToast({ type: "error", title: "Couldn't create concept" });
+    } finally {
+      setConceptBusy(false);
+    }
+  }
+
   function toggleGroup(cat: string) {
     setCollapsed((p) => {
       const n = new Set(p);
@@ -415,9 +493,29 @@ function EditInner() {
                             {isFixing ? "Fixing…" : "Fix"}
                           </button>
                         )}
-                        {f.status === "open" && (f.category === "suggested_question" || f.category === "parent_gap") && (
+                        {f.status === "open" && f.category === "promotion_candidate" && f.targetPage && (
                           <button
                             className="btn primary"
+                            onClick={() => promote(f)}
+                            disabled={isFixing}
+                            title="Promote this child page to the parent wiki"
+                          >
+                            {isFixing ? "Promoting…" : "Promote"}
+                          </button>
+                        )}
+                        {f.status === "open" && (f.category === "recurring_theme" || f.category === "parent_gap") && (
+                          <button
+                            className="btn primary"
+                            onClick={() => setConceptModal({ finding: f, title: f.title })}
+                            disabled={isFixing}
+                            title="Scaffold a new concept page from this finding"
+                          >
+                            Create concept
+                          </button>
+                        )}
+                        {f.status === "open" && (f.category === "suggested_question" || f.category === "parent_gap") && (
+                          <button
+                            className="btn"
                             onClick={() => researchGap(f)}
                             disabled={isFixing}
                             title="Open Research with this as the topic"
@@ -442,6 +540,58 @@ function EditInner() {
             </div>
           );
         })
+      )}
+
+      {conceptModal && (
+        <div className="note-modal-bg" onClick={() => !conceptBusy && setConceptModal(null)}>
+          <div className="note-modal" style={{ width: 500 }} onClick={(e) => e.stopPropagation()}>
+            <div className="note-modal-head">
+              <h3>
+                Create <em>concept</em>
+              </h3>
+              <button className="x" onClick={() => setConceptModal(null)} disabled={conceptBusy}>
+                ×
+              </button>
+            </div>
+            <div className="note-modal-body">
+              <label className="note-field">
+                <span className="lab">Concept title</span>
+                <input
+                  autoFocus
+                  type="text"
+                  value={conceptModal.title}
+                  onChange={(e) => setConceptModal({ ...conceptModal, title: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void createConcept();
+                    if (e.key === "Escape" && !conceptBusy) setConceptModal(null);
+                  }}
+                />
+              </label>
+              <div
+                style={{
+                  fontFamily: "var(--font-inst)",
+                  fontStyle: "italic",
+                  fontSize: 13,
+                  color: "var(--ink-3)",
+                }}
+              >
+                A scaffolded concept page will be written to <b>wiki/concepts/</b> and this finding will close.
+              </div>
+            </div>
+            <div className="note-modal-foot">
+              <button className="btn ghost" onClick={() => setConceptModal(null)} disabled={conceptBusy}>
+                Cancel
+              </button>
+              <button
+                className="btn primary"
+                onClick={() => void createConcept()}
+                disabled={conceptBusy || !conceptModal.title.trim()}
+              >
+                {conceptBusy ? "Scaffolding…" : "Create"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
