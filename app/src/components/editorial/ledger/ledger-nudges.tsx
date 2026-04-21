@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/components/toast-provider";
 import { useProject } from "@/components/project-switcher";
 
+// router is used by research() handoff to /sources?tab=research
+
 interface DashboardNudge {
   id: number;
   projectId: number;
@@ -131,22 +133,13 @@ export function LedgerMarginalia() {
     }
   }
 
-  async function research(n: DashboardNudge) {
-    markBusy(n.id, true);
-    try {
-      const res = await fetch("/api/sources/research", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic: n.title, projectId: n.projectId }),
-      });
-      if (!res.ok) throw new Error();
-      addToast({ type: "success", title: "Commissioning research" });
-      setHidden((p) => new Set(p).add(n.id));
-    } catch {
-      addToast({ type: "error", title: "Research failed to start" });
-    } finally {
-      markBusy(n.id, false);
-    }
+  function research(n: DashboardNudge) {
+    // Hand the research off to the real streaming UI so the user watches
+    // candidates land in real time and can approve/skip them. Fire-and-
+    // forget against /api/sources/research streams to a reader we abandon,
+    // which was why pressing "Research" did nothing visible.
+    router.push(`/sources?tab=research&topic=${encodeURIComponent(n.title)}`);
+    setHidden((p) => new Set(p).add(n.id));
   }
 
   async function createConcept() {
