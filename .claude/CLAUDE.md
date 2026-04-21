@@ -179,9 +179,11 @@ This is a general-purpose knowledge base. Topics are handled via tags in frontma
 
 ## Current Phase
 
-**Output generation + note capture shipped.** STO-1766 (NotebookLM-style output generation) shipped end-to-end: 5 artifact types (report, cheat, summary, deck, infographic) running through the job queue with model provenance, scope, nudges, per-artifact delete, kill-any-job support, and a slide-up Running Jobs panel. STO-1768 (add-note UI on `/sources`), STO-1769 (chat-to-note summariser), and STO-1771 (hardcoded `PROJECT_ID=1` fix on `/chat`) all shipped on 2026-04-19. MCP server gained `generate_output` as a 9th tool. Root README written with 8 screenshots + Karpathy attribution. In-app Help modal added.
+**Editorial frontend redesign complete on `feat/editorial-frontend` branch.** All 9 phases of STO-1775 shipped (STO-1776 through STO-1784). Full editorial-brutalist UI with Fraunces + Instrument Serif + JetBrains Mono, four themes (Paper/Stone/Celadon/Night), five accents, three densities, four font faces, three sizes. Every page wired to real WikiLM data — Ledger (dashboard), Wiki (article reader + markdown renderer + hover preview + picker with filter/sort/search), Intake (drop zone + stamp-cards + approve flow + SSE research stream + per-project persistence + sort), Dispatch (inverted 7-col jobs table with shimmer), Map (force-directed graph with pulsing hub), Dictation (compose screen wired to output generation). ⌘K palette, editorial toast singleton, responsive breakpoints, breadcrumbs, sticky margin cards. Production `npm run build` passes.
 
-Outstanding: STO-1770 (cascade source removal on delete, Low) and STO-1767 (MCP v2 destructive ops, Low). Both purely additive / nice-to-have.
+Main is untouched. To ship: either merge branch into main, or layer a toggle.
+
+Outstanding (non-editorial WikiLM tickets): STO-1770 (cascade source removal on delete, Low) and STO-1767 (MCP v2 destructive ops, Low). Both purely additive / nice-to-have.
 
 ## Known Issues
 
