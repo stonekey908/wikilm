@@ -325,7 +325,11 @@ function SalonInner() {
           try {
             const evt = JSON.parse(line.slice(6));
             if (evt.type === "content" && typeof evt.text === "string") {
-              assembled += evt.text;
+              // The server splits stdout on \n and emits each line as a
+              // separate `content` event with the newline stripped. Rejoin
+              // with \n so markdown blocks (headings, lists, fences) keep
+              // their line boundaries and render correctly.
+              assembled += evt.text + "\n";
               setStreamText(assembled);
             }
           } catch {}
