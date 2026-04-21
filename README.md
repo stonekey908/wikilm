@@ -119,6 +119,24 @@ Natural-language intent routing across the whole app. Type a query, command, or 
 
 ## Setup
 
+### AI-led install (recommended)
+
+Let Claude Code drive the install. From a fresh clone:
+
+```bash
+git clone https://github.com/stonekey908/wikilm.git
+cd wikilm
+claude
+```
+
+Then paste:
+
+> Read SETUP.md and walk me through the setup interactively, one step at a time. Write credentials directly to `app/.env.local` as I provide them. Start in mock mode so I can explore before I add API keys.
+
+Claude will ask about your target providers (Claude / Gemini / Ollama), handle `npm install` + `npm run db:push`, boot the dev server, and only prompt you for the bits that need human eyes (API keys, CLI authentication). If you hit a snag, it'll update SETUP.md with what actually happened.
+
+### Manual install
+
 See [SETUP.md](SETUP.md) for the full walkthrough. Quick version:
 
 ```bash
