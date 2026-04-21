@@ -2087,29 +2087,35 @@ body[data-grain="false"]::after { display: none !important; }
    ══════════════════════════════════════════════════════════════════ */
 
 .edit-toolbar {
-  display: flex; gap: 10px; align-items: center;
+  display: flex; gap: 12px; align-items: stretch;
   padding: 18px 0 14px;
   border-bottom: 1.5px solid var(--rule);
   flex-wrap: wrap;
 }
 .edit-toolbar .count {
   margin-left: auto;
+  align-self: center;
   font-family: var(--font-mono); font-size: 10px; font-weight: 700;
   letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--ink-3);
 }
 .edit-toolbar .count b { color: var(--ink); }
-.edit-toolbar .btn { padding: 8px 14px; font-size: 11px; }
+.edit-toolbar .btn {
+  height: 36px; padding: 0 18px; font-size: 11px;
+  display: inline-flex; align-items: center;
+}
 
 .edit-filter {
   display: inline-flex; border: 1.5px solid var(--rule);
+  height: 36px;
 }
 .edit-filter button {
-  padding: 7px 11px;
+  padding: 0 14px; height: 100%;
   font-family: var(--font-mono); font-size: 10px; font-weight: 700;
   letter-spacing: 0.1em; text-transform: uppercase;
   color: var(--ink-3); cursor: pointer;
   border-right: 1px solid var(--rule-faint);
+  display: inline-flex; align-items: center;
 }
 .edit-filter button:last-child { border-right: none; }
 .edit-filter button:hover { background: var(--paper-2); color: var(--ink); }
@@ -2142,14 +2148,14 @@ body[data-grain="false"]::after { display: none !important; }
 .edit-group-head.collapsed .chev-sm { transform: rotate(-90deg); }
 
 .finding {
-  display: grid; grid-template-columns: 4px 1fr auto;
-  gap: 14px; align-items: start;
-  padding: 14px 14px 14px 12px;
+  display: grid; grid-template-columns: 1fr auto;
+  gap: 18px; align-items: start;
+  padding: 16px 18px;
   border: 1px solid var(--rule-faint);
   border-left-width: 3px;
   background: var(--paper);
   margin-bottom: 10px;
-  transition: background 160ms, opacity 300ms;
+  transition: background 160ms, opacity 300ms, transform 300ms;
 }
 .finding:hover { background: var(--paper-2); }
 .finding.warn { border-left-color: var(--amber); }
@@ -2157,7 +2163,6 @@ body[data-grain="false"]::after { display: none !important; }
 .finding.severe { border-left-color: var(--red); }
 .finding.fixing { opacity: 0.6; }
 .finding.gone { opacity: 0; transform: translateX(24px); pointer-events: none; }
-.finding .bar { display: none; }
 .finding .body { min-width: 0; }
 .finding .cat {
   display: inline-block;
@@ -2184,9 +2189,13 @@ body[data-grain="false"]::after { display: none !important; }
 }
 .finding .acts {
   display: flex; flex-direction: column; gap: 6px; align-items: stretch;
-  min-width: 100px;
+  width: 110px; flex-shrink: 0;
 }
-.finding .acts .btn { height: 26px; padding: 0 10px; font-size: 10px; display: flex; align-items: center; justify-content: center; }
+.finding .acts .btn {
+  height: 30px; padding: 0 10px; font-size: 10px;
+  display: flex; align-items: center; justify-content: center;
+  white-space: nowrap;
+}
 
 .edit-empty {
   font-family: var(--font-inst); font-style: italic; font-size: 17px;

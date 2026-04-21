@@ -301,7 +301,6 @@ function EditInner() {
                       key={f.id}
                       className={`finding ${sevClass}${isFixing ? " fixing" : ""}${isGone ? " gone" : ""}`}
                     >
-                      <span className="bar" />
                       <div className="body">
                         <div className="cat">{f.category.replace(/_/g, " ")}</div>
                         <div className="t">{f.title}</div>
