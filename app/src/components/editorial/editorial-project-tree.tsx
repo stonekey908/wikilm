@@ -266,7 +266,12 @@ export function EditorialProjectTree() {
         </div>
 
         {menuOpen && (
-          <div className="proj-menu" style={{ top: 28, right: 6 }} onClick={(e) => e.stopPropagation()}>
+          <div
+            className="proj-menu"
+            style={{ top: 28, right: 6 }}
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
             <button
               onClick={() => {
                 setAddingUnder(node.id);

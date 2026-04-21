@@ -187,6 +187,27 @@ export function streamClaude({ prompt, projectCwd, type }: StreamOptions): Reada
     });
   }
 
+  // Gemini CLI exposes google_web_search in its tool list but does not
+  // reliably invoke it in headless `-p` mode — the model fabricates URLs
+  // (bare domains, no paths) and answers from parametric knowledge.
+  // Block it for research the same way Ollama is blocked above.
+  if (model.startsWith("gemini:") && type === "research") {
+    return new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({
+              type: "error",
+              text: "Gemini CLI skips google_web_search in headless mode and fabricates URLs. Switch research to a Claude model in Settings.",
+            })}\n\n`
+          )
+        );
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done", code: 1 })}\n\n`));
+        controller.close();
+      },
+    });
+  }
+
   // Gemini: spawn the gemini CLI with its equivalent flags.
   // Claude: keep the existing spawn/flags.
   const isGemini = model.startsWith("gemini:");
@@ -216,6 +237,7 @@ export function streamClaude({ prompt, projectCwd, type }: StreamOptions): Reada
       });
 
       let buffer = "";
+      let stderrBuffer = "";
 
       proc.stdout.on("data", (chunk: Buffer) => {
         buffer += chunk.toString();
@@ -232,16 +254,20 @@ export function streamClaude({ prompt, projectCwd, type }: StreamOptions): Reada
       });
 
       proc.stderr.on("data", (chunk: Buffer) => {
-        const text = chunk.toString();
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ type: "error", text })}\n\n`)
-        );
+        stderrBuffer += chunk.toString();
       });
 
       proc.on("close", (code) => {
         if (buffer.trim()) {
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify({ type: "content", text: buffer })}\n\n`)
+          );
+        }
+        if (code !== 0 && stderrBuffer.trim()) {
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ type: "error", text: stderrBuffer.trim() })}\n\n`
+            )
           );
         }
         controller.enqueue(

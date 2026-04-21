@@ -22,8 +22,13 @@ export async function GET() {
 
   const map = new Map(rows.map((r) => [r.key, r.value]));
 
+  const lastAt = map.get("last_backup_at") ?? null;
   return Response.json({
-    lastBackupAt: map.get("last_backup_at") ?? null,
+    running: false,
+    lastBackupAt: lastAt,
+    lastCompletedAt: lastAt,
+    lastStartedAt: lastAt,
+    lastError: null,
     location: map.get("last_backup_path") ?? DEFAULT_BACKUP_DIR,
     lastDbFile: map.get("last_backup_db_file") ?? null,
     lastContentFile:

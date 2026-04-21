@@ -279,9 +279,24 @@ export default function SettingsPage() {
                     </optgroup>
                   )}
                   {geminiModels.length > 0 && (
-                    <optgroup label="Gemini">
+                    <optgroup
+                      label={
+                        NEEDS_WEB_GROUNDING.has(t.key)
+                          ? "Gemini — no reliable web grounding in headless"
+                          : "Gemini"
+                      }
+                    >
                       {geminiModels.map((m) => (
-                        <option key={m.name} value={`gemini:${m.name}`}>
+                        <option
+                          key={m.name}
+                          value={`gemini:${m.name}`}
+                          disabled={NEEDS_WEB_GROUNDING.has(t.key)}
+                          title={
+                            NEEDS_WEB_GROUNDING.has(t.key)
+                              ? "Gemini CLI in headless mode skips google_web_search and fabricates URLs. Use Claude for research."
+                              : undefined
+                          }
+                        >
                           {m.label ?? m.name}
                         </option>
                       ))}
