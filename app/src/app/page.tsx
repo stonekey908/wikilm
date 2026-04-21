@@ -135,6 +135,7 @@ export default function LedgerPage() {
 
   return (
     <div className="pad">
+      <nav className="breadcrumbs" aria-hidden style={{ visibility: "hidden" }} />
       <div className="ledger-head">
         <h1>
           Good afternoon,
