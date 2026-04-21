@@ -1150,7 +1150,7 @@ body[data-grain="false"]::after { display: none !important; }
   transform: translateY(4px);
   transition: opacity 180ms, transform 180ms;
 }
-.preview.show { opacity: 1; transform: none; pointer-events: auto; }
+.preview.show { opacity: 1; transform: none; pointer-events: none; }
 .preview .crumb { font-family: var(--font-mono); font-size: 9.5px; color: var(--ink-4); text-transform: uppercase; letter-spacing: 0.14em; margin-bottom: 6px; }
 .preview h5 {
   font-family: var(--font-serif); font-weight: 400;
