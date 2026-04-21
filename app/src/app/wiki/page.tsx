@@ -480,6 +480,61 @@ function WikiPageInner() {
         </div>
       </div>
 
+      {page.type === "output" && projectId && (() => {
+        const baseName = page.slug.split("/").pop() ?? page.slug;
+        const href = (ext: string) =>
+          `/api/projects/${projectId}/outputs/download?file=${encodeURIComponent(baseName + "." + ext)}`;
+        // Best-guess derivatives by primary extension inferred from meta or slug
+        const family = (page.meta.output_type as string | undefined) ?? "";
+        const derived =
+          family === "deck"
+            ? ["md", "pdf", "pptx"]
+            : family === "infographic"
+              ? ["html", "png"]
+              : family === "report" || family === "summary" || family === "cheat"
+                ? ["md", "docx"]
+                : ["md", "docx", "pdf", "pptx", "html", "png"]; // fallback: try anything
+        return (
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              flexWrap: "wrap",
+              padding: "16px 0 4px",
+              borderBottom: "1px dashed var(--rule-faint)",
+              marginBottom: 12,
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                color: "var(--ink-4)",
+                alignSelf: "center",
+                marginRight: 8,
+              }}
+            >
+              Download
+            </span>
+            {derived.map((ext) => (
+              <a
+                key={ext}
+                className="btn sm ghost"
+                href={href(ext)}
+                target="_blank"
+                rel="noreferrer noopener"
+                style={{ textTransform: "uppercase" }}
+              >
+                {ext}
+              </a>
+            ))}
+          </div>
+        );
+      })()}
+
       <div className="article">
         <MarkdownBody body={page.body} opts={renderOpts} />
 

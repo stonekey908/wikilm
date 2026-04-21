@@ -267,19 +267,39 @@ export default function DictationPage() {
               </p>
               <div className="artifact-actions">
                 <button
-                  className="btn primary"
+                  className="btn"
                   onClick={() => router.push(`/wiki?slug=${encodeURIComponent(`outputs/${baseSlug}`)}`)}
                 >
-                  Open in Wiki →
+                  Open in Wiki
                 </button>
-                <a
-                  className="btn"
-                  href={`/api/projects/${projectId}/outputs/download?baseSlug=${encodeURIComponent(baseSlug)}&ext=${encodeURIComponent(activeFmt.id === "infographic" ? "html" : "md")}`}
-                  target="_blank"
-                  rel="noreferrer noopener"
-                >
-                  Download primary
-                </a>
+                {(() => {
+                  const primaryExt = activeFmt.id === "infographic" ? "html" : "md";
+                  const derivedExts: string[] =
+                    activeFmt.id === "deck"
+                      ? ["pdf", "pptx"]
+                      : activeFmt.id === "infographic"
+                        ? ["png"]
+                        : ["docx"];
+                  const labelFor = (ext: string) => {
+                    if (ext === "md") return "Markdown";
+                    if (ext === "html") return "HTML";
+                    return ext.toUpperCase();
+                  };
+                  const href = (ext: string) =>
+                    `/api/projects/${projectId}/outputs/download?file=${encodeURIComponent(baseSlug + "." + ext)}`;
+                  return (
+                    <>
+                      <a className="btn primary" href={href(primaryExt)} target="_blank" rel="noreferrer noopener">
+                        Download {labelFor(primaryExt)}
+                      </a>
+                      {derivedExts.map((ext) => (
+                        <a key={ext} className="btn" href={href(ext)} target="_blank" rel="noreferrer noopener">
+                          {labelFor(ext)}
+                        </a>
+                      ))}
+                    </>
+                  );
+                })()}
                 <button
                   className="btn ghost"
                   onClick={() => {
