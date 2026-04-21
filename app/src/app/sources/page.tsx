@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useProject } from "@/components/project-switcher";
 import { useToast } from "@/components/toast-provider";
 import { EditorialBreadcrumbs } from "@/components/editorial/wiki/breadcrumbs";
+import { NoteComposerModal } from "@/components/editorial/note-composer-modal";
 
 interface Source {
   id: number;
@@ -113,6 +114,7 @@ function IntakePageInner() {
   const [approving, setApproving] = useState<Set<number>>(new Set());
   const [slideOut, setSlideOut] = useState<Set<number>>(new Set());
   const [dragActive, setDragActive] = useState(false);
+  const [noteOpen, setNoteOpen] = useState(false);
   const [quickUrl, setQuickUrl] = useState("");
   const [quickBusy, setQuickBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -675,18 +677,56 @@ function IntakePageInner() {
               </button>
             </div>
 
-            <div
-              className={`drop${dragActive ? " drag" : ""}`}
-              onClick={() => fileInputRef.current?.click()}
-              onDrop={onDrop}
-              onDragOver={onDragOver}
-              onDragLeave={onDragLeave}
-            >
-              <h4>
-                Drop <em>any</em> file, or click to upload.
-              </h4>
-              <p>PDF, Markdown, text, audio, image — anything lands here as a pending source.</p>
-              <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => uploadFiles(e.target.files)} />
+            <div style={{ display: "flex", gap: 12, marginBottom: 18, alignItems: "stretch" }}>
+              <div
+                className={`drop${dragActive ? " drag" : ""}`}
+                style={{ flex: 1, marginBottom: 0 }}
+                onClick={() => fileInputRef.current?.click()}
+                onDrop={onDrop}
+                onDragOver={onDragOver}
+                onDragLeave={onDragLeave}
+              >
+                <h4>
+                  Drop <em>any</em> file, or click to upload.
+                </h4>
+                <p>PDF, Markdown, text, audio, image — anything lands as a pending source.</p>
+                <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => uploadFiles(e.target.files)} />
+              </div>
+              <button
+                type="button"
+                onClick={() => setNoteOpen(true)}
+                style={{
+                  border: "2px dashed var(--rule)",
+                  background: "var(--paper-2)",
+                  padding: "0 22px",
+                  cursor: "pointer",
+                  fontFamily: "var(--font-serif)",
+                  fontSize: 17,
+                  letterSpacing: "-0.01em",
+                  color: "var(--ink)",
+                  minWidth: 180,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 4,
+                  transition: "all 180ms",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "var(--paper-3)";
+                  e.currentTarget.style.borderColor = "var(--accent)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "var(--paper-2)";
+                  e.currentTarget.style.borderColor = "var(--rule)";
+                }}
+              >
+                <span style={{ fontFamily: "var(--font-inst)", fontStyle: "italic", color: "var(--accent)", fontSize: 22, lineHeight: 1 }}>§</span>
+                <span>New note</span>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 9.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--ink-4)" }}>
+                  Write markdown
+                </span>
+              </button>
             </div>
 
             <div className="intake">
@@ -959,6 +999,12 @@ function IntakePageInner() {
           )}
         </div>
       )}
+
+      <NoteComposerModal
+        open={noteOpen}
+        onClose={() => setNoteOpen(false)}
+        onSaved={() => fetchSources()}
+      />
     </div>
   );
 }

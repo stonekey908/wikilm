@@ -22,7 +22,7 @@ export const FOLIO: Record<EditorialView, FolioEntry> = {
   wiki: { view: "wiki", num: "02", name: "WIKI", label: "Wiki", path: "/wiki" },
   sources: { view: "sources", num: "03", name: "THE INTAKE", label: "Intake", path: "/sources" },
   chat: { view: "chat", num: "04", name: "THE SALON", label: "Chat", path: "/chat" },
-  lint: { view: "lint", num: "05", name: "THE EDIT", label: "Edit", path: "/lint" },
+  lint: { view: "lint", num: "05", name: "LINT · THE EDIT", label: "Lint", path: "/lint" },
   jobs: { view: "jobs", num: "06", name: "THE DISPATCH", label: "Dispatch", path: "/jobs" },
   graph: { view: "graph", num: "07", name: "THE MAP", label: "Map", path: "/graph" },
   compose: { view: "compose", num: "08", name: "DICTATION", label: "Dictation", path: "/compose" },

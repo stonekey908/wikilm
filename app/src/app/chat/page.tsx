@@ -370,17 +370,31 @@ function SalonInner() {
   }, []);
 
   async function saveAsNote() {
-    if (!sessionId || messages.length < 2) return;
+    if (messages.length < 2) return;
     try {
       const res = await fetch("/api/chat/save-as-note", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, projectId }),
+        body: JSON.stringify({
+          messages: messages.map((m) => ({ role: m.role, content: m.content })),
+          projectId,
+        }),
       });
-      if (!res.ok) throw new Error();
-      addToast({ type: "success", title: "Saving thread as note — pending" });
-    } catch {
-      addToast({ type: "error", title: "Couldn't save thread" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? "save failed");
+      }
+      addToast({
+        type: "success",
+        title: "Summarising thread — check Intake",
+        description: "A pending source will land when the job finishes.",
+      });
+    } catch (err: unknown) {
+      addToast({
+        type: "error",
+        title: "Couldn't save thread",
+        description: err instanceof Error ? err.message : undefined,
+      });
     }
   }
 
