@@ -11,6 +11,7 @@ import {
 } from "@/components/editorial/wiki/markdown-renderer";
 import { useWikiPreview } from "@/components/editorial/wiki/wiki-preview";
 import { EditorialBreadcrumbs } from "@/components/editorial/wiki/breadcrumbs";
+import { QuickGenerateModal } from "@/components/editorial/quick-generate";
 
 interface Backlink {
   slug: string;
@@ -106,6 +107,7 @@ function WikiPageInner() {
   const [page, setPage] = useState<WikiPage | null>(null);
   const [loading, setLoading] = useState(false);
   const [allPages, setAllPages] = useState<WikiIndexEntry[]>([]);
+  const [generateOpen, setGenerateOpen] = useState(false);
 
   // Picker state
   const [search, setSearch] = useState("");
@@ -433,6 +435,18 @@ function WikiPageInner() {
     <div className="pad">
       <EditorialBreadcrumbs showBack tail={page.type.toUpperCase()} />
 
+      <div style={{ display: "flex", gap: 10, marginTop: 2, marginBottom: -8 }}>
+        <button
+          type="button"
+          className="btn sm primary"
+          onClick={() => setGenerateOpen(true)}
+          title="Generate a report, deck, or one-pager from this project"
+          style={{ marginLeft: "auto" }}
+        >
+          ✦ Generate output
+        </button>
+      </div>
+
       <div className="art-masthead">
         <div className="kicker">
           <span className="path">{activeProject?.slug ?? ""}</span>
@@ -605,6 +619,12 @@ function WikiPageInner() {
       </div>
 
       <PreviewCard />
+
+      <QuickGenerateModal
+        open={generateOpen}
+        onClose={() => setGenerateOpen(false)}
+        seedNudge={page.title}
+      />
     </div>
   );
 }

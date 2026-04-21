@@ -324,6 +324,91 @@ body[data-grain="false"]::after { display: none !important; }
 .proj .t { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .proj .c { font-family: var(--font-mono); font-size: 10px; color: var(--ink-4); font-variant-numeric: tabular-nums; }
 
+.proj-menu-btn {
+  opacity: 0; transition: opacity 140ms, color 140ms;
+  background: none; border: none; cursor: pointer;
+  color: var(--ink-4); padding: 0 4px; font-size: 13px; line-height: 1;
+  flex-shrink: 0;
+}
+.proj:hover .proj-menu-btn { opacity: 1; }
+.proj-menu-btn:hover { color: var(--ink); }
+.proj.active .proj-menu-btn { color: var(--paper); opacity: 0.7; }
+
+.proj-menu {
+  position: absolute; z-index: 50;
+  background: var(--paper); border: 1.5px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--ink);
+  display: flex; flex-direction: column;
+  min-width: 140px;
+  animation: pop 200ms cubic-bezier(.2, .7, .2, 1);
+}
+.proj-menu button {
+  padding: 8px 12px;
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ink-2); background: none; border: none; cursor: pointer;
+  text-align: left;
+  border-bottom: 1px solid var(--rule-faint);
+}
+.proj-menu button:last-child { border-bottom: none; }
+.proj-menu button:hover { background: var(--paper-2); color: var(--ink); }
+.proj-menu button.danger { color: var(--red); }
+.proj-menu button.danger:hover { background: var(--red-wash); }
+
+.proj-add-form {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 8px 10px; margin: 4px 8px 6px;
+  border: 1.5px solid var(--ink);
+  background: var(--paper-2);
+}
+.proj-add-form input {
+  font-family: var(--font-serif); font-size: 13px;
+  padding: 6px 8px; border: 1px solid var(--rule-faint);
+  background: var(--paper); color: var(--ink); outline: none;
+}
+.proj-add-form .actions { display: flex; gap: 6px; justify-content: flex-end; }
+.proj-add-form .actions button {
+  padding: 4px 10px;
+  font-family: var(--font-mono); font-size: 9.5px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  cursor: pointer; border: 1px solid var(--rule);
+  background: var(--paper); color: var(--ink-2);
+}
+.proj-add-form .actions button.primary { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+.proj-move-modal {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(15, 14, 12, 0.4); backdrop-filter: blur(2px);
+  display: grid; place-items: center;
+  animation: pal-bg-in 200ms ease-out;
+}
+.proj-move-card {
+  width: 480px; max-width: calc(100vw - 32px);
+  max-height: 70vh; overflow-y: auto;
+  background: var(--paper); border: 1.5px solid var(--ink);
+  box-shadow: 10px 10px 0 var(--ink);
+  animation: pop 260ms cubic-bezier(.2, .7, .2, 1);
+}
+.proj-move-card h3 {
+  padding: 14px 18px; border-bottom: 1.5px solid var(--rule);
+  font-family: var(--font-serif); font-weight: 700; font-size: 18px;
+}
+.proj-move-card h3 em { font-family: var(--font-inst); font-style: italic; color: var(--accent); font-weight: 400; }
+.proj-move-list { padding: 6px; }
+.proj-move-list button {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; cursor: pointer; background: none; border: none;
+  font-family: var(--font-serif); font-size: 14px; color: var(--ink-2);
+  text-align: left;
+}
+.proj-move-list button:hover { background: var(--paper-2); color: var(--ink); }
+.proj-move-list button.on { background: var(--ink); color: var(--paper); }
+.proj-move-list button .slug { font-family: var(--font-mono); font-size: 10px; color: var(--ink-4); margin-left: 6px; }
+.proj-move-card .foot {
+  padding: 12px 18px; border-top: 1.5px solid var(--rule);
+  display: flex; gap: 10px; justify-content: flex-end;
+}
+
 .proj-chev {
   width: 12px; height: 12px; display: grid; place-items: center;
   color: var(--ink-4); cursor: pointer; flex-shrink: 0;
