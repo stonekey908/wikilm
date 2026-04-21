@@ -57,7 +57,13 @@ function applyToBody(state: TweakState) {
   b.dataset.size = state.size;
   b.dataset.font = state.font;
   b.dataset.side = state.sidebar;
-  b.dataset.grain = String(state.grain);
+  b.dataset.grain = state.grain ? "true" : "false";
+  // Mirror onto documentElement in case CSS targets either
+  const h = document.documentElement;
+  h.dataset.theme = state.theme;
+  h.dataset.accent = state.accent;
+  h.dataset.density = state.density;
+  h.dataset.grain = state.grain ? "true" : "false";
 }
 
 export function TweaksProvider({ children }: { children: ReactNode }) {

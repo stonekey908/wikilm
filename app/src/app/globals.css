@@ -87,9 +87,34 @@
 [data-accent="ink"]   { --accent: var(--ink);   --accent-wash: rgba(15, 14, 12, 0.08); }
 
 /* ── Density ── */
-[data-density="cozy"]  { --row-y: 8px;  --row-x: 10px; --pad: 12px; }
-[data-density="comfy"] { --row-y: 11px; --row-x: 14px; --pad: 16px; }
-[data-density="airy"]  { --row-y: 16px; --row-x: 18px; --pad: 22px; }
+[data-density="cozy"]  {
+  --row-y: 6px; --row-x: 10px; --pad: 12px;
+  --density-scale: 0.86;
+}
+[data-density="comfy"] {
+  --row-y: 11px; --row-x: 14px; --pad: 16px;
+  --density-scale: 1;
+}
+[data-density="airy"]  {
+  --row-y: 18px; --row-x: 20px; --pad: 24px;
+  --density-scale: 1.18;
+}
+
+/* Density globally stretches/tightens row + section vertical rhythm.
+   Applied as padding-scaling on .content via transform origin — keeps
+   layout intact but visibly relaxes or compacts the whole reading area. */
+.content > * { row-gap: calc(16px * var(--density-scale, 1)); }
+.pad > * + * { margin-top: calc(var(--density-gap, 0px) * var(--density-scale, 1)); }
+.intake-row { padding: calc(var(--row-y, 11px) + 6px) 0; }
+.entry { padding: calc(var(--row-y, 11px)) 0; }
+.dispatch-row { padding: calc(var(--row-y, 11px) + 3px) 18px; }
+.ledger-body .col { padding: calc(26px * var(--density-scale, 1)) 24px calc(30px * var(--density-scale, 1)); }
+.sec-head, .ledger-head, .art-masthead { padding-bottom: calc(22px * var(--density-scale, 1)); }
+.article { padding: calc(40px * var(--density-scale, 1)) 0 calc(20px * var(--density-scale, 1)); }
+.fr-card { padding: calc(14px * var(--density-scale, 1)) 14px; }
+.mark { padding: calc(12px * var(--density-scale, 1)) 14px; }
+.prose p { margin-bottom: calc(18px * var(--density-scale, 1)); }
+.prose h2 { margin: calc(30px * var(--density-scale, 1)) 0 calc(14px * var(--density-scale, 1)); }
 
 /* ── Display type scale (Tweaks: Size) ── */
 :root           { --fs-scale: 1; }
@@ -169,28 +194,29 @@ body {
 
 button, input, textarea, select { font-family: inherit; color: inherit; background: none; border: none; }
 
-/* ══ Paper grain ══ */
+/* ══ Paper grain ══
+   body[data-grain="true"|"false"] toggles both overlays. */
 body::before {
   content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 999;
   background-image:
-    radial-gradient(rgba(0, 0, 0, 0.035) 1px, transparent 1px),
-    radial-gradient(rgba(0, 0, 0, 0.02) 1px, transparent 1px);
+    radial-gradient(rgba(0, 0, 0, 0.04) 1px, transparent 1px),
+    radial-gradient(rgba(0, 0, 0, 0.025) 1px, transparent 1px);
   background-size: 3px 3px, 7px 7px;
   background-position: 0 0, 1px 2px;
-  opacity: 0.7;
+  opacity: 0.75;
   mix-blend-mode: multiply;
 }
-[data-theme="night"] body::before { mix-blend-mode: screen; opacity: 0.28; }
-[data-grain="false"] body::before { display: none; }
+body[data-theme="night"]::before { mix-blend-mode: screen; opacity: 0.3; }
+body[data-grain="false"]::before { display: none !important; }
 
 body::after {
   content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 998;
   background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/><feColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .5 0'/></filter><rect width='140' height='140' filter='url(%23n)'/></svg>");
-  opacity: 0.12;
+  opacity: 0.14;
   mix-blend-mode: multiply;
 }
-[data-theme="night"] body::after { mix-blend-mode: screen; opacity: 0.05; }
-[data-grain="false"] body::after { display: none; }
+body[data-theme="night"]::after { mix-blend-mode: screen; opacity: 0.06; }
+body[data-grain="false"]::after { display: none !important; }
 
 /* ══ Shell ══ */
 .app { display: grid; grid-template-columns: var(--side-w) 1fr; height: 100vh; }
@@ -396,7 +422,57 @@ body::after {
 .content::-webkit-scrollbar { width: 8px; }
 .content::-webkit-scrollbar-thumb { background: var(--rule-faint); }
 
-.view { display: block; opacity: 1; }
+/* ══ Cinematic page transitions ══
+   Every view fades + rises on mount. Internal sections cascade with
+   a staggered entry so the page feels like a paper being laid out. */
+.view {
+  display: block;
+  opacity: 0;
+  animation: view-in 480ms cubic-bezier(.2, .7, .2, 1) forwards;
+}
+@keyframes view-in {
+  from { opacity: 0; transform: translateY(14px); filter: blur(2px); }
+  60%  { opacity: 1; filter: blur(0); }
+  to   { opacity: 1; transform: none; filter: blur(0); }
+}
+@media (prefers-reduced-motion: reduce) { .view { animation: none; opacity: 1; } }
+
+/* Staggered section entry — use with --n (0..N) on immediate children */
+.view > .pad > * {
+  opacity: 0;
+  animation: section-in 520ms cubic-bezier(.2, .7, .2, 1) forwards;
+  animation-delay: calc(var(--n, 0) * 60ms + 80ms);
+}
+.view > .pad > .breadcrumbs { --n: 0; }
+.view > .pad > .sec-head,
+.view > .pad > .ledger-head,
+.view > .pad > .art-masthead { --n: 1; }
+.view > .pad > .byline-strip { --n: 2; }
+.view > .pad > .run { --n: 2; }
+.view > .pad > .intake-tabs { --n: 2; }
+.view > .pad > .dispatch-toolbar { --n: 2; }
+.view > .pad > .ledger-body,
+.view > .pad > .article,
+.view > .pad > .sources-layout,
+.view > .pad > .dispatch { --n: 3; }
+
+@keyframes section-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .view > .pad > * { animation: none; opacity: 1; }
+}
+
+/* Tab crossfade inside Intake — avoid jumpy content swap */
+.intake-tab-panel {
+  animation: tab-in 360ms cubic-bezier(.2, .7, .2, 1) both;
+}
+@keyframes tab-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) { .intake-tab-panel { animation: none; } }
 
 .pad { padding: 0 28px 80px; max-width: 1440px; margin: 0 auto; }
 /* All section pages begin with a consistent vertical rhythm:
@@ -404,9 +480,10 @@ body::after {
    up/down between route swaps that use different masthead variants. */
 .breadcrumbs { padding: 36px 0 12px; min-height: 72px; box-sizing: content-box; }
 .pad > .breadcrumbs { min-height: 36px; }
-.sec-head { padding: 8px 0 22px; }
+.sec-head { padding: 8px 0 24px; }
 .ledger-head { padding: 8px 0 24px; }
 .art-masthead { padding: 0 0 22px; }
+.sec-head, .ledger-head { min-height: 128px; }
 
 /* ══ Tweaks panel ══ */
 .tweaks {
@@ -1012,8 +1089,8 @@ body::after {
 }
 .sec-head::before { content: ''; position: absolute; left: 0; right: 0; bottom: -6px; border-bottom: 1px solid var(--rule); }
 .sec-head h1 {
-  font-family: var(--font-serif); font-weight: 400; font-size: 72px;
-  letter-spacing: -0.045em; line-height: 0.92;
+  font-family: var(--font-serif); font-weight: 400; font-size: 84px;
+  letter-spacing: -0.045em; line-height: 0.9;
   font-variation-settings: "opsz" 144;
 }
 .sec-head h1 em { font-family: var(--font-inst); font-style: italic; color: var(--accent); }
