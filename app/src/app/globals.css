@@ -1681,6 +1681,166 @@ body[data-grain="false"]::after { display: none !important; }
   z-index: 3;
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   06 · DICTATION (compose)
+   ══════════════════════════════════════════════════════════════════ */
+
+.compose-hall {
+  max-width: 880px; margin: 0 auto;
+  padding: 40px 20px 80px;
+}
+.compose-hall .kicker {
+  text-align: center;
+  font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.22em; color: var(--ink-4);
+  text-transform: uppercase; margin-bottom: 14px;
+}
+.compose-hall h1 {
+  font-family: var(--font-serif); font-weight: 300; font-size: 108px;
+  letter-spacing: -0.05em; line-height: 0.9; text-align: center;
+  font-variation-settings: "opsz" 144;
+}
+.compose-hall h1 em { font-family: var(--font-inst); font-style: italic; color: var(--accent); }
+.compose-hall .sub {
+  text-align: center; margin: 18px 0 40px;
+  font-family: var(--font-inst); font-style: italic;
+  color: var(--ink-3); font-size: 20px;
+  line-height: 1.4;
+}
+
+.compose-input {
+  border: 1.5px solid var(--rule);
+  padding: 22px 24px;
+  background: var(--paper);
+  margin-bottom: 18px;
+  display: grid; grid-template-columns: 26px 1fr; gap: 16px;
+  position: relative;
+}
+.compose-input::before {
+  content: ''; position: absolute; left: -6px; top: 10px; bottom: 10px;
+  width: 3px; background: var(--accent);
+}
+.compose-input .sigil {
+  font-family: var(--font-serif); font-weight: 900; font-size: 24px;
+  color: var(--accent); line-height: 1; padding-top: 2px;
+}
+.compose-input textarea {
+  font-family: var(--font-serif); font-size: 20px; line-height: 1.4;
+  color: var(--ink); background: none; border: none; outline: none;
+  resize: none; min-height: 88px; width: 100%;
+  letter-spacing: -0.01em;
+}
+.compose-input textarea::placeholder {
+  font-family: var(--font-inst); font-style: italic; color: var(--ink-4);
+}
+
+.compose-controls {
+  display: flex; gap: 10px; align-items: center;
+  flex-wrap: wrap; margin-bottom: 30px;
+}
+.fmt-btn {
+  padding: 9px 16px;
+  border: 1.5px solid var(--rule);
+  background: var(--paper);
+  font-family: var(--font-mono); font-size: 10.5px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-2); cursor: pointer;
+  transition: all 140ms;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.fmt-btn:hover { background: var(--paper-2); color: var(--ink); }
+.fmt-btn.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.fmt-btn .h { font-family: var(--font-serif); font-weight: 400; font-size: 14px; letter-spacing: -0.01em; text-transform: none; }
+.fmt-btn .h em { font-family: var(--font-inst); font-style: italic; color: var(--accent); }
+.fmt-btn.on .h em { color: var(--paper); }
+.compose-controls .run-btn {
+  margin-left: auto;
+  padding: 11px 22px;
+  background: var(--ink); color: var(--paper);
+  border: 1.5px solid var(--ink);
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  cursor: pointer; transition: all 160ms;
+}
+.compose-controls .run-btn:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); }
+.compose-controls .run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.compose-output {
+  border: 1.5px solid var(--rule);
+  padding: 36px 42px;
+  background: var(--paper);
+  min-height: 280px;
+  position: relative;
+}
+.compose-output::before {
+  content: 'DRAFT';
+  position: absolute; top: -11px; left: 18px;
+  padding: 0 10px; background: var(--paper);
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.2em; color: var(--ink-3);
+}
+.compose-output.ready::before { content: 'READY'; color: var(--accent); }
+.compose-output.failed::before { content: 'FAILED'; color: var(--red); }
+.compose-output h4 {
+  font-family: var(--font-serif); font-weight: 600; font-size: 24px;
+  letter-spacing: -0.02em; margin-bottom: 14px;
+  color: var(--ink);
+}
+.compose-output h4 em { font-family: var(--font-inst); font-style: italic; color: var(--accent); }
+.compose-output p {
+  font-family: var(--font-serif); font-size: 16px; line-height: 1.55;
+  color: var(--ink-2); margin-bottom: 12px;
+}
+.compose-output p b { font-weight: 600; color: var(--ink); }
+.compose-output .foot {
+  margin-top: 18px; padding-top: 12px;
+  border-top: 1px dashed var(--rule-faint);
+  font-family: var(--font-mono); font-size: 9.5px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-4);
+}
+.compose-output .dictating {
+  font-family: var(--font-inst); font-style: italic; font-size: 20px;
+  color: var(--ink-3);
+}
+.typing::after {
+  content: '▍';
+  color: var(--accent); font-weight: 700;
+  animation: blink 0.9s step-end infinite;
+  margin-left: 4px;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+.compose-output .artifact-meta {
+  display: flex; gap: 12px; align-items: center;
+  margin-bottom: 16px; flex-wrap: wrap;
+}
+.compose-output .artifact-actions {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-top: 18px;
+  padding-top: 14px; border-top: 1px dashed var(--rule-faint);
+}
+
+.compose-scope {
+  display: flex; gap: 14px; align-items: center;
+  margin: 6px 0 18px;
+  font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-4);
+}
+.compose-scope .seg {
+  display: inline-flex;
+  border: 1.5px solid var(--rule);
+}
+.compose-scope .seg button {
+  padding: 5px 12px;
+  font-family: var(--font-mono); font-size: 9.5px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ink-3); cursor: pointer;
+  border-right: 1px solid var(--rule-faint);
+}
+.compose-scope .seg button:last-child { border-right: none; }
+.compose-scope .seg button.on { background: var(--ink); color: var(--paper); }
+
 /* ══ Editorial toast (stub; full wire in Phase 7) ══ */
 .ed-toast {
   position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(16px);
