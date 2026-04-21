@@ -652,7 +652,7 @@ function IntakePageInner() {
       </div>
 
       {tab === "library" ? (
-        <div className="sources-layout">
+        <div key="library-tab" className="intake-tab-panel sources-layout">
           <div>
             <div className="drop-tools">
               <div className="drop-url">
@@ -821,7 +821,7 @@ function IntakePageInner() {
         </div>
       ) : (
         // ── Research tab ──────────────────────────────────────────
-        <div style={{ paddingTop: 18, maxWidth: 960 }}>
+        <div key="research-tab" className="intake-tab-panel" style={{ paddingTop: 18, maxWidth: 960 }}>
           <div className="drop-tools">
             <div className="drop-url">
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
