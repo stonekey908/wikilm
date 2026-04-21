@@ -7,6 +7,7 @@ import { TweaksPanel } from "./tweaks-panel";
 import { KeyboardShortcuts } from "./keyboard-shortcuts";
 import { Palette } from "./palette";
 import { EditorialToastBridge } from "./editorial-toast-bridge";
+import { HelpModal } from "./help-modal";
 
 export function EditorialShell({ children }: { children: ReactNode }) {
   return (
@@ -24,6 +25,7 @@ export function EditorialShell({ children }: { children: ReactNode }) {
       <KeyboardShortcuts />
       <Palette />
       <EditorialToastBridge />
+      <HelpModal />
     </>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useProject } from "@/components/project-switcher";
+import { useToast } from "@/components/toast-provider";
 
 interface TreeNode {
   id: number;
@@ -49,6 +50,38 @@ function ancestorsOf(tree: TreeNode[], id: number): number[] {
   return path;
 }
 
+function subtreeIds(tree: TreeNode[], id: number): Set<number> {
+  const result = new Set<number>();
+  function findAndCollect(nodes: TreeNode[]): TreeNode | null {
+    for (const n of nodes) {
+      if (n.id === id) return n;
+      const hit = findAndCollect(n.children);
+      if (hit) return hit;
+    }
+    return null;
+  }
+  const root = findAndCollect(tree);
+  if (!root) return result;
+  function collect(n: TreeNode) {
+    result.add(n.id);
+    n.children.forEach(collect);
+  }
+  collect(root);
+  return result;
+}
+
+function flattenTree(tree: TreeNode[]): { node: TreeNode; depth: number }[] {
+  const out: { node: TreeNode; depth: number }[] = [];
+  function walk(nodes: TreeNode[], depth: number) {
+    for (const n of nodes) {
+      out.push({ node: n, depth });
+      if (n.children.length) walk(n.children, depth + 1);
+    }
+  }
+  walk(tree, 0);
+  return out;
+}
+
 const Chevron = () => (
   <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
     <path d="M6 4l4 4-4 4" />
@@ -56,9 +89,16 @@ const Chevron = () => (
 );
 
 export function EditorialProjectTree() {
-  const { activeProject, projects, setActiveProject } = useProject();
+  const { activeProject, projects, setActiveProject, refreshProjects } = useProject();
+  const { addToast } = useToast();
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [collapsed, setCollapsed] = useState<Set<number>>(() => readCollapsed());
+  const [menuFor, setMenuFor] = useState<number | null>(null);
+  const [addingUnder, setAddingUnder] = useState<number | "root" | null>(null);
+  const [newName, setNewName] = useState("");
+  const [moveTarget, setMoveTarget] = useState<TreeNode | null>(null);
+  const [moveNewParentId, setMoveNewParentId] = useState<number | null>(null);
+  const [moveBusy, setMoveBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -92,6 +132,16 @@ export function EditorialProjectTree() {
     });
   }, [activeProject?.id, tree]);
 
+  useEffect(() => {
+    function onDoc() {
+      setMenuFor(null);
+    }
+    if (menuFor !== null) {
+      window.setTimeout(() => document.addEventListener("mousedown", onDoc), 0);
+    }
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [menuFor]);
+
   function toggleCollapsed(id: number) {
     setCollapsed((prev) => {
       const next = new Set(prev);
@@ -107,20 +157,77 @@ export function EditorialProjectTree() {
     if (p) setActiveProject(p);
   }
 
+  async function createProject(parentId: number | null) {
+    const name = newName.trim();
+    if (!name) return;
+    try {
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, parentId }),
+      });
+      if (!res.ok) throw new Error();
+      const p = await res.json();
+      setActiveProject(p);
+      refreshProjects();
+      addToast({ type: "success", title: `Created · ${name}` });
+    } catch {
+      addToast({ type: "error", title: "Couldn't create project" });
+    } finally {
+      setNewName("");
+      setAddingUnder(null);
+    }
+  }
+
+  async function deleteProject(id: number, name: string) {
+    if (!confirm(`Delete project "${name}" and all its wiki + sources? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`/api/projects/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      addToast({ type: "success", title: `Deleted · ${name}` });
+      refreshProjects();
+    } catch {
+      addToast({ type: "error", title: "Couldn't delete project" });
+    } finally {
+      setMenuFor(null);
+    }
+  }
+
+  async function handleMove() {
+    if (!moveTarget) return;
+    setMoveBusy(true);
+    try {
+      const res = await fetch(`/api/projects/${moveTarget.id}/move`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newParentId: moveNewParentId }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? "move failed");
+      }
+      addToast({ type: "success", title: "Moved" });
+      refreshProjects();
+      setMoveTarget(null);
+      setMoveNewParentId(null);
+    } catch (err: unknown) {
+      addToast({ type: "error", title: err instanceof Error ? err.message : "Couldn't move" });
+    } finally {
+      setMoveBusy(false);
+    }
+  }
+
   function renderNode(node: TreeNode, depth: number): React.ReactNode {
     const hasChildren = node.children.length > 0;
     const isCollapsed = collapsed.has(node.id);
     const isActive = activeProject?.id === node.id;
     const count = projects.find((p) => p.id === node.id)?.pageCount ?? 0;
+    const menuOpen = menuFor === node.id;
+    const isAddingHere = addingUnder === node.id;
 
     return (
-      <div key={node.id}>
-        <button
-          type="button"
-          className={`proj${isActive ? " active" : ""}`}
-          style={{ paddingLeft: `${depth * 12 + 8}px` }}
-          onClick={() => activate(node.id)}
-        >
+      <div key={node.id} style={{ position: "relative" }}>
+        <div className={`proj${isActive ? " active" : ""}`} style={{ paddingLeft: `${depth * 12 + 8}px` }}>
           {hasChildren ? (
             <span
               className={`proj-chev${isCollapsed ? "" : " open"}`}
@@ -136,32 +243,191 @@ export function EditorialProjectTree() {
             <span className="proj-spacer" />
           )}
           <span className="dot" style={{ background: node.color }}></span>
-          <span className="t">{node.name}</span>
-          {count > 0 && <span className="c">{count}</span>}
-        </button>
-        {hasChildren && !isCollapsed && (
-          <div>{node.children.map((c) => renderNode(c, depth + 1))}</div>
+          <span className="t" onClick={() => activate(node.id)} style={{ cursor: "pointer" }}>
+            {node.name}
+          </span>
+          {count > 0 && (
+            <span className="c" onClick={() => activate(node.id)} style={{ cursor: "pointer" }}>
+              {count}
+            </span>
+          )}
+          {node.id !== 1 && (
+            <button
+              className="proj-menu-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                setMenuFor((v) => (v === node.id ? null : node.id));
+              }}
+              aria-label="Project actions"
+            >
+              ⋯
+            </button>
+          )}
+        </div>
+
+        {menuOpen && (
+          <div className="proj-menu" style={{ top: 28, right: 6 }} onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => {
+                setAddingUnder(node.id);
+                setNewName("");
+                setMenuFor(null);
+              }}
+            >
+              Add child
+            </button>
+            <button
+              onClick={() => {
+                setMoveTarget(node);
+                setMoveNewParentId(node.parentId ?? null);
+                setMenuFor(null);
+              }}
+            >
+              Move
+            </button>
+            <button className="danger" onClick={() => deleteProject(node.id, node.name)}>
+              Delete
+            </button>
+          </div>
         )}
+
+        {isAddingHere && (
+          <div className="proj-add-form">
+            <input
+              autoFocus
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Child project name"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") createProject(node.id);
+                if (e.key === "Escape") {
+                  setAddingUnder(null);
+                  setNewName("");
+                }
+              }}
+            />
+            <div className="actions">
+              <button onClick={() => setAddingUnder(null)}>Cancel</button>
+              <button className="primary" onClick={() => createProject(node.id)} disabled={!newName.trim()}>
+                Create
+              </button>
+            </div>
+          </div>
+        )}
+
+        {hasChildren && !isCollapsed && <div>{node.children.map((c) => renderNode(c, depth + 1))}</div>}
       </div>
     );
   }
 
-  if (tree.length === 0) {
-    return (
-      <div
-        style={{
-          padding: "10px 12px",
-          fontFamily: "var(--font-mono)",
-          fontSize: 10,
-          letterSpacing: "0.1em",
-          textTransform: "uppercase",
-          color: "var(--ink-4)",
-        }}
-      >
-        No projects yet
-      </div>
-    );
-  }
+  const movePlaces = moveTarget
+    ? (() => {
+        const blocked = subtreeIds(tree, moveTarget.id);
+        return flattenTree(tree).filter(({ node }) => !blocked.has(node.id));
+      })()
+    : [];
 
-  return <div>{tree.map((n) => renderNode(n, 0))}</div>;
+  return (
+    <div>
+      {tree.length === 0 ? (
+        <div
+          style={{
+            padding: "10px 12px",
+            fontFamily: "var(--font-mono)",
+            fontSize: 10,
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+            color: "var(--ink-4)",
+          }}
+        >
+          No projects yet
+        </div>
+      ) : (
+        tree.map((n) => renderNode(n, 0))
+      )}
+
+      {addingUnder === "root" ? (
+        <div className="proj-add-form">
+          <input
+            autoFocus
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="New project name"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") createProject(null);
+              if (e.key === "Escape") {
+                setAddingUnder(null);
+                setNewName("");
+              }
+            }}
+          />
+          <div className="actions">
+            <button onClick={() => setAddingUnder(null)}>Cancel</button>
+            <button className="primary" onClick={() => createProject(null)} disabled={!newName.trim()}>
+              Create
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => {
+            setAddingUnder("root");
+            setNewName("");
+          }}
+          style={{
+            margin: "6px 8px 4px",
+            padding: "6px 10px",
+            fontFamily: "var(--font-mono)",
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            color: "var(--accent)",
+            background: "none",
+            border: "1px dashed var(--rule-faint)",
+            cursor: "pointer",
+            width: "calc(100% - 16px)",
+            textAlign: "left",
+          }}
+        >
+          + New project
+        </button>
+      )}
+
+      {moveTarget && (
+        <div className="proj-move-modal" onClick={() => !moveBusy && setMoveTarget(null)}>
+          <div className="proj-move-card" onClick={(e) => e.stopPropagation()}>
+            <h3>
+              Move <em>{moveTarget.name}</em>
+            </h3>
+            <div className="proj-move-list">
+              <button className={moveNewParentId === null ? "on" : ""} onClick={() => setMoveNewParentId(null)}>
+                <em style={{ fontFamily: "var(--font-inst)", color: "var(--accent)" }}>Detach to root</em>
+              </button>
+              {movePlaces.map(({ node, depth }) => (
+                <button
+                  key={node.id}
+                  className={moveNewParentId === node.id ? "on" : ""}
+                  style={{ paddingLeft: depth * 14 + 10 }}
+                  onClick={() => setMoveNewParentId(node.id)}
+                >
+                  <span>{node.name}</span>
+                  <span className="slug">{node.slug}</span>
+                </button>
+              ))}
+            </div>
+            <div className="foot">
+              <button className="btn ghost" onClick={() => setMoveTarget(null)} disabled={moveBusy}>
+                Cancel
+              </button>
+              <button className="btn primary" onClick={handleMove} disabled={moveBusy}>
+                {moveBusy ? "Moving…" : "Move"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
