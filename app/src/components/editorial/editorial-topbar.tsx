@@ -50,6 +50,18 @@ export function EditorialTopbar() {
 
       <div style={{ display: "flex", gap: "4px" }}>
         <JobBeacon />
+        <button
+          className="icon-btn"
+          title="Help — press ? anywhere"
+          type="button"
+          onClick={() => window.dispatchEvent(new Event("editorial:open-help"))}
+        >
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6">
+            <circle cx="8" cy="8" r="6.25" />
+            <path d="M6 6.2c0-1.1 0.9-2 2-2s2 0.9 2 2c0 1-0.6 1.4-1.3 1.8C8.2 8.4 8 8.8 8 9.5" strokeLinecap="round" />
+            <circle cx="8" cy="12" r="0.6" fill="currentColor" stroke="none" />
+          </svg>
+        </button>
         <button className="icon-btn" title="Set type" type="button" onClick={togglePanel}>
           <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6">
             <circle cx="5" cy="4" r="1.5" />
