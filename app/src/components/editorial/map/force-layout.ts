@@ -32,9 +32,15 @@ export function forceLayout({
   edges,
   width,
   height,
-  iterations = 220,
+  iterations = 260,
 }: ForceInput): { nodes: LaidNode[]; edges: LaidEdge[] } {
   if (nodes.length === 0) return { nodes: [], edges: [] };
+  // Scale the canvas with node count so larger graphs get breathing room
+  // without collapsing into a single dense cluster.
+  const scale = Math.max(1, Math.sqrt(nodes.length / 40));
+  width = width * scale;
+  height = height * scale;
+  iterations = Math.min(420, Math.round(iterations * Math.sqrt(scale)));
   const laid: LaidNode[] = nodes.map((n, i) => {
     const angle = (i / nodes.length) * Math.PI * 2;
     const radius = Math.min(width, height) * 0.32;
@@ -69,7 +75,9 @@ export function forceLayout({
     n.r = Math.min(22, n.r + Math.sqrt(d) * 1.2);
   }
 
-  const k = Math.sqrt((width * height) / Math.max(1, laid.length)) * 0.9;
+  // Stronger repulsion coefficient — keeps hubs from overlapping each other
+  // and spreads out leaf nodes around their parents.
+  const k = Math.sqrt((width * height) / Math.max(1, laid.length)) * 1.25;
   const center = { x: width / 2, y: height / 2 };
 
   for (let t = 0; t < iterations; t++) {
@@ -108,10 +116,10 @@ export function forceLayout({
       b.vy += (dy / dist) * force * 0.5;
     }
 
-    // Mild pull to center
+    // Mild pull to center (weaker so clusters don't collapse into a blob)
     for (const n of laid) {
-      n.vx += (center.x - n.x) * 0.005;
-      n.vy += (center.y - n.y) * 0.005;
+      n.vx += (center.x - n.x) * 0.003;
+      n.vy += (center.y - n.y) * 0.003;
     }
 
     // Apply velocity with temperature cap
@@ -121,11 +129,35 @@ export function forceLayout({
       n.x += (n.vx / mag) * cap;
       n.y += (n.vy / mag) * cap;
       // Keep inside bounds
-      const pad = 24;
+      const pad = 32;
       if (n.x < pad) n.x = pad;
       if (n.x > width - pad) n.x = width - pad;
       if (n.y < pad) n.y = pad;
       if (n.y > height - pad) n.y = height - pad;
+    }
+  }
+
+  // Post-pass: enforce a minimum-distance separation between every pair so
+  // overlapping circles (frequent in dense clusters) get nudged apart.
+  for (let pass = 0; pass < 3; pass++) {
+    for (let i = 0; i < laid.length; i++) {
+      for (let j = i + 1; j < laid.length; j++) {
+        const a = laid[i];
+        const b = laid[j];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) + 0.01;
+        const minDist = a.r + b.r + 8;
+        if (dist < minDist) {
+          const push = (minDist - dist) / 2;
+          const ux = dx / dist;
+          const uy = dy / dist;
+          a.x -= ux * push;
+          a.y -= uy * push;
+          b.x += ux * push;
+          b.y += uy * push;
+        }
+      }
     }
   }
 

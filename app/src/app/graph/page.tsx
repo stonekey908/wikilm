@@ -20,8 +20,8 @@ interface GraphEdge {
   crossProject: boolean;
 }
 
-const WIDTH = 1000;
-const HEIGHT = 640;
+const BASE_WIDTH = 1000;
+const BASE_HEIGHT = 640;
 
 const TYPE_COLOR_VAR: Record<string, string> = {
   synthesis: "var(--accent)",
@@ -101,16 +101,28 @@ export default function MapPage() {
     };
   }, [projectId]);
 
-  const { nodes, edges } = useMemo(() => {
-    if (rawNodes.length === 0) return { nodes: [] as LaidNode[], edges: [] as LaidEdge[] };
-    return forceLayout({
+  const { nodes, edges, bounds } = useMemo(() => {
+    if (rawNodes.length === 0)
+      return {
+        nodes: [] as LaidNode[],
+        edges: [] as LaidEdge[],
+        bounds: { width: BASE_WIDTH, height: BASE_HEIGHT },
+      };
+    const layoutScale = Math.max(1, Math.sqrt(rawNodes.length / 40));
+    const width = BASE_WIDTH * layoutScale;
+    const height = BASE_HEIGHT * layoutScale;
+    const result = forceLayout({
       nodes: rawNodes.map((n) => ({ id: n.id, type: n.type, title: n.title, slug: n.slug })),
       edges: rawEdges,
-      width: WIDTH,
-      height: HEIGHT,
+      width: BASE_WIDTH,
+      height: BASE_HEIGHT,
       iterations: 260,
     });
+    return { ...result, bounds: { width, height } };
   }, [rawNodes, rawEdges]);
+
+  const WIDTH = bounds.width;
+  const HEIGHT = bounds.height;
 
   const typeCounts = useMemo(() => {
     const c = new Map<string, number>();
@@ -147,17 +159,19 @@ export default function MapPage() {
     [router]
   );
 
-  function edgeDim(e: LaidEdge): boolean {
-    if (!activeType) return false;
+  function edgeVisible(e: LaidEdge): boolean {
+    if (!activeType) return true;
     const a = nodes.find((n) => n.id === e.from);
     const b = nodes.find((n) => n.id === e.to);
-    if (!a || !b) return true;
-    return a.type !== activeType && b.type !== activeType;
+    if (!a || !b) return false;
+    // Show an edge only when BOTH endpoints are the active type —
+    // keeps the filtered view visually tight.
+    return a.type === activeType && b.type === activeType;
   }
 
-  function nodeDim(n: LaidNode): boolean {
-    if (!activeType) return false;
-    return n.type !== activeType;
+  function nodeVisible(n: LaidNode): boolean {
+    if (!activeType) return true;
+    return n.type === activeType;
   }
 
   // Build an SVG coordinate → screen coordinate mapper for the tooltip.
@@ -252,6 +266,7 @@ export default function MapPage() {
             >
               {/* edges */}
               {edges.map((e, i) => {
+                if (!edgeVisible(e)) return null;
                 const a = nodes.find((n) => n.id === e.from);
                 const b = nodes.find((n) => n.id === e.to);
                 if (!a || !b) return null;
@@ -265,8 +280,8 @@ export default function MapPage() {
                     stroke="var(--ink)"
                     strokeWidth={e.crossProject ? 0.9 : 0.7}
                     strokeDasharray={e.crossProject ? "4 3" : undefined}
-                    opacity={edgeDim(e) ? 0.06 : 0.55}
-                    className={`map-edge${edgeDim(e) ? " dim" : ""}`}
+                    opacity={0.55}
+                    className="map-edge"
                   />
                 );
               })}
@@ -274,7 +289,7 @@ export default function MapPage() {
               {/* hub pulse */}
               {hubId && nodes.length > 0 && (() => {
                 const hub = nodes.find((n) => n.id === hubId);
-                if (!hub) return null;
+                if (!hub || !nodeVisible(hub)) return null;
                 return (
                   <circle cx={hub.x} cy={hub.y} r={hub.r} fill="var(--accent)" opacity={0.5}>
                     <animate
@@ -297,6 +312,7 @@ export default function MapPage() {
 
               {/* nodes */}
               {nodes.map((n) => {
+                if (!nodeVisible(n)) return null;
                 const isHub = n.id === hubId;
                 const fill = isHub ? "var(--accent)" : TYPE_COLOR_VAR[n.type] ?? "var(--ink)";
                 return (
@@ -308,7 +324,7 @@ export default function MapPage() {
                       fill={fill}
                       stroke="var(--paper)"
                       strokeWidth={1.5}
-                      className={`map-node${nodeDim(n) ? " dim" : ""}`}
+                      className="map-node"
                       onMouseEnter={() => setHoverId(n.id)}
                       onMouseLeave={() => setHoverId(null)}
                       onClick={() => onNodeClick(n)}
