@@ -27,8 +27,11 @@ function renderBubbleHtml(md: string): string {
   const inline = (s: string): string => {
     let h = esc(s);
     h = h.replace(/`([^`]+)`/g, "<code>$1</code>");
-    h = h.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    h = h.replace(/\*\*\*([^*\n]+)\*\*\*/g, "<strong><em>$1</em></strong>");
+    h = h.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
     h = h.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>");
+    h = h.replace(/(^|[^_])_([^_\n]+)_(?!_)/g, "$1<em>$2</em>");
+    h = h.replace(/~~([^~\n]+)~~/g, "<del>$1</del>");
     h = h.replace(/\[\[([^\]]+)\]\]/g, (_m, t) => {
       const raw = String(t);
       const pipe = raw.indexOf("|");
@@ -37,54 +40,163 @@ function renderBubbleHtml(md: string): string {
       return `<a class="wikilink" href="/wiki?slug=${encodeURIComponent(target)}">${label}</a>`;
     });
     h = h.replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer noopener">$1</a>');
+    // Auto-link bare URLs
+    h = h.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, '$1<a href="$2" target="_blank" rel="noreferrer noopener">$2</a>');
     return h;
   };
 
-  // Pull fenced code blocks out first so their internals don't get
-  // inline-formatted or line-split.
-  const codeBlocks: string[] = [];
-  md = md.replace(/```(\w*)\n([\s\S]*?)```/g, (_m, _lang, code) => {
-    const id = codeBlocks.length;
-    codeBlocks.push(`<pre><code>${esc(code.replace(/\n+$/, ""))}</code></pre>`);
-    return `\u0000CODE${id}\u0000`;
-  });
-
-  // Split on blank lines → blocks. Each block becomes a single <p>, <h*>,
-  // <ul>, <ol>, or <hr>. Inside a block, single newlines are preserved as
-  // <br/> so paragraph text wraps naturally without splitting.
-  const blocks = md.split(/\n{2,}/);
+  const lines = md.split("\n");
   const out: string[] = [];
-  for (const raw of blocks) {
-    const b = raw.replace(/^\n+|\n+$/g, "");
-    if (!b) continue;
-    if (/^\u0000CODE(\d+)\u0000$/.test(b.trim())) {
-      out.push(b.trim());
+  let i = 0;
+
+  const isBlank = (l: string) => l.trim() === "";
+  const isHeading = (l: string) => /^#{1,6}\s+/.test(l);
+  const isHr = (l: string) => /^(-{3,}|_{3,}|\*{3,})\s*$/.test(l.trim());
+  const isUl = (l: string) => /^\s*[-*+]\s+/.test(l);
+  const isOl = (l: string) => /^\s*\d+\.\s+/.test(l);
+  const isQuote = (l: string) => /^>\s?/.test(l);
+  const isFence = (l: string) => /^```/.test(l.trim());
+  const isTableRow = (l: string) => /^\s*\|.*\|\s*$/.test(l);
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Blank
+    if (isBlank(line)) {
+      i++;
       continue;
     }
-    if (/^-{3,}$|^_{3,}$|^\*{3,}$/.test(b.trim())) {
+
+    // Code fence
+    if (isFence(line)) {
+      const buf: string[] = [];
+      i++;
+      while (i < lines.length && !isFence(lines[i])) {
+        buf.push(lines[i]);
+        i++;
+      }
+      i++; // closing fence
+      out.push(`<pre><code>${esc(buf.join("\n"))}</code></pre>`);
+      continue;
+    }
+
+    // HR
+    if (isHr(line)) {
       out.push("<hr/>");
+      i++;
       continue;
     }
-    const hMatch = b.match(/^(#{1,3})\s+(.+)$/);
-    if (hMatch && !b.includes("\n")) {
-      const level = hMatch[1].length;
-      out.push(`<h${level}>${inline(hMatch[2])}</h${level}>`);
+
+    // Heading
+    if (isHeading(line)) {
+      const m = line.match(/^(#{1,6})\s+(.+?)\s*#*\s*$/);
+      if (m) {
+        const level = Math.min(6, m[1].length);
+        out.push(`<h${level}>${inline(m[2])}</h${level}>`);
+        i++;
+        continue;
+      }
+    }
+
+    // Blockquote
+    if (isQuote(line)) {
+      const buf: string[] = [];
+      while (i < lines.length && isQuote(lines[i])) {
+        buf.push(lines[i].replace(/^>\s?/, ""));
+        i++;
+      }
+      out.push(`<blockquote>${inline(buf.join(" "))}</blockquote>`);
       continue;
     }
-    const lines = b.split("\n");
-    if (lines.every((l) => /^[-*]\s+/.test(l.trim()))) {
-      out.push("<ul>" + lines.map((l) => `<li>${inline(l.trim().replace(/^[-*]\s+/, ""))}</li>`).join("") + "</ul>");
+
+    // Table (simple, pipe-separated)
+    if (isTableRow(line) && i + 1 < lines.length && /^\s*\|?\s*[-:| ]+\|/.test(lines[i + 1])) {
+      const header = line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+      i += 2;
+      const rows: string[][] = [];
+      while (i < lines.length && isTableRow(lines[i])) {
+        rows.push(
+          lines[i].trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim())
+        );
+        i++;
+      }
+      const th = header.map((c) => `<th>${inline(c)}</th>`).join("");
+      const tb = rows
+        .map((r) => "<tr>" + r.map((c) => `<td>${inline(c)}</td>`).join("") + "</tr>")
+        .join("");
+      out.push(`<table><thead><tr>${th}</tr></thead><tbody>${tb}</tbody></table>`);
       continue;
     }
-    if (lines.every((l) => /^\d+\.\s+/.test(l.trim()))) {
-      out.push("<ol>" + lines.map((l) => `<li>${inline(l.trim().replace(/^\d+\.\s+/, ""))}</li>`).join("") + "</ol>");
+
+    // Unordered list
+    if (isUl(line)) {
+      const items: string[] = [];
+      while (i < lines.length && isUl(lines[i])) {
+        const content = lines[i].replace(/^\s*[-*+]\s+/, "");
+        // Collect continuation lines (indented or not starting a new block)
+        const buf = [content];
+        i++;
+        while (
+          i < lines.length &&
+          !isBlank(lines[i]) &&
+          !isUl(lines[i]) &&
+          !isOl(lines[i]) &&
+          !isHeading(lines[i]) &&
+          !isFence(lines[i])
+        ) {
+          buf.push(lines[i].trim());
+          i++;
+        }
+        items.push(`<li>${inline(buf.join(" "))}</li>`);
+      }
+      out.push(`<ul>${items.join("")}</ul>`);
       continue;
     }
-    out.push("<p>" + inline(b).replace(/\n/g, "<br/>") + "</p>");
+
+    // Ordered list
+    if (isOl(line)) {
+      const items: string[] = [];
+      while (i < lines.length && isOl(lines[i])) {
+        const content = lines[i].replace(/^\s*\d+\.\s+/, "");
+        const buf = [content];
+        i++;
+        while (
+          i < lines.length &&
+          !isBlank(lines[i]) &&
+          !isUl(lines[i]) &&
+          !isOl(lines[i]) &&
+          !isHeading(lines[i]) &&
+          !isFence(lines[i])
+        ) {
+          buf.push(lines[i].trim());
+          i++;
+        }
+        items.push(`<li>${inline(buf.join(" "))}</li>`);
+      }
+      out.push(`<ol>${items.join("")}</ol>`);
+      continue;
+    }
+
+    // Paragraph — accumulate until blank line or new block start
+    const buf: string[] = [line];
+    i++;
+    while (
+      i < lines.length &&
+      !isBlank(lines[i]) &&
+      !isHeading(lines[i]) &&
+      !isHr(lines[i]) &&
+      !isUl(lines[i]) &&
+      !isOl(lines[i]) &&
+      !isQuote(lines[i]) &&
+      !isFence(lines[i])
+    ) {
+      buf.push(lines[i]);
+      i++;
+    }
+    out.push(`<p>${inline(buf.join("\n").replace(/\n/g, " "))}</p>`);
   }
 
-  // Re-inject code blocks
-  return out.join("\n").replace(/\u0000CODE(\d+)\u0000/g, (_m, idx) => codeBlocks[Number(idx)] ?? "");
+  return out.join("\n");
 }
 
 function SalonInner() {
@@ -285,7 +397,7 @@ function SalonInner() {
           )}
           {messages.map((m, i) => (
             <div key={i} className={`msg ${m.role}`}>
-              <span className="who">{m.role === "user" ? "You" : "Claude"}</span>
+              <span className="who">{m.role === "user" ? "You" : "WikiLM"}</span>
               <div
                 className="bubble"
                 dangerouslySetInnerHTML={{ __html: renderBubbleHtml(m.content) }}
@@ -294,7 +406,7 @@ function SalonInner() {
           ))}
           {streaming && (
             <div className="msg assistant">
-              <span className="who">Claude</span>
+              <span className="who">WikiLM</span>
               <div className="bubble" dangerouslySetInnerHTML={{ __html: renderBubbleHtml(streamText) + '<span class="typing"></span>' }} />
             </div>
           )}

@@ -219,7 +219,10 @@ function WikiPageInner() {
   }, [allPages, search, typeFilter, sortKey]);
 
   const grouped = useMemo(() => {
-    if (typeFilter || search || sortKey !== "type") return null;
+    // Group whenever the user hasn't actively filtered — regardless of sort.
+    // This gives the picker its editorial "table of contents" feel every
+    // time you land on /wiki without a type filter or search query.
+    if (typeFilter || search) return null;
     const groups = new Map<string, WikiIndexEntry[]>();
     for (const t of TYPE_ORDER) groups.set(t, []);
     for (const p of filtered) {
@@ -227,8 +230,10 @@ function WikiPageInner() {
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(p);
     }
+    // Sort each group by the chosen key (filtered[] is already globally
+    // sorted, so each group's order is consistent with the dropdown).
     return Array.from(groups.entries()).filter(([, v]) => v.length > 0);
-  }, [filtered, typeFilter, search, sortKey]);
+  }, [filtered, typeFilter, search]);
 
   const typeCounts = useMemo(() => {
     const counts = new Map<string, number>();
