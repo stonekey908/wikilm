@@ -19,7 +19,51 @@ type PalItem =
   | { kind: "nav"; title: string; sub: string; icn: string; view: EditorialView; key: string }
   | { kind: "action"; title: string; sub: string; icn: string; onRun: () => void; key: string }
   | { kind: "tweak"; title: string; sub: string; icn: string; onRun: () => void; key: string }
-  | { kind: "research"; title: string; sub: string; icn: string; topic: string; key: string };
+  | { kind: "research"; title: string; sub: string; icn: string; topic: string; key: string }
+  | { kind: "chat"; title: string; sub: string; icn: string; prompt: string; key: string }
+  | { kind: "lint-run"; title: string; sub: string; icn: string; key: string };
+
+type Intent =
+  | { kind: "lint" }
+  | { kind: "research"; topic: string }
+  | { kind: "chat"; prompt: string };
+
+/**
+ * Parse a natural-language palette query into a structured intent.
+ * Returns null when nothing specific matches — caller falls back to the
+ * generic "Ask WikiLM" chat handoff.
+ */
+function detectIntent(raw: string): Intent | null {
+  const q = raw.trim();
+  if (!q) return null;
+  const lc = q.toLowerCase();
+
+  // Lint / edit pass
+  if (/\b(run|start|trigger|do)\b.*\blint/i.test(lc) || /^lint\b/i.test(lc)) {
+    return { kind: "lint" };
+  }
+  if (/\b(edit|review|clean|tidy)\b.*\b(wiki|pages)\b/i.test(lc)) {
+    return { kind: "lint" };
+  }
+
+  // Research
+  const researchM = lc.match(
+    /\b(?:research|look up|look into|find (?:sources?|papers?|references?)|commission research)\b(?:\s+(?:about|on|for|into))?\s+(.{2,})/i
+  );
+  if (researchM) {
+    return { kind: "research", topic: researchM[1].replace(/[?.!]+$/, "").trim() };
+  }
+
+  // Deep dive / explain / expand → chat
+  const chatM = lc.match(
+    /\b(?:deep(?:er)?\s+dive(?:\s+into)?|dive into|tell me (?:more\s+)?about|explain|expand on|more on|what is|what are|who is|summari[sz]e|walk me through)\s+(.{2,})/i
+  );
+  if (chatM) {
+    return { kind: "chat", prompt: q };
+  }
+
+  return null;
+}
 
 function scorePage(p: WikiPageIx, q: string): number {
   if (!q) return 0;
@@ -95,7 +139,40 @@ export function Palette() {
 
   const items: PalItem[] = useMemo(() => {
     const query = q.trim().toLowerCase();
+    const raw = q.trim();
     const out: PalItem[] = [];
+
+    // Intent-specific command rows appear at the top
+    const intent = detectIntent(raw);
+    if (intent) {
+      if (intent.kind === "lint") {
+        out.push({
+          kind: "lint-run",
+          title: "Run a lint pass",
+          sub: "Start a fresh editor's review · opens The Edit",
+          icn: "✎",
+          key: "intent-lint",
+        });
+      } else if (intent.kind === "research") {
+        out.push({
+          kind: "research",
+          title: `Research · ${intent.topic}`,
+          sub: "Commission WikiLM to search the web",
+          icn: "✦",
+          topic: intent.topic,
+          key: "intent-research",
+        });
+      } else if (intent.kind === "chat") {
+        out.push({
+          kind: "chat",
+          title: `Ask WikiLM: ${intent.prompt}`,
+          sub: "Opens a new chat and runs the prompt",
+          icn: "✎",
+          prompt: intent.prompt,
+          key: "intent-chat",
+        });
+      }
+    }
 
     // Pages
     const pageMatches = query
@@ -118,15 +195,23 @@ export function Palette() {
       });
     }
 
-    // Research
-    if (query.length > 2) {
+    // Generic "Ask WikiLM" fallback when no intent matched but there's a query
+    if (!intent && query.length > 2) {
+      out.push({
+        kind: "chat",
+        title: `Ask WikiLM: ${raw}`,
+        sub: "Opens a new chat and runs the prompt",
+        icn: "✎",
+        prompt: raw,
+        key: "ask-fallback",
+      });
       out.push({
         kind: "research",
-        title: `Research · ${query}`,
-        sub: "Commission Claude to search the web",
+        title: `Research · ${raw}`,
+        sub: "Commission WikiLM to search the web",
         icn: "✦",
-        topic: query,
-        key: "research",
+        topic: raw,
+        key: "research-fallback",
       });
     }
 
@@ -205,6 +290,12 @@ export function Palette() {
       } else if (it.kind === "research") {
         router.push(`/sources?tab=research&topic=${encodeURIComponent(it.topic)}`);
         addToast({ type: "success", title: `Commissioning · ${it.topic}` });
+      } else if (it.kind === "chat") {
+        router.push(`/chat?q=${encodeURIComponent(it.prompt)}`);
+        addToast({ type: "success", title: "Asking WikiLM…" });
+      } else if (it.kind === "lint-run") {
+        router.push("/lint?run=1");
+        addToast({ type: "success", title: "Running a lint pass…" });
       }
     },
     [items, router, addToast]
@@ -239,8 +330,8 @@ export function Palette() {
         .filter((x) => kinds.includes(x.item.kind));
       if (found.length > 0) groups.push({ label, items: found });
     };
+    push("Commands", ["chat", "research", "lint-run"]);
     push("Pages", ["page"]);
-    push("Research", ["research"]);
     push("Navigate", ["nav"]);
     push("Actions", ["action", "tweak"]);
     return groups;
@@ -257,7 +348,7 @@ export function Palette() {
           <input
             ref={inputRef}
             type="text"
-            placeholder="Ask, search, command…"
+            placeholder="Ask a question, commission research, run lint, find a page…"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={onKey}

@@ -2015,6 +2015,118 @@ body[data-grain="false"]::after { display: none !important; }
 .fixed.bottom-4.right-4 { display: none !important; }
 
 /* ══════════════════════════════════════════════════════════════════
+   EDIT · Lint findings
+   ══════════════════════════════════════════════════════════════════ */
+
+.edit-toolbar {
+  display: flex; gap: 10px; align-items: center;
+  padding: 18px 0 14px;
+  border-bottom: 1.5px solid var(--rule);
+  flex-wrap: wrap;
+}
+.edit-toolbar .count {
+  margin-left: auto;
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-3);
+}
+.edit-toolbar .count b { color: var(--ink); }
+.edit-toolbar .btn { padding: 8px 14px; font-size: 11px; }
+
+.edit-filter {
+  display: inline-flex; border: 1.5px solid var(--rule);
+}
+.edit-filter button {
+  padding: 7px 11px;
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--ink-3); cursor: pointer;
+  border-right: 1px solid var(--rule-faint);
+}
+.edit-filter button:last-child { border-right: none; }
+.edit-filter button:hover { background: var(--paper-2); color: var(--ink); }
+.edit-filter button.on { background: var(--ink); color: var(--paper); }
+
+.edit-group {
+  margin-top: 22px;
+}
+.edit-group-head {
+  display: flex; align-items: baseline; gap: 10px;
+  padding-bottom: 8px; margin-bottom: 6px;
+  border-bottom: 1px dashed var(--rule-faint);
+  cursor: pointer; background: none; border-left: none; border-right: none; border-top: none;
+  width: 100%; text-align: left; font-family: inherit;
+}
+.edit-group-head .lab {
+  font-family: var(--font-serif); font-weight: 700; font-size: 19px;
+  letter-spacing: -0.015em; color: var(--ink);
+}
+.edit-group-head .lab em { font-family: var(--font-inst); font-style: italic; font-weight: 400; color: var(--accent); }
+.edit-group-head .c {
+  margin-left: auto;
+  font-family: var(--font-mono); font-size: 10px; color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+}
+.edit-group-head .chev-sm {
+  font-family: var(--font-mono); font-size: 10px; color: var(--ink-4);
+  margin-right: 4px; transition: transform 140ms;
+}
+.edit-group-head.collapsed .chev-sm { transform: rotate(-90deg); }
+
+.finding {
+  display: grid; grid-template-columns: 4px 1fr auto;
+  gap: 14px; align-items: start;
+  padding: 14px 14px 14px 12px;
+  border: 1px solid var(--rule-faint);
+  border-left-width: 3px;
+  background: var(--paper);
+  margin-bottom: 10px;
+  transition: background 160ms, opacity 300ms;
+}
+.finding:hover { background: var(--paper-2); }
+.finding.warn { border-left-color: var(--amber); }
+.finding.info { border-left-color: var(--ink-3); }
+.finding.severe { border-left-color: var(--red); }
+.finding.fixing { opacity: 0.6; }
+.finding.gone { opacity: 0; transform: translateX(24px); pointer-events: none; }
+.finding .bar { display: none; }
+.finding .body { min-width: 0; }
+.finding .cat {
+  display: inline-block;
+  font-family: var(--font-mono); font-size: 9.5px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-4); margin-bottom: 4px;
+}
+.finding.warn .cat { color: var(--amber); }
+.finding.severe .cat { color: var(--red); }
+.finding .t {
+  font-family: var(--font-serif); font-weight: 600; font-size: 16px;
+  letter-spacing: -0.01em; color: var(--ink);
+  margin-bottom: 3px; line-height: 1.3;
+}
+.finding .t em { font-family: var(--font-inst); font-style: italic; color: var(--accent); }
+.finding .d {
+  font-family: var(--font-serif); font-size: 14px; line-height: 1.5;
+  color: var(--ink-2); max-width: 70ch;
+}
+.finding .tgt {
+  display: inline-block; margin-top: 6px;
+  font-family: var(--font-mono); font-size: 10px; color: var(--accent);
+  text-decoration: none; border-bottom: 1px solid currentColor;
+}
+.finding .acts {
+  display: flex; flex-direction: column; gap: 6px; align-items: stretch;
+  min-width: 100px;
+}
+.finding .acts .btn { height: 26px; padding: 0 10px; font-size: 10px; display: flex; align-items: center; justify-content: center; }
+
+.edit-empty {
+  font-family: var(--font-inst); font-style: italic; font-size: 17px;
+  color: var(--ink-3);
+  padding: 40px 0; text-align: center;
+}
+
+/* ══════════════════════════════════════════════════════════════════
    TOPBAR · Job-status icon + dropdown
    ══════════════════════════════════════════════════════════════════ */
 
@@ -2225,12 +2337,13 @@ body[data-grain="false"]::after { display: none !important; }
    ══════════════════════════════════════════════════════════════════ */
 
 .salon {
-  display: grid; grid-template-rows: 1fr auto;
-  height: calc(100vh - 140px);
+  display: flex; flex-direction: column;
+  height: calc(100vh - 240px);
   max-width: 900px; margin: 0 auto;
-  padding-top: 8px;
+  padding-top: 6px;
 }
 .salon-thread {
+  flex: 1; min-height: 0;
   overflow-y: auto;
   padding: 10px 4px 20px;
   display: flex; flex-direction: column; gap: 18px;
@@ -2339,13 +2452,14 @@ body[data-grain="false"]::after { display: none !important; }
 .salon-empty p { font-family: var(--font-inst); font-style: italic; font-size: 18px; color: var(--ink-3); }
 
 .salon-input {
-  position: sticky; bottom: 0;
+  flex-shrink: 0;
   background: var(--paper);
   border: 1.5px solid var(--rule);
   padding: 14px 18px;
   display: grid; grid-template-columns: 22px 1fr auto;
   gap: 14px; align-items: end;
   margin-top: 12px;
+  position: relative;
 }
 .salon-input::before {
   content: ''; position: absolute; left: -6px; top: 10px; bottom: 10px;

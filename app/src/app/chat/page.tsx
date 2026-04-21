@@ -207,6 +207,7 @@ function SalonInner() {
   const projectId = activeProject?.id ?? null;
   const sessionIdParam = searchParams.get("session");
   const sessionId = sessionIdParam ? Number(sessionIdParam) : null;
+  const autoPrompt = searchParams.get("q");
 
   const [session, setSession] = useState<Session | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -214,6 +215,7 @@ function SalonInner() {
   const [streaming, setStreaming] = useState(false);
   const [streamText, setStreamText] = useState("");
   const abortRef = useRef<AbortController | null>(null);
+  const autoFiredRef = useRef(false);
   const threadRef = useRef<HTMLDivElement | null>(null);
 
   // Load session + messages
@@ -383,6 +385,21 @@ function SalonInner() {
   }
 
   const isEmpty = messages.length === 0 && !streaming && !streamText;
+
+  // Auto-fire from palette intent: /chat?q=<topic>
+  useEffect(() => {
+    if (autoFiredRef.current) return;
+    if (!autoPrompt || !projectId) return;
+    if (sessionId) return; // don't hijack an existing thread
+    autoFiredRef.current = true;
+    setInput(autoPrompt);
+    // Clear q from URL so reloads don't re-fire
+    const url = new URL(window.location.href);
+    url.searchParams.delete("q");
+    window.history.replaceState(null, "", url.pathname + url.search);
+    window.setTimeout(() => sendMessage(), 60);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPrompt, projectId, sessionId]);
 
   return (
     <div className="pad">
