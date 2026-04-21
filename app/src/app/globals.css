@@ -2015,6 +2015,74 @@ body[data-grain="false"]::after { display: none !important; }
 .fixed.bottom-4.right-4 { display: none !important; }
 
 /* ══════════════════════════════════════════════════════════════════
+   NOTE COMPOSER (modal)
+   ══════════════════════════════════════════════════════════════════ */
+
+.note-modal-bg {
+  position: fixed; inset: 0; z-index: 400;
+  background: rgba(15, 14, 12, 0.4);
+  backdrop-filter: blur(2px);
+  display: grid; place-items: center;
+  animation: pal-bg-in 200ms ease-out;
+}
+.note-modal {
+  width: 620px; max-width: calc(100vw - 32px);
+  max-height: 80vh;
+  background: var(--paper);
+  border: 1.5px solid var(--ink);
+  box-shadow: 10px 10px 0 var(--ink);
+  display: flex; flex-direction: column;
+  animation: pop 260ms cubic-bezier(.2, .7, .2, 1);
+}
+.note-modal-head {
+  padding: 16px 22px;
+  border-bottom: 1.5px solid var(--rule);
+  display: flex; align-items: baseline; gap: 14px;
+  background: var(--paper-2);
+}
+.note-modal-head h3 {
+  font-family: var(--font-serif); font-weight: 700; font-size: 22px;
+  letter-spacing: -0.015em;
+}
+.note-modal-head h3 em { font-family: var(--font-inst); font-style: italic; color: var(--accent); font-weight: 400; }
+.note-modal-head .x {
+  margin-left: auto;
+  background: none; border: none; cursor: pointer;
+  color: var(--ink-3); font-size: 18px; line-height: 1; padding: 4px;
+}
+.note-modal-head .x:hover { color: var(--ink); }
+.note-modal-body { padding: 18px 22px; overflow-y: auto; flex: 1; }
+.note-field { display: block; margin-bottom: 14px; }
+.note-field .lab {
+  display: block; margin-bottom: 6px;
+  font-family: var(--font-mono); font-size: 9.5px; font-weight: 700;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-4);
+}
+.note-field input, .note-field textarea {
+  width: 100%; box-sizing: border-box;
+  border: 1.5px solid var(--rule);
+  background: var(--paper);
+  padding: 10px 12px;
+  font-family: var(--font-serif); font-size: 15px; color: var(--ink);
+  outline: none;
+}
+.note-field textarea {
+  min-height: 180px; max-height: 40vh;
+  line-height: 1.5; resize: vertical;
+  font-family: var(--font-serif);
+}
+.note-field input::placeholder, .note-field textarea::placeholder {
+  font-family: var(--font-inst); font-style: italic; color: var(--ink-4);
+}
+.note-field input:focus, .note-field textarea:focus { border-color: var(--ink); }
+.note-modal-foot {
+  padding: 14px 22px;
+  border-top: 1.5px solid var(--rule);
+  display: flex; gap: 10px; justify-content: flex-end;
+  background: var(--paper-2);
+}
+
+/* ══════════════════════════════════════════════════════════════════
    EDIT · Lint findings
    ══════════════════════════════════════════════════════════════════ */
 
