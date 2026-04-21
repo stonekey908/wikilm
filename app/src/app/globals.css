@@ -401,6 +401,10 @@ body::after {
 @media (prefers-reduced-motion: reduce) { .view { animation: none; } }
 
 .pad { padding: 0 28px 80px; max-width: 1440px; margin: 0 auto; }
+/* Prevent sub-pixel jitter on tab switches that re-mount similarly-sized
+   headings: stabilize the baseline across routes. */
+.pad > .breadcrumbs { min-height: 36px; }
+.sec-head { contain: layout style; }
 
 /* ══ Tweaks panel ══ */
 .tweaks {
@@ -1211,7 +1215,7 @@ body::after {
 .research-row .acts .btn { height: 26px; padding: 0 10px; font-size: 10px; display: flex; align-items: center; justify-content: center; }
 .research-empty {
   font-family: var(--font-inst); font-style: italic; font-size: 14px;
-  color: var(--ink-3); padding: 14px 0;
+  color: var(--ink-3); padding: 4px 0 14px;
 }
 .research-row.approved { opacity: 0.55; }
 .research-row.approved .body .t a { text-decoration: line-through; text-decoration-color: var(--rule-faint); }
