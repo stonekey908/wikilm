@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { useTweaks } from "./tweaks-provider";
 import { FOLIO, viewFromPath } from "./folio-map";
+import { JobBeacon } from "./job-beacon";
 
 export function EditorialTopbar() {
   const pathname = usePathname();
@@ -48,12 +49,7 @@ export function EditorialTopbar() {
       </div>
 
       <div style={{ display: "flex", gap: "4px" }}>
-        <button className="icon-btn has-dot" title="Inbox" type="button">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6">
-            <path d="M2 6l2-3h8l2 3v7H2z" />
-            <path d="M2 6h4l1 2h2l1-2h4" />
-          </svg>
-        </button>
+        <JobBeacon />
         <button className="icon-btn" title="Set type" type="button" onClick={togglePanel}>
           <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6">
             <circle cx="5" cy="4" r="1.5" />
