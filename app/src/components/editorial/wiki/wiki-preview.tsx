@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 interface PreviewData {
   title: string;
@@ -11,20 +12,8 @@ interface PreviewData {
   backlinksCount: number;
 }
 
-interface PreviewState {
-  visible: boolean;
-  x: number;
-  y: number;
-  data: PreviewData | null;
-  loading: boolean;
-}
-
 const CACHE = new Map<string, PreviewData>();
 
-/**
- * Extract the first ~20 words of body (stripping markdown heading, wikilinks,
- * bold/italic markers) as a preview excerpt.
- */
 function extractExcerpt(body: string): string {
   const stripped = body
     .replace(/^---[\s\S]*?---\n/, "")
@@ -46,68 +35,85 @@ function splitTitleOnLastWord(title: string): { lead: string; tail: string } {
   return { lead: parts.slice(0, -1).join(" ") + " ", tail: parts[parts.length - 1] };
 }
 
+const CARD_W = 340;
+const CARD_H_APPROX = 220;
+const MARGIN = 16;
+
+function place(cursorX: number, cursorY: number): { x: number; y: number } {
+  let x = cursorX + 14;
+  let y = cursorY + 18;
+  if (x + CARD_W > window.innerWidth - MARGIN) x = window.innerWidth - CARD_W - MARGIN;
+  if (x < MARGIN) x = MARGIN;
+  if (y + CARD_H_APPROX > window.innerHeight - MARGIN) y = cursorY - CARD_H_APPROX - 14;
+  if (y < MARGIN) y = MARGIN;
+  return { x, y };
+}
+
 export function useWikiPreview(projectId: number | null) {
-  const [state, setState] = useState<PreviewState>({
-    visible: false,
-    x: 0,
-    y: 0,
-    data: null,
-    loading: false,
-  });
+  const [visible, setVisible] = useState(false);
+  const [data, setData] = useState<PreviewData | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  const cardRef = useRef<HTMLDivElement | null>(null);
+  const currentTarget = useRef<string | null>(null);
   const showTimer = useRef<number | null>(null);
   const hideTimer = useRef<number | null>(null);
-  const currentTarget = useRef<string | null>(null);
+  const rafPending = useRef(false);
+  const latestCursor = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  const clearShow = () => {
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const applyPosition = useCallback(() => {
+    rafPending.current = false;
+    if (!cardRef.current) return;
+    const { x, y } = place(latestCursor.current.x, latestCursor.current.y);
+    cardRef.current.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+  }, []);
+
+  const scheduleMove = useCallback(
+    (x: number, y: number) => {
+      latestCursor.current = { x, y };
+      if (rafPending.current) return;
+      rafPending.current = true;
+      requestAnimationFrame(applyPosition);
+    },
+    [applyPosition]
+  );
+
+  const clearTimers = () => {
     if (showTimer.current !== null) {
       window.clearTimeout(showTimer.current);
       showTimer.current = null;
     }
-  };
-  const clearHide = () => {
     if (hideTimer.current !== null) {
       window.clearTimeout(hideTimer.current);
       hideTimer.current = null;
     }
   };
 
-  function placeNear(px: number, py: number) {
-    // Anchor the card ~16px below-right of the cursor, clamp to viewport.
-    const W = 340;
-    const approxH = 220;
-    const margin = 16;
-    let x = px + 14;
-    let y = py + 18;
-    if (x + W > window.innerWidth - margin) x = window.innerWidth - W - margin;
-    if (x < margin) x = margin;
-    if (y + approxH > window.innerHeight - margin) y = py - approxH - 14;
-    if (y < margin) y = margin;
-    return { x, y };
-  }
-
   const onHover = useCallback(
     (pt: { x: number; y: number }, target: string) => {
-      clearHide();
-      // If the card is already visible for this target, just update the
-      // position so it tracks the cursor naturally across a multi-line link.
-      if (currentTarget.current === target) {
-        const { x, y } = placeNear(pt.x, pt.y);
-        setState((s) => ({ ...s, x, y }));
-        return;
+      if (hideTimer.current !== null) {
+        window.clearTimeout(hideTimer.current);
+        hideTimer.current = null;
       }
+
+      // Track every move — position is DOM-mutated via rAF, no React render.
+      scheduleMove(pt.x, pt.y);
+
+      // Same link being tracked — nothing else to do.
+      if (currentTarget.current === target) return;
       currentTarget.current = target;
 
-      clearShow();
-      const { x: initX, y: initY } = placeNear(pt.x, pt.y);
+      if (showTimer.current !== null) window.clearTimeout(showTimer.current);
       showTimer.current = window.setTimeout(async () => {
         if (currentTarget.current !== target) return;
 
-        // Normalize target → slug (strip optional `project/` prefix for same-project lookups)
         const slug = target.includes("/") ? target.split("/").slice(-1)[0] : target;
-
-        let data = CACHE.get(target);
-        if (!data) {
-          setState((s) => ({ ...s, visible: true, x: initX, y: initY, loading: true, data: null }));
+        let d = CACHE.get(target);
+        if (!d) {
           try {
             const url = projectId
               ? `/api/wiki/${encodeURIComponent(slug)}?projectId=${projectId}`
@@ -115,7 +121,7 @@ export function useWikiPreview(projectId: number | null) {
             const res = await fetch(url);
             if (!res.ok) throw new Error("not found");
             const json = await res.json();
-            data = {
+            d = {
               title: json.title,
               type: json.type,
               body: json.body,
@@ -123,70 +129,65 @@ export function useWikiPreview(projectId: number | null) {
               projectSlug: "",
               backlinksCount: json.backlinks?.length ?? 0,
             };
-            CACHE.set(target, data);
+            CACHE.set(target, d);
           } catch {
-            setState((s) => ({ ...s, visible: false, loading: false }));
             return;
           }
         }
         if (currentTarget.current !== target) return;
-        setState({ visible: true, x: initX, y: initY, data, loading: false });
-      }, 140);
+        setData(d);
+        setVisible(true);
+        requestAnimationFrame(applyPosition);
+      }, 120);
     },
-    [projectId]
+    [projectId, scheduleMove, applyPosition]
   );
 
-  const onLeave = useCallback(() => {
-    clearShow();
+  const hardHide = useCallback(() => {
+    clearTimers();
     currentTarget.current = null;
-    clearHide();
-    // Short delay so the card can persist while the pointer crosses the gap
-    // between the link and the card — the card itself sets pointer-events:
-    // auto when .show so hovering it re-triggers onHover via the card (no),
-    // we keep it simple: always hide after the grace window.
-    hideTimer.current = window.setTimeout(() => {
-      setState((s) => ({ ...s, visible: false }));
-    }, 120);
+    setVisible(false);
   }, []);
 
-  // Global fallback — if the pointer leaves the viewport or any unrelated
-  // scroll / click fires, forcibly hide. The old implementation relied on
-  // the link's onMouseLeave firing, which can miss when the link is inside
-  // a scrolling container or when the element unmounts mid-hover.
+  const onLeave = useCallback(() => {
+    if (showTimer.current !== null) {
+      window.clearTimeout(showTimer.current);
+      showTimer.current = null;
+    }
+    currentTarget.current = null;
+    if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
+    hideTimer.current = window.setTimeout(() => setVisible(false), 80);
+  }, []);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const hideNow = () => {
-      clearShow();
-      clearHide();
-      currentTarget.current = null;
-      setState((s) => ({ ...s, visible: false }));
-    };
-    window.addEventListener("scroll", hideNow, true);
-    window.addEventListener("pointerdown", hideNow, true);
-    document.addEventListener("mouseleave", hideNow);
+    window.addEventListener("scroll", hardHide, true);
+    window.addEventListener("pointerdown", hardHide, true);
+    document.addEventListener("mouseleave", hardHide);
     return () => {
-      window.removeEventListener("scroll", hideNow, true);
-      window.removeEventListener("pointerdown", hideNow, true);
-      document.removeEventListener("mouseleave", hideNow);
+      window.removeEventListener("scroll", hardHide, true);
+      window.removeEventListener("pointerdown", hardHide, true);
+      document.removeEventListener("mouseleave", hardHide);
     };
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      clearShow();
-      clearHide();
-    };
-  }, []);
+  }, [hardHide]);
 
   const PreviewCard = () => {
-    if (!state.data) return null;
-    const { lead, tail } = splitTitleOnLastWord(state.data.title);
-    const excerpt = extractExcerpt(state.data.body);
-    const type = state.data.type.toUpperCase();
-    return (
+    if (!mounted || !data) return null;
+    const { lead, tail } = splitTitleOnLastWord(data.title);
+    const excerpt = extractExcerpt(data.body);
+    const type = data.type.toUpperCase();
+    const node = (
       <div
-        className={`preview${state.visible ? " show" : ""}`}
-        style={{ left: `${state.x}px`, top: `${state.y}px` }}
+        ref={cardRef}
+        className={`preview${visible ? " show" : ""}`}
+        style={{
+          // position is mutated via transform on rAF; the initial transform
+          // keeps it off-screen until the first move fires
+          top: 0,
+          left: 0,
+          transform: "translate3d(-9999px, -9999px, 0)",
+          willChange: "transform",
+        }}
       >
         <div className="crumb">{type}</div>
         <h5>
@@ -196,10 +197,10 @@ export function useWikiPreview(projectId: number | null) {
         <p>{excerpt}</p>
         <div className="mbox">
           <span className="seal ghost">{type}</span>
-          {state.data.backlinksCount > 0 && (
-            <span className="seal ghost">{state.data.backlinksCount} BACKLINKS</span>
+          {data.backlinksCount > 0 && (
+            <span className="seal ghost">{data.backlinksCount} BACKLINKS</span>
           )}
-          {state.data.tags.slice(0, 1).map((t) => (
+          {data.tags.slice(0, 1).map((t) => (
             <span key={t} className="seal ghost">
               {t.toUpperCase()}
             </span>
@@ -207,6 +208,8 @@ export function useWikiPreview(projectId: number | null) {
         </div>
       </div>
     );
+    // Portal to document.body so .content's zoom transform doesn't move the card.
+    return createPortal(node, document.body);
   };
 
   return { onHover, onLeave, PreviewCard };
