@@ -179,9 +179,16 @@ This is a general-purpose knowledge base. Topics are handled via tags in frontma
 
 ## Current Phase
 
-**Editorial frontend redesign complete on `feat/editorial-frontend` branch.** All 9 phases of STO-1775 shipped (STO-1776 through STO-1784). Full editorial-brutalist UI with Fraunces + Instrument Serif + JetBrains Mono, four themes (Paper/Stone/Celadon/Night), five accents, three densities, four font faces, three sizes. Every page wired to real WikiLM data — Ledger (dashboard), Wiki (article reader + markdown renderer + hover preview + picker with filter/sort/search), Intake (drop zone + stamp-cards + approve flow + SSE research stream + per-project persistence + sort), Dispatch (inverted 7-col jobs table with shimmer), Map (force-directed graph with pulsing hub), Dictation (compose screen wired to output generation). ⌘K palette, editorial toast singleton, responsive breakpoints, breadcrumbs, sticky margin cards. Production `npm run build` passes.
+**v1.5-beta shipped to `main`.** `feat/editorial-frontend` merged as a non-ff merge commit at `4677548` and tagged `v1.5-beta`. Pre-merge main is preserved at tag `v1-alpha` (commit `2687d13`). Both tags pushed.
 
-Main is untouched. To ship: either merge branch into main, or layer a toggle.
+What v1.5-beta carries over v1-alpha:
+- Full editorial-brutalist UI (themes/accents/densities/faces/sizes, ⌘K palette, hover preview cards via portal + rAF, visible `?` help icon in topbar)
+- Multi-provider model routing per job type (Claude aliases + explicit IDs, Gemini preview models, Ollama local) with live availability pings
+- Structured error classification: `provider_unavailable` / `model_not_found` / `rate_limited` / `auth_failed` — rendered via `formatJobError` across /jobs + /compose
+- Research Ollama guard (UI disables + endpoint hard-blocks — no web grounding)
+- Inline PNG preview + "Open interactive HTML" button on infographic output pages; ext pills force download
+- `scripts/capture-screenshots.mjs` — puppeteer-core rig that shoots all 13 README screenshots at 1440×900 @2x. Screenshots committed to `docs/screenshots/` against the e2e-rag-test project.
+- README overhauled for v1.5-beta with Versions table pointing at both tags.
 
 Outstanding (non-editorial WikiLM tickets): STO-1770 (cascade source removal on delete, Low) and STO-1767 (MCP v2 destructive ops, Low). Both purely additive / nice-to-have.
 
@@ -192,7 +199,7 @@ Outstanding (non-editorial WikiLM tickets): STO-1770 (cascade source removal on 
 - `wiki_pages` DB table exists but is not synced with filesystem wiki — API reads from disk directly
 - Synthesis pending flag is in-memory only — if server restarts during a synthesis burst, follow-up is lost (next ingest re-triggers; not a data-loss issue, just a staleness window)
 - Research results don't stream as found — Claude's tool-use pattern emits all `RESULT:` lines in the final text phase (investigation ticket STO-1750 cancelled)
-- Ollama streaming for research/chat still unsupported — `streamClaude` emits a "not supported yet" error for `ollama:*` models
+- Ollama streaming for research/chat still unsupported — `streamClaude` emits a type-specific error for `ollama:*` models (research: "no web grounding", chat: "streaming not wired"). UI blocks Ollama for research entirely via `NEEDS_WEB_GROUNDING` set in Settings.
 - Local directory is still `~/SecondBrain/` and DB file is still `secondbrain.db` — deferred per user preference ("leave it as long as everything else is ok")
 - Ingest prompt can reference entities without creating pages → dangling wikilinks (tightened in STO-1765 but not zero-risk — "wikilink discipline" rule is soft guidance, not enforced by code)
 - MCP v1 omits destructive ops (move/delete/promote) — tracked as STO-1767
@@ -229,15 +236,63 @@ Outstanding (non-editorial WikiLM tickets): STO-1770 (cascade source removal on 
 - **Chat page used hardcoded `PROJECT_ID=1`** → sessions + saved queries all landed in top-level wiki regardless of active project → fix: `useProject()` everywhere + `?projectId=` filter on `GET /api/chat/sessions` (STO-1771).
 - **Claude Code `claude -p` subprocess default tools allow limited FS writes** → the output-generation prompt wants to write HTML with `<script>` tags, which triggered "Write tool: blocked extension" in earlier versions → current setup already lists Write + Edit in `--allowedTools`, so fine today; flag if it regresses.
 - **Cross-project API endpoints that should be project-scoped** → audit: any `GET /api/.../something` that reads `lintFindings`, `chatSessions`, `sources` etc. must take a `?projectId=` query param and filter. Reminder triggered twice this session: STO-1771 (chat sessions), STO-1772 (dashboard nudges). Default assumption for any new list endpoint: scope by active project, expose the unfiltered variant only if there's an explicit reason (e.g. cross-project search).
+- **Hover preview card flew in from (-9999,-9999) on first hover** → CSS was transitioning both `opacity` AND `transform` over 180ms, combined with the rAF-positioned inline transform that starts off-screen → fix: transition `opacity` only; delete the idle `translateY(4px)` / show `transform: none` overrides so the inline transform is authoritative. See `globals.css` `.preview` rules.
+- **Hover preview card positioned inside a `zoom: var(--fs-scale)` ancestor** → `position: fixed` inside a zoomed ancestor calculates from scaled coordinate space, offsetting the card from the real cursor → fix: render card via `createPortal(node, document.body)` so it escapes the `.content` zoom context; drive position via rAF-batched `style.transform` mutation on a ref so moves don't cause React renders.
+- **Settings `model_<type>` keys must use underscore, not colon** → I wrote `model:<type>` earlier and `getModel` read `model_<type>` — dropdowns had no effect on the actual selection. Always use `model_` underscore form; audit DB for any stale `model:` rows.
+- **Ollama job with bad model name returned a generic 404 stack** → now `ollama-runner` parses 404 body and sets `errorCode: model_not_found` with Ollama's own "model 'x' not found" message. Same applies to Gemini: `gemini-runner` classifies 404/429/auth stderr into `model_not_found` / `rate_limited` / `auth_failed`.
+- **SSE consumers silently dropped `type:"error"` frames** → chat + research both only handled `type:"content"`. If a user picked Ollama for /chat or /research, the stream correctly emitted an error frame but the UI swallowed it → fix: both pages now check `evt.type === "error"` and toast the message.
+- **README screenshots were never committed** → image links existed but `docs/screenshots/*.png` didn't → fix: `scripts/capture-screenshots.mjs` drives headless Chrome (piggy-backs on the `puppeteer-core` already vendored for infographic PNG rendering). Seeds `localStorage.activeProject` before navigation. Run from repo root with dev server on :3000.
+- **Help modal (`?` key) had no visible affordance** → added a `?` icon button to the topbar next to the type-tweaks icon that dispatches the existing `editorial:open-help` window event.
+- **Gemini CLI rate-limits on rapid Pro calls** → 429 Too Many Requests from cloudcode-pa.googleapis.com; recovers after ~20s. Classified as `rate_limited` with actionable message "switch to Flash (higher quota)".
 
 ## Last Session
 
 ```
-**Date:** 2026-04-19 (long session — output generation + note capture)
+**Date:** 2026-04-21 (multi-hour session — v1.5-beta cut + model eval + screenshots)
 **Who:** Claude session
 **What was done:**
 
-Four tickets shipped + one bug filed/fixed:
+v1.5-beta released on main. Summary of commits since prior handoff at 2687d13:
+
+- 9ad14c7 fix(wiki): preview card — portal out of zoom, cursor-accurate, no flicker
+- b603099 fix(wiki): preview card — kill first-hover flash from top-left
+- 7d840aa fix(providers): graceful failure across Claude, Gemini, Ollama
+- 274fb4b fix(gemini): classify 404 / 429 / auth errors into errorCode
+- ade5365 fix(research): block Ollama — no web grounding
+- 835a401 feat(outputs): inline infographic preview with click-to-open HTML
+- 558a791 content: e2e-rag-test project + incremental output + log entries
+- 4677548 merge: v1.5-beta — editorial-brutalist frontend + multi-provider routing
+- 843cb61 docs: README overhaul for v1.5-beta
+- 9b71703 docs: capture v1.5-beta screenshots via puppeteer-core
+- 79d9f89 fix(topbar): visible help (?) button next to the tweaks icon
+
+Major work:
+1. Hover preview card fully rewritten — portal out of .content (which has `zoom: var(--fs-scale)`) to document.body, rAF-batched transform mutation on a ref (React state only {visible, data}), CSS transitions limited to opacity. Killed flicker, tracking drift, and first-hover flash.
+2. E2E eval on the e2e-rag-test project (29 pages of real RAG surveys) — graph health, orphan check, cross-source tension coverage all clean.
+3. Full provider ping matrix: Claude (sonnet/opus/haiku + explicit IDs), Gemini (3-flash-preview, 3-pro-preview, 3.1-pro-preview) — bare `-flash`/`-pro` return 404 as expected, Ollama (qwen2.5-coder, gemma4:e4b). All green.
+4. Surfaced + fixed 4 graceful-failure gaps: (a) chat+research SSE consumers silently dropped `type:"error"` frames; (b) Ollama jobs with bad model names returned raw 404 stacks; (c) /jobs+/compose showed raw `[code] msg` brackets instead of `formatJobError` titles; (d) Gemini stderr stack traces (429, 404, auth) weren't classified. All fixed with structured errorCodes + friendly messages.
+5. Research grounding guard: UI disables Ollama options in Settings for research (tooltip + optgroup label); streamClaude error frame on research is now type-specific ("needs live web access").
+6. Infographic output pages now show the PNG inline (click to open HTML); ext pills force download via `&download=1`.
+7. Version cut: tagged current main as `v1-alpha` (preserves pre-editorial release), fast-forward merged feat/editorial-frontend into main with a summary merge commit, tagged HEAD as `v1.5-beta`. Both tags pushed.
+8. README rewritten top-to-bottom for v1.5-beta with Versions table.
+9. Screenshots: built scripts/capture-screenshots.mjs — puppeteer-core driven rig (piggybacks on the Chrome discovery + puppeteer-core we vendored for infographic PNG rendering). Seeds `localStorage.activeProject` then navigates each route at 1440×900 @2x. Captured 13 screenshots against e2e-rag-test and committed them to docs/screenshots/. README image references updated.
+10. User-visible `?` help button added to the topbar (circle-with-?-glyph) next to the type-tweaks icon. Dispatches the existing editorial:open-help event.
+
+**What's next:**
+- STO-1770: Cascade source removal — delete source + sweep wiki pages it seeded. Still Low, still deferred.
+- STO-1767: MCP v2 destructive ops (move/delete/promote preview-confirm pairs). Low. Easy to land when wanted.
+- Optional: mobile-responsive UI polish. Editorial UI hasn't been mobile-tuned yet.
+- Optional: expose via LAN or cloudflared tunnel for remote/mobile access (still no auth — don't expose broadly without basic auth).
+- Optional: evaluate adding Ollama SSE streaming support so chat+research aren't hard-blocked. Research grounding would still be absent, but chat could work.
+- Consider filing tickets for v1.5-beta follow-up: (a) the `model:chat` stale DB row from earlier underscore/colon bug — low-priority cleanup; (b) v2 of screenshot rig to also capture the Tweaks panel and the Running Jobs panel.
+
+**Branch:** main (clean, pushed to origin at 79d9f89; tags `v1-alpha` and `v1.5-beta` both on origin).
+**Blockers:** None.
+```
+
+## Prior Session (2026-04-19 — output generation + note capture)
+
+Four tickets shipped + one bug filed/fixed in a long session:
 
 STO-1766 — NotebookLM-style output generation (High, Done)
 - Five artifact types all running through the job queue with model provenance:
