@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useProject } from "@/components/project-switcher";
 import { useToast } from "@/components/toast-provider";
 import { EditorialBreadcrumbs } from "@/components/editorial/wiki/breadcrumbs";
+import { formatJobError } from "@/lib/error-codes";
 
 interface Job {
   id: number;
@@ -215,12 +216,14 @@ export default function DispatchPage() {
                 <div className="n">{String(j.id).padStart(3, "0")}</div>
                 <div className="task">
                   {j.title}
-                  {j.error && (
-                    <small style={{ color: "var(--red)" }}>
-                      {j.errorCode ? `[${j.errorCode}] ` : ""}
-                      {j.error}
-                    </small>
-                  )}
+                  {j.error && (() => {
+                    const fmt = formatJobError(j.errorCode, j.error);
+                    return (
+                      <small style={{ color: "var(--red)" }}>
+                        <b>{fmt.title}.</b> {fmt.description}
+                      </small>
+                    );
+                  })()}
                 </div>
                 <div>
                   <span className="type-pill">{j.type}</span>

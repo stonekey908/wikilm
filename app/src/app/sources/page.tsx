@@ -459,6 +459,12 @@ function IntakePageInner() {
                     addedThisRun++;
                   } catch {}
                 }
+              } else if (evt.type === "error" && typeof evt.text === "string") {
+                addToast({
+                  type: "error",
+                  title: "Research unavailable",
+                  description: evt.text,
+                });
               } else if (evt.type === "done") {
                 // stream will end naturally
               }
