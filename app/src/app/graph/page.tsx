@@ -217,6 +217,8 @@ export default function MapPage() {
               preserveAspectRatio="xMidYMid meet"
               style={{ cursor: dragging ? "grabbing" : "grab" }}
               onMouseDown={(e) => {
+                // Only start dragging from the SVG background, not from a node
+                if ((e.target as Element).tagName === "circle") return;
                 setDragging(true);
                 dragStart.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
               }}
@@ -241,10 +243,11 @@ export default function MapPage() {
                 dragStart.current = null;
               }}
               onWheel={(e) => {
-                if (!e.ctrlKey && !e.metaKey) return;
+                // Any wheel event zooms (no modifier needed), so trackpad
+                // pinch + scroll-to-zoom both work naturally.
                 e.preventDefault();
                 const delta = e.deltaY > 0 ? 0.9 : 1.1;
-                setZoom((z) => Math.max(0.5, Math.min(4, z * delta)));
+                setZoom((z) => Math.max(0.3, Math.min(6, z * delta)));
               }}
             >
               {/* edges */}
@@ -332,16 +335,16 @@ export default function MapPage() {
               <button
                 type="button"
                 title="Zoom in"
-                onClick={() => setZoom((z) => Math.min(4, z * 1.25))}
-                disabled={zoom >= 4}
+                onClick={() => setZoom((z) => Math.min(6, z * 1.25))}
+                disabled={zoom >= 6}
               >
                 +
               </button>
               <button
                 type="button"
                 title="Zoom out"
-                onClick={() => setZoom((z) => Math.max(0.5, z * 0.8))}
-                disabled={zoom <= 0.5}
+                onClick={() => setZoom((z) => Math.max(0.3, z * 0.8))}
+                disabled={zoom <= 0.3}
               >
                 −
               </button>

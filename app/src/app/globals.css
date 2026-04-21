@@ -2109,12 +2109,14 @@ body[data-grain="false"]::after { display: none !important; }
 .proj-switch {
   display: grid; grid-template-columns: 10px 1fr 14px;
   gap: 10px; align-items: center;
-  margin: 12px 14px 4px;
+  margin: 12px 10px 6px;
   padding: 10px 12px;
   border: 1.5px solid var(--rule);
   background: var(--paper);
   cursor: pointer;
   transition: background 140ms;
+  width: calc(100% - 20px);
+  box-sizing: border-box;
 }
 .proj-switch:hover { background: var(--paper-2); }
 .proj-switch .dot { width: 9px; height: 9px; border-radius: 50%; border: 1px solid var(--ink); }
@@ -2137,7 +2139,7 @@ body[data-grain="false"]::after { display: none !important; }
 .proj-switch.open .chev { transform: rotate(180deg); }
 
 .proj-switch-pop {
-  position: absolute; top: 0; left: 14px; right: 14px;
+  position: absolute; top: 0; left: 10px; right: 10px;
   background: var(--paper);
   border: 1.5px solid var(--ink);
   box-shadow: 6px 6px 0 var(--ink);
@@ -2290,6 +2292,37 @@ body[data-grain="false"]::after { display: none !important; }
 .msg .bubble hr { border: none; border-top: 1px dashed var(--rule-faint); margin: 16px 0; }
 .msg.user .bubble { color: var(--ink); }
 .msg.assistant .bubble { color: var(--ink-2); }
+.msg .bubble blockquote {
+  border-left: 3px solid var(--accent);
+  padding: 4px 0 4px 14px;
+  margin: 10px 0 14px;
+  font-family: var(--font-inst); font-style: italic;
+  color: var(--ink-2);
+}
+.msg .bubble del { color: var(--ink-4); text-decoration: line-through; }
+.msg .bubble table {
+  border-collapse: collapse; width: 100%; max-width: 62ch;
+  margin: 10px 0 14px;
+  font-family: var(--font-serif); font-size: 14px;
+}
+.msg .bubble th, .msg .bubble td {
+  border-bottom: 1px solid var(--rule-faint);
+  padding: 7px 10px; text-align: left;
+}
+.msg .bubble th {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--ink-3);
+  border-bottom: 1.5px solid var(--rule);
+}
+.msg .bubble tbody tr:last-child td { border-bottom: 1.5px solid var(--rule); }
+.msg .bubble h4, .msg .bubble h5, .msg .bubble h6 {
+  font-family: var(--font-serif); font-weight: 600;
+  letter-spacing: -0.01em; margin: 16px 0 6px;
+}
+.msg .bubble h4 { font-size: 16px; }
+.msg .bubble h5 { font-size: 14px; }
+.msg .bubble h6 { font-size: 13px; color: var(--ink-3); }
 
 .salon-empty {
   display: grid; place-items: center; flex: 1;
