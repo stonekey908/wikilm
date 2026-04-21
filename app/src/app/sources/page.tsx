@@ -315,18 +315,44 @@ function IntakePageInner() {
   }
 
   // ── Research: SSE stream ────────────────────────────────────────
+  // Tracks which topic produced the currently-held results. When a user
+  // types a *new* topic and hits Commission, we confirm before wiping —
+  // when they hit Commission without changing the topic (or use Load more),
+  // we preserve the existing list and just append.
+  const [resultsTopic, setResultsTopic] = useState<string>("");
+  useEffect(() => {
+    // On project switch, sync resultsTopic from persisted query if we have results
+    if (results.length > 0 && !resultsTopic) setResultsTopic(researchQuery);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
+
   const runResearch = useCallback(
     async (topicOverride: string | undefined, append: boolean) => {
       const topic = (topicOverride ?? researchQuery).trim();
       if (!topic || isSearching || !projectId) return;
 
-      const seenUrls = new Set<string>(append ? results.map((r) => r.url).filter(Boolean) : []);
+      // If the topic matches the existing results' topic, always append
+      // (preserve prior work). Only wipe when the topic genuinely changes.
+      const topicChanged = resultsTopic && resultsTopic !== topic && results.length > 0;
+      const effectiveAppend = append || (!topicChanged && results.length > 0);
+
+      if (topicChanged && !append) {
+        const ok = window.confirm(
+          `Replace ${results.length} result${results.length === 1 ? "" : "s"} for "${resultsTopic}" with a fresh search for "${topic}"?`
+        );
+        if (!ok) return;
+      }
+
+      const seenUrls = new Set<string>(
+        effectiveAppend ? results.map((r) => r.url).filter(Boolean) : []
+      );
       let addedThisRun = 0;
 
-      if (!append) {
+      if (!effectiveAppend) {
         setResults([]);
         nextResultId.current = 0;
       }
+      setResultsTopic(topic);
       setIsSearching(true);
 
       const controller = new AbortController();
@@ -454,13 +480,13 @@ function IntakePageInner() {
           }
         }
 
-        if (append && addedThisRun === 0) {
+        if (effectiveAppend && addedThisRun === 0) {
           addToast({
             type: "info",
             title: "No new sources found",
             description: "The model couldn't turn up anything beyond what's already listed.",
           });
-        } else if (!append) {
+        } else if (!effectiveAppend) {
           addToast({ type: "success", title: `Found ${addedThisRun} source${addedThisRun === 1 ? "" : "s"}` });
         } else {
           addToast({ type: "success", title: `Added ${addedThisRun} more` });
@@ -476,7 +502,7 @@ function IntakePageInner() {
         abortRef.current = null;
       }
     },
-    [researchQuery, isSearching, maxResults, results, projectId, addToast]
+    [researchQuery, isSearching, maxResults, results, resultsTopic, projectId, addToast]
   );
 
   const startResearch = useCallback(
@@ -496,6 +522,7 @@ function IntakePageInner() {
     setIsSearching(false);
     setResults([]);
     setResearchQuery("");
+    setResultsTopic("");
     if (projectId !== null) {
       try {
         localStorage.removeItem(researchQueryKey(projectId));
@@ -817,7 +844,13 @@ function IntakePageInner() {
               onClick={() => startResearch()}
               disabled={!researchQuery.trim() || isSearching}
             >
-              {isSearching ? "Searching…" : totalCount > 0 ? "New search →" : "Commission →"}
+              {isSearching
+                ? "Searching…"
+                : totalCount > 0 && resultsTopic === researchQuery.trim()
+                  ? "Find more →"
+                  : totalCount > 0
+                    ? "New search →"
+                    : "Commission →"}
             </button>
           </div>
 
