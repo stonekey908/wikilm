@@ -1,543 +1,427 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { useTheme } from "@/components/theme-provider";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/toast-provider";
-import {
-  Sun,
-  Moon,
-  Monitor,
-  Zap,
-  Cpu,
-  Brain,
-  Check,
-  Server,
-  Archive,
-  Loader2,
-} from "lucide-react";
+import { EditorialBreadcrumbs } from "@/components/editorial/wiki/breadcrumbs";
+import { useTweaks, type Theme, type Accent, type Density, type Size, type FontFace } from "@/components/editorial/tweaks-provider";
 
+interface OllamaModel { name: string; size?: number }
+interface GeminiModel { name: string; label?: string }
 interface BackupStatus {
-  lastBackupAt: string | null;
-  location: string;
-  lastDbFile: string | null;
-  lastContentFile: string | null;
+  running: boolean;
+  lastStartedAt?: string | null;
+  lastCompletedAt?: string | null;
+  lastError?: string | null;
 }
 
-function formatRelative(iso: string | null): string {
-  if (!iso) return "Never";
-  const diffSec = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
-  if (diffSec < 60) return "just now";
-  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
-  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
-  const days = Math.floor(diffSec / 86400);
-  if (days < 30) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
-}
+// Job types that require live web access. Ollama runs locally with no
+// tool-use / search protocol, so picking it here would produce answers
+// drawn purely from parametric knowledge — a footgun for research.
+const NEEDS_WEB_GROUNDING = new Set(["research"]);
 
-interface OllamaModel {
-  id: string; // "ollama:qwen2.5-coder:7b"
-  name: string;
-  contextWindow: number;
-}
-
-interface GeminiModel {
-  id: string; // "gemini:gemini-3-pro"
-  name: string;
-  label: string;
-}
-
-const themeOptions = [
-  { value: "light" as const, label: "Light", icon: Sun },
-  { value: "dark" as const, label: "Dark", icon: Moon },
-  { value: "system" as const, label: "System", icon: Monitor },
-];
-
-const models = [
-  { value: "haiku", label: "Haiku", icon: Zap, desc: "Fastest, cheapest", color: "var(--green)" },
-  { value: "sonnet", label: "Sonnet", icon: Cpu, desc: "Balanced", color: "var(--blue)" },
-  { value: "opus", label: "Opus", icon: Brain, desc: "Best quality", color: "var(--primary)" },
-];
-
-const operations = [
+const JOB_TYPES = [
   { key: "ingest", label: "Ingestion", desc: "Processing raw sources into wiki pages" },
   { key: "research", label: "Research", desc: "Web search for new sources" },
-  { key: "synthesis", label: "Synthesis", desc: "Auto-update the project overview after each ingest" },
-  { key: "chat", label: "Chat", desc: "Conversational queries against your wiki" },
+  { key: "synthesis", label: "Synthesis", desc: "Auto-update the project overview" },
+  { key: "chat", label: "Chat", desc: "Conversational queries against the wiki" },
   { key: "query", label: "Query", desc: "Direct wiki lookups" },
-  { key: "lint", label: "Lint", desc: "Wiki health checks and cleanup" },
-  { key: "fix", label: "Fix", desc: "Applying suggested fixes to lint findings" },
+  { key: "lint", label: "Lint", desc: "Wiki health checks" },
+  { key: "fix", label: "Fix", desc: "Applying suggested fixes" },
+  { key: "output", label: "Output", desc: "Artifact generation (deck, report, etc.)" },
+  { key: "note-summary", label: "Note summary", desc: "Summarise chat as note" },
+  { key: "concept-fill", label: "Concept drafting", desc: "Populate scaffolded concept pages from the wiki" },
+];
+
+const CLAUDE_MODELS = [
+  { value: "haiku", label: "Haiku", desc: "Fastest, cheapest" },
+  { value: "sonnet", label: "Sonnet", desc: "Balanced" },
+  { value: "opus", label: "Opus", desc: "Best quality" },
+];
+
+const THEMES: { v: Theme; label: string }[] = [
+  { v: "paper", label: "Cream" },
+  { v: "stone", label: "Stone" },
+  { v: "celadon", label: "Celadon" },
+  { v: "night", label: "Night" },
+];
+
+const ACCENTS: { v: Accent; color: string }[] = [
+  { v: "red", color: "#b91c1c" },
+  { v: "blue", color: "#1e3a8a" },
+  { v: "green", color: "#3f6212" },
+  { v: "amber", color: "#a16207" },
+  { v: "ink", color: "#0f0e0c" },
+];
+
+const DENSITIES: { v: Density; label: string }[] = [
+  { v: "cozy", label: "Dense" },
+  { v: "comfy", label: "Text" },
+  { v: "airy", label: "Loose" },
+];
+
+const SIZES: { v: Size; label: string }[] = [
+  { v: "sm", label: "Sm" },
+  { v: "md", label: "Md" },
+  { v: "lg", label: "Lg" },
+];
+
+const FACES: { v: FontFace; label: string }[] = [
+  { v: "fraunces", label: "Signature" },
+  { v: "playfair", label: "Masthead" },
+  { v: "crimson", label: "Book" },
+  { v: "garamond", label: "Classic" },
 ];
 
 export default function SettingsPage() {
-  const { theme, setTheme } = useTheme();
   const { addToast } = useToast();
+  const { state: tweakState, setTweak } = useTweaks();
+
   const [modelSettings, setModelSettings] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState<string | null>(null);
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
   const [ollamaAvailable, setOllamaAvailable] = useState(false);
   const [geminiModels, setGeminiModels] = useState<GeminiModel[]>([]);
   const [geminiAvailable, setGeminiAvailable] = useState(false);
-  const [backupStatus, setBackupStatus] = useState<BackupStatus | null>(null);
+  const [saving, setSaving] = useState<string | null>(null);
+  const [backupStatus, setBackupStatus] = useState<BackupStatus>({ running: false });
   const [backupRunning, setBackupRunning] = useState(false);
-  // auto_sync_parent_synthesis — when true, a child project's completed
-  // synthesis auto-triggers its parent's parent-synthesis (coalesced).
-  const [autoSyncParent, setAutoSyncParent] = useState(false);
-  const [autoSyncSaving, setAutoSyncSaving] = useState(false);
 
-  const fetchBackupStatus = useCallback(() => {
-    fetch("/api/backup/status")
-      .then((r) => r.json())
-      .then((data: BackupStatus) => setBackupStatus(data))
-      .catch(() => {});
-  }, []);
-
+  // Load settings + provider availability
   useEffect(() => {
     fetch("/api/settings")
       .then((r) => r.json())
-      .then((data) => {
-        const models: Record<string, string> = {};
-        for (const op of operations) {
-          models[op.key] = data[`model_${op.key}`] ?? "sonnet";
-        }
-        setModelSettings(models);
-        // boolean settings are stored as "true" / "false" strings
-        setAutoSyncParent(data.auto_sync_parent_synthesis === "true");
-      })
+      .then((d) => setModelSettings(d ?? {}))
       .catch(() => {});
-
-    // Detect Ollama in parallel
     fetch("/api/ollama/models")
-      .then((r) => r.json())
-      .then((data: { available: boolean; models: OllamaModel[] }) => {
-        setOllamaAvailable(data.available);
-        setOllamaModels(data.models ?? []);
+      .then((r) => (r.ok ? r.json() : { models: [] }))
+      .then((d) => {
+        setOllamaModels(d.models ?? []);
+        setOllamaAvailable((d.models ?? []).length > 0);
       })
       .catch(() => {});
-
-    // Detect Gemini CLI in parallel
     fetch("/api/gemini/models")
-      .then((r) => r.json())
-      .then((data: { available: boolean; models: GeminiModel[] }) => {
-        setGeminiAvailable(data.available);
-        setGeminiModels(data.models ?? []);
+      .then((r) => (r.ok ? r.json() : { models: [] }))
+      .then((d) => {
+        setGeminiModels(d.models ?? []);
+        setGeminiAvailable((d.models ?? []).length > 0);
       })
       .catch(() => {});
-
     fetchBackupStatus();
-  }, [fetchBackupStatus]);
-
-  const runBackup = useCallback(async () => {
-    if (backupRunning) return;
-    setBackupRunning(true);
-    try {
-      const res = await fetch("/api/backup/run", { method: "POST" });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error ?? "Backup failed");
-      }
-      const data = await res.json();
-      addToast({
-        type: "success",
-        title: "Backup complete",
-        description: `${data.files.db} · ${data.files.content}`,
-      });
-      fetchBackupStatus();
-    } catch (err) {
-      addToast({
-        type: "error",
-        title: "Backup failed",
-        description: err instanceof Error ? err.message : "Unknown error",
-      });
-    } finally {
-      setBackupRunning(false);
-    }
-  }, [backupRunning, addToast, fetchBackupStatus]);
-
-  const toggleAutoSyncParent = useCallback(async () => {
-    const next = !autoSyncParent;
-    setAutoSyncParent(next);
-    setAutoSyncSaving(true);
-    try {
-      await fetch("/api/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ auto_sync_parent_synthesis: String(next) }),
-      });
-    } catch {
-      // revert on failure so the UI doesn't lie about persisted state
-      setAutoSyncParent(!next);
-    } finally {
-      setTimeout(() => setAutoSyncSaving(false), 600);
-    }
-  }, [autoSyncParent]);
-
-  const setModel = useCallback(async (operation: string, model: string) => {
-    setModelSettings((prev) => ({ ...prev, [operation]: model }));
-    setSaving(operation);
-    try {
-      await fetch("/api/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ [`model_${operation}`]: model }),
-      });
-    } catch {
-      // ignore
-    } finally {
-      setTimeout(() => setSaving(null), 600);
-    }
   }, []);
 
+  const fetchBackupStatus = useCallback(async () => {
+    try {
+      const res = await fetch("/api/backup/status");
+      if (res.ok) {
+        const d: BackupStatus = await res.json();
+        setBackupStatus(d);
+        return d;
+      }
+    } catch {}
+    return null;
+  }, []);
+
+  // Poll while backup is running
+  useEffect(() => {
+    if (!backupRunning && !backupStatus.running) return;
+    const i = window.setInterval(async () => {
+      const d = await fetchBackupStatus();
+      if (d && !d.running && backupRunning) {
+        setBackupRunning(false);
+        if (d.lastError) {
+          addToast({ type: "error", title: "Backup failed", description: d.lastError });
+        } else {
+          addToast({ type: "success", title: "Backup complete" });
+        }
+      }
+    }, 2000);
+    return () => window.clearInterval(i);
+  }, [backupRunning, backupStatus.running, fetchBackupStatus, addToast]);
+
+  async function runBackup() {
+    setBackupRunning(true);
+    addToast({ type: "success", title: "Backup started" });
+    try {
+      const res = await fetch("/api/backup/run", { method: "POST" });
+      if (!res.ok) throw new Error();
+      fetchBackupStatus();
+    } catch {
+      setBackupRunning(false);
+      addToast({ type: "error", title: "Backup failed to start" });
+    }
+  }
+
+  function fmtAgo(iso: string | null | undefined): string {
+    if (!iso) return "never";
+    const t = new Date(iso).getTime();
+    if (!Number.isFinite(t)) return "never";
+    const diff = Date.now() - t;
+    const sec = Math.round(diff / 1000);
+    if (sec < 60) return `${sec}s ago`;
+    const min = Math.floor(sec / 60);
+    if (min < 60) return `${min}m ago`;
+    const hr = Math.floor(min / 60);
+    if (hr < 24) return `${hr}h ago`;
+    const d = Math.floor(hr / 24);
+    return `${d}d ago`;
+  }
+
+  const saveModel = useCallback(
+    async (jobType: string, value: string) => {
+      const key = `model_${jobType}`;
+      setModelSettings((prev) => ({ ...prev, [key]: value }));
+      setSaving(jobType);
+      try {
+        const res = await fetch("/api/settings", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ [key]: value }),
+        });
+        if (!res.ok) throw new Error();
+        addToast({ type: "success", title: `${jobType} → ${value}` });
+      } catch {
+        addToast({ type: "error", title: "Couldn't save" });
+      } finally {
+        setSaving(null);
+      }
+    },
+    [addToast]
+  );
+
+  const modelOptions = useMemo(() => {
+    const opts: { value: string; label: string; group: string }[] = [];
+    for (const c of CLAUDE_MODELS) opts.push({ value: c.value, label: `${c.label} · ${c.desc}`, group: "Claude" });
+    for (const o of ollamaModels) opts.push({ value: `ollama:${o.name}`, label: o.name, group: "Ollama (local)" });
+    for (const g of geminiModels) opts.push({ value: `gemini:${g.name}`, label: g.label ?? g.name, group: "Gemini" });
+    return opts;
+  }, [ollamaModels, geminiModels]);
+
   return (
-    <div className="p-8 max-w-[960px]">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-[22px] font-[650] text-[var(--text-1)] tracking-tight leading-tight">
-          Settings
+    <div className="pad">
+      <EditorialBreadcrumbs tail="Settings" />
+
+      <div className="sec-head">
+        <h1>
+          The <em>Press.</em>
         </h1>
-        <p className="text-sm text-[var(--text-3)] mt-1">
-          Manage your preferences
-        </p>
+        <div className="rail-meta">
+          <div>
+            <b>{CLAUDE_MODELS.length}</b> Claude
+          </div>
+          <div>
+            <b>{ollamaModels.length}</b> Ollama
+          </div>
+          <div>
+            <b>{geminiModels.length}</b> Gemini
+          </div>
+        </div>
       </div>
 
-      {/* Model Configuration Section */}
-      <section className="mb-8">
-        <div className="bg-[var(--surface-card)] border border-[var(--border)] rounded-lg shadow-[var(--shadow-sm)]">
-          <div className="px-5 py-4 border-b border-[var(--border)]">
-            <h2 className="text-[14px] font-[600] text-[var(--text-1)]">Model Configuration</h2>
-            <p className="text-[12px] text-[var(--text-3)] mt-0.5">
-              Choose which model (Claude or local Ollama) to use for each operation
-            </p>
+      <div className="settings-grid">
+        {/* ── Models ──────────────────────────── */}
+        <div className="settings-card" style={{ gridColumn: "1 / -1" }}>
+          <h3>
+            Models by <em>job type</em>
+          </h3>
+          <div className="sub">
+            Route each job type to a specific model. `ollama:*` runs locally; `gemini:*` shells out to the Gemini CLI;
+            bare names are Claude aliases.
           </div>
-          <div className="divide-y divide-[var(--border)]">
-            {operations.map((op) => {
-              const selected = modelSettings[op.key] ?? "sonnet";
-              const isOllamaSelected = selected.startsWith("ollama:");
-              const isGeminiSelected = selected.startsWith("gemini:");
-              return (
-                <div key={op.key} className="px-5 py-4">
-                  <div className="flex items-start justify-between gap-4 flex-wrap">
-                    <div className="min-w-0">
-                      <div className="text-[13px] font-[600] text-[var(--text-1)]">{op.label}</div>
-                      <div className="text-[12px] text-[var(--text-3)] mt-0.5">{op.desc}</div>
-                    </div>
-                    <div className="flex gap-1.5 shrink-0 flex-wrap justify-end">
-                      {/* Three uniform-size dropdowns: Claude / Ollama / Gemini.
-                          The selected provider shows its chosen model label
-                          with primary styling; the others show the provider
-                          placeholder. Switching via any dropdown swaps the
-                          whole operation to that provider. */}
-
-                      {/* Claude — always visible, three fixed presets */}
-                      {(() => {
-                        const isClaudeSelected = !isOllamaSelected && !isGeminiSelected;
-                        const claudeLabel =
-                          models.find((m) => m.value === selected)?.label ?? "Claude";
-                        return (
-                          <div className="relative w-[130px]">
-                            <select
-                              value={isClaudeSelected ? selected : ""}
-                              onChange={(e) => {
-                                if (e.target.value) setModel(op.key, e.target.value);
-                              }}
-                              className={`w-full flex items-center gap-1.5 pl-7 pr-7 py-1.5 rounded-md border text-[12px] font-[500] transition-all duration-150 cursor-pointer appearance-none ${
-                                isClaudeSelected
-                                  ? "border-[var(--primary)] bg-[var(--primary-dim)] text-[var(--primary)]"
-                                  : "border-[var(--border)] bg-[var(--bg-2)] text-[var(--text-3)] hover:border-[var(--border-strong)] hover:text-[var(--text-2)]"
-                              }`}
-                              title="Claude model"
-                            >
-                              {isClaudeSelected ? (
-                                <option value={selected}>{claudeLabel}</option>
-                              ) : (
-                                <option value="">Claude</option>
-                              )}
-                              {models
-                                .filter((m) => !isClaudeSelected || m.value !== selected)
-                                .map((m) => (
-                                  <option key={m.value} value={m.value}>
-                                    {m.label}
-                                  </option>
-                                ))}
-                            </select>
-                            <Cpu
-                              className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none"
-                              style={{
-                                color: isClaudeSelected ? "var(--primary)" : "var(--text-3)",
-                              }}
-                            />
-                            {isClaudeSelected && saving === op.key && (
-                              <Check className="absolute right-6 top-1/2 -translate-y-1/2 w-3 h-3 text-[var(--green)] pointer-events-none" />
-                            )}
-                          </div>
-                        );
-                      })()}
-
-                      {/* Ollama — only if installed */}
-                      {ollamaAvailable && ollamaModels.length > 0 && (() => {
-                        const ollamaLabel = isOllamaSelected
-                          ? ollamaModels.find((m) => m.id === selected)?.name ?? selected.slice(7)
-                          : "Ollama";
-                        return (
-                          <div className="relative w-[130px]">
-                            <select
-                              value={isOllamaSelected ? selected : ""}
-                              onChange={(e) => {
-                                if (e.target.value) setModel(op.key, e.target.value);
-                              }}
-                              className={`w-full flex items-center gap-1.5 pl-7 pr-7 py-1.5 rounded-md border text-[12px] font-[500] transition-all duration-150 cursor-pointer appearance-none ${
-                                isOllamaSelected
-                                  ? "border-[var(--primary)] bg-[var(--primary-dim)] text-[var(--primary)]"
-                                  : "border-[var(--border)] bg-[var(--bg-2)] text-[var(--text-3)] hover:border-[var(--border-strong)] hover:text-[var(--text-2)]"
-                              }`}
-                              title="Local Ollama model"
-                            >
-                              {isOllamaSelected ? (
-                                <option value={selected}>{ollamaLabel}</option>
-                              ) : (
-                                <option value="">Ollama</option>
-                              )}
-                              {ollamaModels
-                                .filter((m) => !isOllamaSelected || m.id !== selected)
-                                .map((m) => (
-                                  <option key={m.id} value={m.id}>
-                                    {m.name}
-                                  </option>
-                                ))}
-                            </select>
-                            <Server
-                              className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none"
-                              style={{
-                                color: isOllamaSelected ? "var(--primary)" : "var(--text-3)",
-                              }}
-                            />
-                          </div>
-                        );
-                      })()}
-
-                      {/* Gemini — only if CLI is installed */}
-                      {geminiAvailable && geminiModels.length > 0 && (() => {
-                        const geminiLabel = isGeminiSelected
-                          ? geminiModels.find((m) => m.id === selected)?.label ?? selected.slice(7)
-                          : "Gemini";
-                        return (
-                          <div className="relative w-[130px]">
-                            <select
-                              value={isGeminiSelected ? selected : ""}
-                              onChange={(e) => {
-                                if (e.target.value) setModel(op.key, e.target.value);
-                              }}
-                              className={`w-full flex items-center gap-1.5 pl-7 pr-7 py-1.5 rounded-md border text-[12px] font-[500] transition-all duration-150 cursor-pointer appearance-none ${
-                                isGeminiSelected
-                                  ? "border-[var(--primary)] bg-[var(--primary-dim)] text-[var(--primary)]"
-                                  : "border-[var(--border)] bg-[var(--bg-2)] text-[var(--text-3)] hover:border-[var(--border-strong)] hover:text-[var(--text-2)]"
-                              }`}
-                              title="Gemini CLI model"
-                            >
-                              {isGeminiSelected ? (
-                                <option value={selected}>{geminiLabel}</option>
-                              ) : (
-                                <option value="">Gemini</option>
-                              )}
-                              {geminiModels
-                                .filter((m) => !isGeminiSelected || m.id !== selected)
-                                .map((m) => (
-                                  <option key={m.id} value={m.id}>
-                                    {m.label}
-                                  </option>
-                                ))}
-                            </select>
-                            <Brain
-                              className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none"
-                              style={{
-                                color: isGeminiSelected ? "var(--primary)" : "var(--text-3)",
-                              }}
-                            />
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-            {!ollamaAvailable && (
-              <div className="px-5 py-3 border-t border-[var(--border)] bg-[var(--bg-1)]">
-                <div className="flex items-center gap-2 text-[11px] text-[var(--text-4)]">
-                  <Server className="w-3 h-3" />
-                  Start Ollama (<code className="font-mono">ollama serve</code>) to use local models
-                </div>
-              </div>
-            )}
-            {!geminiAvailable && (
-              <div className="px-5 py-3 border-t border-[var(--border)] bg-[var(--bg-1)]">
-                <div className="flex items-center gap-2 text-[11px] text-[var(--text-4)]">
-                  <Brain className="w-3 h-3" />
-                  Install Gemini CLI (<code className="font-mono">npm i -g @google/gemini-cli</code>) for Google Search-grounded research
-                </div>
-              </div>
-            )}
+          <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+            <span className={`avail ${ollamaAvailable ? "ok" : "off"}`}>
+              <span className="d" /> Ollama {ollamaAvailable ? "online" : "offline"}
+            </span>
+            <span className={`avail ${geminiAvailable ? "ok" : "off"}`}>
+              <span className="d" /> Gemini {geminiAvailable ? "online" : "offline"}
+            </span>
           </div>
+          {JOB_TYPES.map((t) => {
+            const current = modelSettings[`model_${t.key}`] ?? "sonnet";
+            return (
+              <div className="setting-row" key={t.key}>
+                <div>
+                  <div className="k">{t.label}</div>
+                  <div className="desc">{t.desc}</div>
+                </div>
+                <select
+                  value={current}
+                  onChange={(e) => saveModel(t.key, e.target.value)}
+                  disabled={saving === t.key}
+                >
+                  <optgroup label="Claude">
+                    {CLAUDE_MODELS.map((m) => (
+                      <option key={m.value} value={m.value}>
+                        {m.label} · {m.desc}
+                      </option>
+                    ))}
+                  </optgroup>
+                  {ollamaModels.length > 0 && (
+                    <optgroup
+                      label={
+                        NEEDS_WEB_GROUNDING.has(t.key)
+                          ? "Ollama (local) — no web grounding"
+                          : "Ollama (local)"
+                      }
+                    >
+                      {ollamaModels.map((m) => (
+                        <option
+                          key={m.name}
+                          value={`ollama:${m.name}`}
+                          disabled={NEEDS_WEB_GROUNDING.has(t.key)}
+                          title={
+                            NEEDS_WEB_GROUNDING.has(t.key)
+                              ? "Ollama runs locally and has no web access. Pick Claude or Gemini for research."
+                              : undefined
+                          }
+                        >
+                          {m.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {geminiModels.length > 0 && (
+                    <optgroup label="Gemini">
+                      {geminiModels.map((m) => (
+                        <option key={m.name} value={`gemini:${m.name}`}>
+                          {m.label ?? m.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
+            );
+          })}
         </div>
-      </section>
 
-      {/* Parent Project Sync Section */}
-      <section className="mb-8">
-        <div className="bg-[var(--surface-card)] border border-[var(--border)] rounded-lg shadow-[var(--shadow-sm)]">
-          <div className="px-5 py-4 border-b border-[var(--border)]">
-            <h2 className="text-[14px] font-[600] text-[var(--text-1)]">Project Nesting</h2>
-            <p className="text-[12px] text-[var(--text-3)] mt-0.5">
-              Behavior for projects that have children
-            </p>
+        {/* ── UI tokens (Tweaks mirror) ──────── */}
+        <div className="settings-card">
+          <h3>
+            <em>Set type</em>
+          </h3>
+          <div className="sub">Paper + ink + leading. Live across every page.</div>
+
+          <div className="setting-row">
+            <div>
+              <div className="k">Paper</div>
+              <div className="desc">Surface theme</div>
+            </div>
+            <div className="seg">
+              {THEMES.map((t) => (
+                <button key={t.v} type="button" className={tweakState.theme === t.v ? "on" : ""} onClick={() => setTweak("theme", t.v)}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="px-5 py-4">
-            <div className="flex items-start justify-between gap-4 flex-wrap">
-              <div className="min-w-0">
-                <div className="text-[13px] font-[600] text-[var(--text-1)]">
-                  Auto-sync parent syntheses
-                </div>
-                <div className="text-[12px] text-[var(--text-3)] mt-0.5 max-w-[480px]">
-                  When a child project&apos;s synthesis completes, automatically
-                  re-run the parent&apos;s synthesis. Coalesced to avoid bursts.
-                  Default off — you can still run it on demand from a parent
-                  project&apos;s wiki.
-                </div>
-              </div>
-              <button
-                onClick={toggleAutoSyncParent}
-                disabled={autoSyncSaving}
-                role="switch"
-                aria-checked={autoSyncParent}
-                className={`shrink-0 relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer disabled:opacity-60 ${
-                  autoSyncParent
-                    ? "bg-[var(--primary)]"
-                    : "bg-[var(--bg-2)] border border-[var(--border)]"
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm ${
-                    autoSyncParent ? "translate-x-6" : "translate-x-1"
-                  }`}
+
+          <div className="setting-row">
+            <div>
+              <div className="k">Ink</div>
+              <div className="desc">Accent color</div>
+            </div>
+            <div className="swatches">
+              {ACCENTS.map((a) => (
+                <div
+                  key={a.v}
+                  className={`sw${tweakState.accent === a.v ? " on" : ""}`}
+                  style={{ background: a.color }}
+                  onClick={() => setTweak("accent", a.v)}
+                  role="button"
+                  tabIndex={0}
                 />
-              </button>
+              ))}
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* Theme Section */}
-      <section className="mb-8">
-        <div className="bg-[var(--surface-card)] border border-[var(--border)] rounded-lg shadow-[var(--shadow-sm)]">
-          <div className="px-5 py-4 border-b border-[var(--border)]">
-            <h2 className="text-[14px] font-[600] text-[var(--text-1)]">Theme</h2>
-            <p className="text-[12px] text-[var(--text-3)] mt-0.5">
-              Choose how WikiLM looks to you
-            </p>
-          </div>
-          <div className="px-5 py-4">
-            <div className="flex gap-3">
-              {themeOptions.map((option) => {
-                const isSelected = theme === option.value;
-                const Icon = option.icon;
-                return (
-                  <button
-                    key={option.value}
-                    onClick={() => setTheme(option.value)}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border text-[13px] font-[500] transition-all duration-150 ${
-                      isSelected
-                        ? "border-[var(--primary)] bg-[var(--primary-dim)] text-[var(--primary)]"
-                        : "border-[var(--border)] bg-[var(--bg-2)] text-[var(--text-3)] hover:border-[var(--border-strong)] hover:text-[var(--text-2)]"
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    {option.label}
-                  </button>
-                );
-              })}
+          <div className="setting-row">
+            <div>
+              <div className="k">Face</div>
+              <div className="desc">Type family</div>
+            </div>
+            <div className="seg">
+              {FACES.map((f) => (
+                <button key={f.v} type="button" className={tweakState.font === f.v ? "on" : ""} onClick={() => setTweak("font", f.v)}>
+                  {f.label}
+                </button>
+              ))}
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* Backup Section */}
-      <section className="mb-8">
-        <div className="bg-[var(--surface-card)] border border-[var(--border)] rounded-lg shadow-[var(--shadow-sm)]">
-          <div className="px-5 py-4 border-b border-[var(--border)]">
-            <h2 className="text-[14px] font-[600] text-[var(--text-1)]">Backup</h2>
-            <p className="text-[12px] text-[var(--text-3)] mt-0.5">
-              Snapshot the SQLite database and wiki content whenever you want. Keeps the latest 14 of each.
-            </p>
+          <div className="setting-row">
+            <div>
+              <div className="k">Size</div>
+              <div className="desc">Global scale</div>
+            </div>
+            <div className="seg">
+              {SIZES.map((s) => (
+                <button key={s.v} type="button" className={tweakState.size === s.v ? "on" : ""} onClick={() => setTweak("size", s.v)}>
+                  {s.label}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="px-5 py-4">
-            <div className="flex items-center justify-between gap-4 flex-wrap">
-              <div className="min-w-0">
-                <div className="text-[13px] text-[var(--text-2)]">
-                  Last backup:{" "}
-                  <span className="font-[550] text-[var(--text-1)]">
-                    {formatRelative(backupStatus?.lastBackupAt ?? null)}
-                  </span>
-                </div>
-                {backupStatus?.location && (
-                  <div className="text-[12px] text-[var(--text-4)] mt-1 font-mono break-all">
-                    {backupStatus.location}
-                  </div>
-                )}
-                {backupStatus?.lastDbFile && backupStatus?.lastContentFile && (
-                  <div className="text-[11px] text-[var(--text-4)] mt-1 font-mono">
-                    {backupStatus.lastDbFile} · {backupStatus.lastContentFile}
-                  </div>
-                )}
+
+          <div className="setting-row">
+            <div>
+              <div className="k">Leading</div>
+              <div className="desc">Row + section rhythm</div>
+            </div>
+            <div className="seg">
+              {DENSITIES.map((d) => (
+                <button key={d.v} type="button" className={tweakState.density === d.v ? "on" : ""} onClick={() => setTweak("density", d.v)}>
+                  {d.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="setting-row">
+            <div>
+              <div className="k">Grain</div>
+              <div className="desc">Paper texture overlay</div>
+            </div>
+            <div
+              className={`switch${tweakState.grain ? " on" : ""}`}
+              onClick={() => setTweak("grain", !tweakState.grain)}
+              role="button"
+              tabIndex={0}
+            />
+          </div>
+        </div>
+
+        {/* ── Storage / backup pointers ───────── */}
+        <div className="settings-card">
+          <h3>
+            <em>Storage</em>
+          </h3>
+          <div className="sub">Backup snapshots + raw paths.</div>
+          <div className="setting-row">
+            <div>
+              <div className="k">Run backup now</div>
+              <div className="desc">
+                Snapshots wiki/ + projects/ to backups/ as a tarball · Last: <b>{fmtAgo(backupStatus.lastCompletedAt)}</b>
+                {backupStatus.lastError ? ` · last error: ${backupStatus.lastError}` : ""}
               </div>
-              <button
-                onClick={runBackup}
-                disabled={backupRunning}
-                className="shrink-0 inline-flex items-center gap-2 px-3.5 py-2 rounded-md bg-[var(--primary)] text-white text-[13px] font-[550] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
-              >
-                {backupRunning ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    Backing up…
-                  </>
-                ) : (
-                  <>
-                    <Archive className="w-3.5 h-3.5" />
-                    Backup now
-                  </>
-                )}
-              </button>
             </div>
+            <button
+              className="btn primary"
+              onClick={runBackup}
+              disabled={backupRunning || backupStatus.running}
+            >
+              {backupRunning || backupStatus.running ? "Running…" : "Run backup"}
+            </button>
+          </div>
+          <div className="setting-row">
+            <div>
+              <div className="k">Wiki location</div>
+              <div className="desc">Project-scoped; see SETUP.md</div>
+            </div>
+            <span className="sv">
+              <b>~/SecondBrain/projects</b>
+            </span>
           </div>
         </div>
-      </section>
-
-      {/* About Section */}
-      <section>
-        <div className="bg-[var(--surface-card)] border border-[var(--border)] rounded-lg shadow-[var(--shadow-sm)]">
-          <div className="px-5 py-4 border-b border-[var(--border)]">
-            <h2 className="text-[14px] font-[600] text-[var(--text-1)]">About</h2>
-            <p className="text-[12px] text-[var(--text-3)] mt-0.5">
-              Application information
-            </p>
-          </div>
-          <div className="px-5 py-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-[13px] text-[var(--text-3)]">Application</span>
-              <span className="text-[13px] font-[500] text-[var(--text-1)]">WikiLM</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[13px] text-[var(--text-3)]">Version</span>
-              <span className="text-[13px] font-mono font-[500] text-[var(--text-1)]">0.1.0</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[13px] text-[var(--text-3)]">Architecture</span>
-              <span className="text-[13px] font-[500] text-[var(--text-1)]">LLM Wiki Schema</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[13px] text-[var(--text-3)]">Framework</span>
-              <span className="text-[13px] font-mono font-[500] text-[var(--text-1)]">Next.js 16</span>
-            </div>
-          </div>
-        </div>
-      </section>
+      </div>
     </div>
   );
 }

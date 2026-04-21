@@ -1,33 +1,27 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import {
-  Beaker,
-  Play,
-  Loader2,
-  CheckCircle2,
-  ExternalLink,
-  X,
-  Wand2,
-  Link2Off,
-  Lightbulb,
-  AlertTriangle,
-  Clock,
-  HelpCircle,
-  Search,
-  Unlink,
-} from "lucide-react";
-import { useToast } from "@/components/toast-provider";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useProject } from "@/components/project-switcher";
-import { Breadcrumbs } from "@/components/breadcrumbs";
-import { formatJobError } from "@/lib/error-codes";
+import { useToast } from "@/components/toast-provider";
+import { EditorialBreadcrumbs } from "@/components/editorial/wiki/breadcrumbs";
+
+/** Matches lib/lint.ts FIXABLE_CATEGORIES — the lint/fix pipeline only
+ *  knows how to repair these. Suggested questions + nudge-family findings
+ *  (promotion/theme/gap) are user-driven, not auto-fixable. */
+const FIXABLE_CATEGORIES = new Set([
+  "orphan",
+  "missing_concept",
+  "missing_cross_ref",
+  "stale_claim",
+  "contradiction",
+]);
 
 interface Finding {
   id: number;
   projectId: number;
   jobId: number | null;
+  scope: string;
   category: string;
   severity: string;
   title: string;
@@ -48,653 +42,609 @@ interface LatestJob {
   completedAt: string | null;
 }
 
-interface FindingsResponse {
-  findings: Finding[];
-  latestJob: LatestJob | null;
-}
+type StatusFilter = "active" | "dismissed" | "resolved" | "all";
 
-const categoryMeta: Record<
-  string,
-  { label: string; description: string; icon: typeof Beaker; color: string; dim: string }
-> = {
-  orphan: {
-    label: "Orphans",
-    description: "Pages with no inbound links",
-    icon: Unlink,
-    color: "var(--orange)",
-    dim: "var(--orange-dim)",
-  },
-  missing_concept: {
-    label: "Missing concept pages",
-    description: "Frequently mentioned ideas that don't have their own page",
-    icon: Lightbulb,
-    color: "var(--green)",
-    dim: "var(--green-dim)",
-  },
-  contradiction: {
-    label: "Contradictions",
-    description: "Pages making competing claims",
-    icon: AlertTriangle,
-    color: "var(--red)",
-    dim: "var(--red-dim)",
-  },
-  stale_claim: {
-    label: "Stale claims",
-    description: "Statements possibly superseded by newer sources",
-    icon: Clock,
-    color: "var(--text-3)",
-    dim: "var(--bg-3)",
-  },
-  missing_cross_ref: {
-    label: "Missing cross-references",
-    description: "Pages that should link to each other but don't",
-    icon: Link2Off,
-    color: "var(--blue)",
-    dim: "var(--blue-dim)",
-  },
-  suggested_question: {
-    label: "Suggested questions",
-    description: "Gaps worth investigating",
-    icon: HelpCircle,
-    color: "var(--primary)",
-    dim: "var(--primary-dim)",
-  },
+const CATEGORY_LABEL: Record<string, string> = {
+  orphan: "Orphans",
+  missing_concept: "Missing concepts",
+  contradiction: "Contradictions",
+  stale_claim: "Stale claims",
+  missing_cross_ref: "Missing cross-refs",
+  suggested_question: "Suggested questions",
+  promotion_candidate: "Promotion candidates",
+  recurring_theme: "Recurring themes",
+  parent_gap: "Parent gaps",
 };
 
 const CATEGORY_ORDER = [
-  "orphan",
   "contradiction",
   "stale_claim",
+  "orphan",
   "missing_concept",
   "missing_cross_ref",
   "suggested_question",
+  "promotion_candidate",
+  "recurring_theme",
+  "parent_gap",
 ];
 
-const FIXABLE_CATEGORIES = new Set([
-  "orphan",
-  "missing_concept",
-  "missing_cross_ref",
-  "stale_claim",
-]);
-
-// Findings in these categories open the /sources research flow instead of
-// an edit-wiki fix — the right answer for a gap is "find new material", not
-// "rewrite existing pages".
-const RESEARCHABLE_CATEGORIES = new Set(["suggested_question"]);
-
-function formatRelative(dateStr: string | null): string {
-  if (!dateStr) return "—";
-  const d = new Date(dateStr);
-  const diffSec = Math.round((Date.now() - d.getTime()) / 1000);
-  if (diffSec < 60) return "just now";
-  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
-  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+function severityClass(s: string, cat: string): string {
+  if (s === "warn" || cat === "contradiction") return "warn";
+  if (cat === "stale_claim") return "severe";
+  return "info";
 }
 
-function wikiPageToHref(targetPage: string | null): string | null {
-  if (!targetPage) return null;
-  const stripped = targetPage.replace(/^wiki\//, "").replace(/\.md$/, "");
-  if (!stripped) return null;
-  return `/wiki?slug=${encodeURIComponent(stripped)}`;
+function fmtAgo(iso: string | undefined | null): string {
+  if (!iso) return "never";
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return "never";
+  const diff = Date.now() - t;
+  const sec = Math.round(diff / 1000);
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  return `${Math.floor(hr / 24)}d ago`;
 }
 
-export default function LintPage() {
+function EditInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { activeProject } = useProject();
-  const activeProjectId = activeProject?.id ?? null;
-  const [data, setData] = useState<FindingsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [starting, setStarting] = useState(false);
-  const [dismissing, setDismissing] = useState<Set<number>>(new Set());
-  const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const [fixingBulk, setFixingBulk] = useState(false);
   const { addToast } = useToast();
+  const projectId = activeProject?.id ?? null;
+
+  const [findings, setFindings] = useState<Finding[]>([]);
+  const [latestJob, setLatestJob] = useState<LatestJob | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
+  const [running, setRunning] = useState(false);
+  const [busy, setBusy] = useState<Set<number>>(new Set());
+  const [gone, setGone] = useState<Set<number>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const autoFiredRef = useState({ done: false })[0];
+  const autoRun = searchParams.get("run") === "1";
+  const [conceptModal, setConceptModal] = useState<{ finding: Finding; title: string } | null>(null);
+  const [conceptBusy, setConceptBusy] = useState(false);
 
   const fetchFindings = useCallback(async () => {
-    // Defer until the active project is known so the first paint reflects
-    // the real project, not project 1 via endpoint default.
-    if (activeProjectId === null) return;
+    if (projectId === null) return;
     try {
       const res = await fetch(
-        `/api/lint/findings?status=active&projectId=${activeProjectId}`
+        `/api/lint/findings?projectId=${projectId}&status=${statusFilter}&scope=all`
       );
-      if (res.ok) {
-        const json: FindingsResponse = await res.json();
-        setData(json);
-        // Prune selections for findings that no longer exist or are no longer open
-        const validIds = new Set(
-          json.findings.filter((f) => f.status === "open").map((f) => f.id)
-        );
-        setSelected((prev) => {
-          const next = new Set<number>();
-          for (const id of prev) if (validIds.has(id)) next.add(id);
-          return next.size === prev.size ? prev : next;
-        });
-      }
-    } catch {
-      // silent
-    } finally {
-      setLoading(false);
-    }
-  }, [activeProjectId]);
+      if (!res.ok) return;
+      const d = await res.json();
+      setFindings(d.findings ?? []);
+      setLatestJob(d.latestLintJob ?? null);
+    } catch {}
+  }, [projectId, statusFilter]);
 
-  // Re-fetch when project changes; clear selections so a fix-all from
-  // another project can't fire against stale ids.
   useEffect(() => {
-    setSelected(new Set());
     fetchFindings();
-    const interval = setInterval(fetchFindings, 4000);
-    return () => clearInterval(interval);
   }, [fetchFindings]);
 
-  const latestJob = data?.latestJob ?? null;
-  const jobRunning =
-    latestJob?.status === "running" || latestJob?.status === "queued";
-  const lintRunning = jobRunning && latestJob?.type === "lint";
+  // Palette intent: /lint?run=1 triggers a fresh pass on arrival
+  useEffect(() => {
+    if (autoFiredRef.done) return;
+    if (!autoRun || !projectId) return;
+    autoFiredRef.done = true;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("run");
+    window.history.replaceState(null, "", url.pathname + url.search);
+    runLint();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoRun, projectId]);
+
+  // Poll while a lint job is running
+  useEffect(() => {
+    if (!latestJob || (latestJob.status !== "running" && latestJob.status !== "queued")) return;
+    const i = window.setInterval(fetchFindings, 3000);
+    return () => window.clearInterval(i);
+  }, [latestJob, fetchFindings]);
+
+  const mark = useCallback((id: number, on: boolean) => {
+    setBusy((p) => {
+      const next = new Set(p);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
 
   async function runLint() {
-    if (starting || jobRunning || activeProjectId === null) return;
-    setStarting(true);
+    if (!projectId || running) return;
+    setRunning(true);
     try {
       const res = await fetch("/api/lint/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId: activeProjectId }),
+        body: JSON.stringify({ projectId }),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error ?? "Failed to start lint job");
-      }
-      const data = await res.json();
-      // If the job failed pre-flight (provider unreachable etc.), surface
-      // the classified error instead of pretending the run started.
-      if (data.status === "failed") {
-        const msg = formatJobError(data.errorCode, data.error);
-        addToast({ type: "error", ...msg });
-      } else {
-        addToast({
-          type: "info",
-          title: "Lint started",
-          description: "Auditing the wiki — findings will appear as they're discovered.",
-        });
-      }
+      if (!res.ok) throw new Error();
+      addToast({ type: "success", title: "Lint pass started — findings will land below" });
       fetchFindings();
-    } catch (err) {
-      addToast({
-        type: "error",
-        title: "Couldn't start lint",
-        description: err instanceof Error ? err.message : "Unknown error",
-      });
+    } catch {
+      addToast({ type: "error", title: "Couldn't start lint" });
     } finally {
-      setStarting(false);
+      setRunning(false);
     }
   }
 
-  async function dismiss(id: number) {
-    setDismissing((prev) => new Set(prev).add(id));
+  async function dismiss(f: Finding) {
+    mark(f.id, true);
     try {
-      const res = await fetch(`/api/lint/findings/${id}`, {
+      const res = await fetch(`/api/lint/findings/${f.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "dismissed" }),
       });
-      if (!res.ok) throw new Error("Dismiss failed");
-      setData((prev) =>
-        prev
-          ? { ...prev, findings: prev.findings.filter((f) => f.id !== id) }
-          : prev
-      );
-      setSelected((prev) => {
-        if (!prev.has(id)) return prev;
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
+      if (!res.ok) throw new Error();
+      setGone((p) => new Set(p).add(f.id));
+      addToast({ type: "success", title: "Dismissed" });
+      window.setTimeout(() => {
+        setFindings((p) => p.filter((x) => x.id !== f.id));
+        setGone((p) => {
+          const n = new Set(p);
+          n.delete(f.id);
+          return n;
+        });
+      }, 300);
     } catch {
-      addToast({ type: "error", title: "Couldn't dismiss finding" });
+      addToast({ type: "error", title: "Couldn't dismiss" });
     } finally {
-      setDismissing((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
+      mark(f.id, false);
     }
   }
 
-  async function fixOne(id: number) {
-    if (activeProjectId === null) return;
+  async function fixOne(f: Finding) {
+    mark(f.id, true);
     try {
-      const res = await fetch(`/api/lint/findings/${id}/fix`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId: activeProjectId }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error ?? "Failed to start fix");
-      }
-      const data = await res.json();
-      if (data.status === "failed") {
-        const msg = formatJobError(data.errorCode, data.error);
-        addToast({ type: "error", ...msg });
-        fetchFindings();
-        return;
-      }
-      addToast({
-        type: "info",
-        title: "Fix started",
-        description: "Claude is applying the fix — this takes ~30s.",
-      });
-      setSelected((prev) => {
-        if (!prev.has(id)) return prev;
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
+      const res = await fetch(`/api/lint/findings/${f.id}/fix`, { method: "POST" });
+      if (!res.ok) throw new Error();
+      addToast({ type: "success", title: "Fix queued — see Dispatch" });
       fetchFindings();
-    } catch (err) {
-      addToast({
-        type: "error",
-        title: "Couldn't start fix",
-        description: err instanceof Error ? err.message : "Unknown error",
-      });
+    } catch {
+      addToast({ type: "error", title: "Couldn't queue fix" });
+    } finally {
+      mark(f.id, false);
     }
   }
 
-  async function fixMany(ids: number[]) {
-    if (ids.length === 0 || activeProjectId === null) return;
-    setFixingBulk(true);
+  async function fixCategory(cat: string, items: Finding[]) {
+    if (!projectId) return;
+    const ids = items
+      .filter((f) => f.status === "open" && FIXABLE_CATEGORIES.has(f.category))
+      .map((f) => f.id);
+    if (ids.length === 0) {
+      addToast({ type: "info", title: "Nothing auto-fixable in this category" });
+      return;
+    }
+    ids.forEach((id) => mark(id, true));
     try {
       const res = await fetch("/api/lint/fix", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId: activeProjectId, findingIds: ids }),
+        body: JSON.stringify({ findingIds: ids, projectId }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error ?? "Failed to start fix");
+        throw new Error(err.error ?? "fix failed");
       }
-      const json = (await res.json()) as {
-        count: number;
-        status?: string;
-        error?: string | null;
-        errorCode?: string | null;
-      };
-      if (json.status === "failed") {
-        const msg = formatJobError(json.errorCode, json.error);
-        addToast({ type: "error", ...msg });
-        setSelected(new Set());
+      const d = await res.json();
+      addToast({
+        type: "success",
+        title: `Fixing ${ids.length} in ${cat}`,
+        description: "Synthesis will refresh automatically after all fixes complete.",
+      });
+      // Follow the bulk-fix job so the list refreshes when it finishes
+      if (d.jobId) {
+        const poll = window.setInterval(async () => {
+          try {
+            const jr = await fetch(`/api/claude/job/${d.jobId}`);
+            if (jr.ok) {
+              const j = await jr.json();
+              if (j.status === "completed" || j.status === "failed" || j.status === "cancelled") {
+                window.clearInterval(poll);
+                ids.forEach((id) => mark(id, false));
+                fetchFindings();
+              }
+            }
+          } catch {}
+        }, 3000);
+      }
+    } catch (err: unknown) {
+      ids.forEach((id) => mark(id, false));
+      addToast({ type: "error", title: err instanceof Error ? err.message : "Couldn't queue bulk fix" });
+    }
+  }
+
+  function researchGap(f: Finding) {
+    // Hand the suggested question / gap off to the real research stream
+    // by navigating to /sources with the topic pre-filled. The Research
+    // tab auto-fires on mount when ?topic= is present.
+    const topic = f.title;
+    router.push(`/sources?tab=research&topic=${encodeURIComponent(topic)}`);
+  }
+
+  async function promote(f: Finding, mode: "move" | "copy" = "move") {
+    if (!f.targetPage) {
+      addToast({ type: "error", title: "No target page", description: "This finding has nothing to promote." });
+      return;
+    }
+    // target_page format from parent-lint: "<childSlug>:<pageSlug>"
+    const colon = f.targetPage.lastIndexOf(":");
+    if (colon === -1) {
+      addToast({ type: "error", title: "Invalid target", description: `Expected "<childSlug>:<pageSlug>", got ${f.targetPage}` });
+      return;
+    }
+    const childSlug = f.targetPage.slice(0, colon);
+    const pageSlug = f.targetPage.slice(colon + 1);
+    mark(f.id, true);
+    try {
+      const res = await fetch(`/api/projects/${f.projectId}/promote-page`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ findingId: f.id, childSlug, pageSlug, mode }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? "promote failed");
+      }
+      addToast({
+        type: "success",
+        title: mode === "copy" ? "Copied to parent" : "Promoted to parent",
+        description:
+          mode === "copy"
+            ? "Child keeps its copy; both locations remain valid"
+            : "Child page moved; wikilinks rewritten everywhere",
+      });
+      setGone((p) => new Set(p).add(f.id));
+      window.setTimeout(() => {
+        setFindings((p) => p.filter((x) => x.id !== f.id));
+        setGone((p) => {
+          const n = new Set(p);
+          n.delete(f.id);
+          return n;
+        });
         fetchFindings();
-        return;
-      }
-      addToast({
-        type: "info",
-        title: `Fixing ${json.count} findings`,
-        description: "Claude is batching these — this can take a few minutes.",
-      });
-      setSelected(new Set());
-      fetchFindings();
-    } catch (err) {
-      addToast({
-        type: "error",
-        title: "Couldn't start bulk fix",
-        description: err instanceof Error ? err.message : "Unknown error",
-      });
+      }, 300);
+    } catch (err: unknown) {
+      addToast({ type: "error", title: err instanceof Error ? err.message : "Couldn't promote" });
     } finally {
-      setFixingBulk(false);
+      mark(f.id, false);
     }
   }
 
-  function toggleCategory(cat: string) {
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (next.has(cat)) next.delete(cat);
-      else next.add(cat);
-      return next;
+  async function createConcept() {
+    if (!conceptModal) return;
+    setConceptBusy(true);
+    try {
+      // Derive evidencing slugs from the finding's target_page + description.
+      // target_page format from lint findings is "<slug>" or "<childSlug>:<slug>".
+      const f = conceptModal.finding;
+      const evidencingSlugs: string[] = [];
+      if (f.targetPage) {
+        const colon = f.targetPage.lastIndexOf(":");
+        const slug = colon === -1 ? f.targetPage : f.targetPage.slice(colon + 1);
+        if (slug && !evidencingSlugs.includes(slug)) evidencingSlugs.push(slug);
+      }
+      // Pull any [[wikilinks]] mentioned in the description
+      const re = /\[\[([^\]]+)\]\]/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(f.description)) !== null) {
+        const s = m[1].split("|")[0].trim();
+        if (s && !evidencingSlugs.includes(s)) evidencingSlugs.push(s);
+      }
+      const res = await fetch("/api/wiki/concept-scaffold", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: f.projectId,
+          title: conceptModal.title,
+          findingId: f.id,
+          evidencingSlugs,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? "scaffold failed");
+      }
+      const d = await res.json();
+      addToast({
+        type: "success",
+        title: `Concept drafting · ${conceptModal.title}`,
+        description: d.fillJobId
+          ? "Skeleton written; Claude is populating the page — watch Dispatch."
+          : "Skeleton written (fill job didn't queue — edit manually).",
+      });
+      setGone((p) => new Set(p).add(conceptModal.finding.id));
+      const closedId = conceptModal.finding.id;
+      setConceptModal(null);
+      window.setTimeout(() => {
+        setFindings((p) => p.filter((x) => x.id !== closedId));
+        setGone((p) => {
+          const n = new Set(p);
+          n.delete(closedId);
+          return n;
+        });
+        fetchFindings();
+      }, 300);
+    } catch {
+      addToast({ type: "error", title: "Couldn't create concept" });
+    } finally {
+      setConceptBusy(false);
+    }
+  }
+
+  function toggleGroup(cat: string) {
+    setCollapsed((p) => {
+      const n = new Set(p);
+      if (n.has(cat)) n.delete(cat);
+      else n.add(cat);
+      return n;
     });
   }
 
-  function toggleSelected(id: number) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  const findings = data?.findings ?? [];
   const grouped = useMemo(() => {
-    const m = new Map<string, Finding[]>();
+    const groups = new Map<string, Finding[]>();
+    for (const cat of CATEGORY_ORDER) groups.set(cat, []);
     for (const f of findings) {
-      const list = m.get(f.category) ?? [];
-      list.push(f);
-      m.set(f.category, list);
+      if (!groups.has(f.category)) groups.set(f.category, []);
+      groups.get(f.category)!.push(f);
     }
-    return m;
+    return Array.from(groups.entries()).filter(([, v]) => v.length > 0);
   }, [findings]);
 
-  const hasFindings = findings.length > 0;
-  const selectedFixableIds = useMemo(
-    () =>
-      findings
-        .filter(
-          (f) =>
-            selected.has(f.id) &&
-            f.status === "open" &&
-            FIXABLE_CATEGORIES.has(f.category)
-        )
-        .map((f) => f.id),
-    [findings, selected]
-  );
+  const counts = useMemo(() => {
+    const c = { active: 0, warn: 0, dismissed: 0, total: findings.length };
+    for (const f of findings) {
+      if (f.status === "open" || f.status === "fixing") c.active++;
+      if (f.severity === "warn") c.warn++;
+      if (f.status === "dismissed") c.dismissed++;
+    }
+    return c;
+  }, [findings]);
 
-  const lastRanLabel = latestJob?.completedAt
-    ? `Last ${latestJob.type === "fix" ? "fix" : "lint"} ${formatRelative(latestJob.completedAt)}`
-    : latestJob?.startedAt && !jobRunning
-      ? `Started ${formatRelative(latestJob.startedAt)}`
-      : latestJob
-        ? null
-        : "Never run";
+  const jobRunning =
+    latestJob && (latestJob.status === "running" || latestJob.status === "queued");
 
   return (
-    <div className="p-8 max-w-[960px]">
-      <Breadcrumbs project={activeProject} />
-      {/* Header */}
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5 mb-1">
-            <div
-              className="w-8 h-8 rounded-md flex items-center justify-center"
-              style={{ backgroundColor: "var(--orange-dim)" }}
-            >
-              <Beaker className="w-4 h-4" style={{ color: "var(--orange)" }} />
-            </div>
-            <h1 className="text-[22px] font-[650] text-[var(--text-1)] tracking-tight leading-tight">
-              Lint
-            </h1>
-          </div>
-          <p className="text-sm text-[var(--text-3)]">
-            Wiki health check — orphans, missing pages, contradictions, and cross-reference gaps.
-          </p>
-        </div>
+    <div className="pad">
+      <EditorialBreadcrumbs tail="Edit" />
 
-        <button
-          onClick={runLint}
-          disabled={starting || jobRunning}
-          className="shrink-0 inline-flex items-center gap-2 px-3.5 py-2 rounded-md bg-[var(--primary)] text-white text-[13px] font-[550] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
-        >
-          {lintRunning ? (
-            <>
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              Running…
-            </>
-          ) : (
-            <>
-              <Play className="w-3.5 h-3.5" />
-              Run lint
-            </>
-          )}
+      <div className="sec-head">
+        <h1>
+          The <em>Edit.</em>
+        </h1>
+        <div className="rail-meta">
+          <div>
+            <b>{counts.active}</b> open
+          </div>
+          <div>
+            <b>{counts.warn}</b> warn
+          </div>
+          <div>
+            Last pass <b>{fmtAgo(latestJob?.completedAt ?? latestJob?.startedAt)}</b>
+          </div>
+        </div>
+      </div>
+
+      <div className="edit-toolbar">
+        <button className="btn primary" onClick={runLint} disabled={running || !!jobRunning}>
+          {jobRunning ? "Linting…" : running ? "Queueing…" : "Run lint pass →"}
         </button>
-      </div>
-
-      {/* Status strip */}
-      <div className="mb-5 flex items-center gap-2 text-[12px] text-[var(--text-4)]">
-        {lintRunning ? (
-          <>
-            <Loader2 className="w-3 h-3 animate-spin text-[var(--blue)]" />
-            <span className="text-[var(--text-3)]">
-              Auditing the wiki — this usually takes a minute or two.
-            </span>
-          </>
-        ) : jobRunning && latestJob?.type === "fix" ? (
-          <>
-            <Loader2 className="w-3 h-3 animate-spin text-[var(--green)]" />
-            <span className="text-[var(--text-3)]">
-              Applying fixes — findings will disappear as they're resolved.
-            </span>
-          </>
-        ) : (
-          <>
-            <span>{lastRanLabel}</span>
-            {hasFindings && (
-              <>
-                <span className="text-[var(--text-4)]">·</span>
-                <span>
-                  {findings.length} open finding{findings.length === 1 ? "" : "s"}
-                </span>
-              </>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Selection bar */}
-      {selectedFixableIds.length > 0 && (
-        <div className="mb-4 flex items-center justify-between gap-3 px-4 py-2.5 rounded-md bg-[var(--primary-dim)] border border-[var(--primary)] text-[13px]">
-          <div className="text-[var(--primary)] font-[550]">
-            {selectedFixableIds.length} finding
-            {selectedFixableIds.length === 1 ? "" : "s"} selected
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setSelected(new Set())}
-              className="px-2.5 py-1 rounded text-[12px] font-[500] text-[var(--text-3)] hover:bg-[var(--bg-hover)]"
-            >
-              Clear
+        <div className="edit-filter">
+          {(["active", "dismissed", "resolved", "all"] as StatusFilter[]).map((s) => (
+            <button key={s} className={statusFilter === s ? "on" : ""} onClick={() => setStatusFilter(s)}>
+              {s}
             </button>
-            <button
-              onClick={() => fixMany(selectedFixableIds)}
-              disabled={fixingBulk || jobRunning}
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-[var(--primary)] text-white text-[12px] font-[550] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Wand2 className="w-3 h-3" />
-              Fix selected
-            </button>
-          </div>
+          ))}
         </div>
-      )}
+        <span className="count">
+          Showing <b>{findings.length}</b> findings
+        </span>
+      </div>
 
-      {/* Body */}
-      {loading ? (
-        <div className="text-center py-16 text-[13px] text-[var(--text-4)]">Loading…</div>
-      ) : !hasFindings ? (
-        <div className="bg-[var(--surface-card)] border border-[var(--border)] rounded-lg shadow-[var(--shadow-sm)] p-10 text-center">
-          <div
-            className="w-10 h-10 mx-auto mb-3 rounded-md flex items-center justify-center"
-            style={{ backgroundColor: "var(--green-dim)" }}
-          >
-            <CheckCircle2 className="w-5 h-5" style={{ color: "var(--green)" }} />
-          </div>
-          <div className="text-[14px] font-[550] text-[var(--text-1)] mb-1">
-            {latestJob ? "No open findings" : "Haven't run yet"}
-          </div>
-          <div className="text-[13px] text-[var(--text-3)] max-w-md mx-auto">
-            {latestJob
-              ? "The wiki is clean — or everything's been dismissed. Run lint again to re-audit."
-              : "Run lint to audit the wiki for orphans, missing concepts, contradictions, and gaps."}
-          </div>
+      {findings.length === 0 ? (
+        <div className="edit-empty">
+          {jobRunning
+            ? "Lint pass in flight — findings will land here as they come in."
+            : statusFilter === "active"
+              ? "Nothing to flag. Run a lint pass to surface new findings."
+              : `No ${statusFilter} findings.`}
         </div>
       ) : (
-        <div className="space-y-4">
-          {CATEGORY_ORDER.filter((cat) => grouped.has(cat)).map((cat) => {
-            const items = grouped.get(cat)!;
-            const meta = categoryMeta[cat];
-            const isCollapsed = collapsed.has(cat);
-            const Icon = meta?.icon ?? Beaker;
-            const isFixable = FIXABLE_CATEGORIES.has(cat);
-            const fixableOpenIds = items
-              .filter((f) => f.status === "open")
-              .map((f) => f.id);
-
-            return (
-              <div
-                key={cat}
-                className="bg-[var(--surface-card)] border border-[var(--border)] rounded-lg shadow-[var(--shadow-sm)] overflow-hidden"
-              >
-                <div className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[var(--bg-hover)] transition-colors">
+        grouped.map(([cat, items]) => {
+          const isCollapsed = collapsed.has(cat);
+          const isFixable = FIXABLE_CATEGORIES.has(cat);
+          const openInCat = items.filter((f) => f.status === "open").length;
+          return (
+            <div key={cat} className="edit-group">
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <button
+                  type="button"
+                  className={`edit-group-head${isCollapsed ? " collapsed" : ""}`}
+                  style={{ flex: 1 }}
+                  onClick={() => toggleGroup(cat)}
+                >
+                  <span className="chev-sm">▾</span>
+                  <span className="lab">
+                    <em>{CATEGORY_LABEL[cat] ?? cat}</em>
+                  </span>
+                  <span className="c">{items.length}</span>
+                </button>
+                {isFixable && openInCat > 1 && (
                   <button
-                    onClick={() => toggleCategory(cat)}
-                    className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                    type="button"
+                    className="btn sm primary"
+                    style={{ marginBottom: 10 }}
+                    onClick={() => fixCategory(cat, items)}
+                    title={`Queue a bulk fix for all open ${cat.replace(/_/g, " ")} findings — synthesis refreshes after`}
                   >
-                    <div
-                      className="w-7 h-7 rounded-md flex items-center justify-center shrink-0"
-                      style={{ backgroundColor: meta?.dim ?? "var(--bg-3)" }}
-                    >
-                      <Icon
-                        className="w-3.5 h-3.5"
-                        style={{ color: meta?.color ?? "var(--text-3)" }}
-                      />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-[13px] font-[600] text-[var(--text-1)]">
-                        {meta?.label ?? cat}
-                        <span className="ml-2 text-[11px] font-mono font-[500] text-[var(--text-4)]">
-                          {items.length}
-                        </span>
-                      </div>
-                      {meta?.description && (
-                        <div className="text-[12px] text-[var(--text-4)] mt-0.5">
-                          {meta.description}
-                        </div>
-                      )}
-                    </div>
-                    <span className="text-[11px] text-[var(--text-4)] font-mono">
-                      {isCollapsed ? "+" : "−"}
-                    </span>
+                    Fix all · {openInCat}
                   </button>
-                  {isFixable && fixableOpenIds.length > 0 && (
-                    <button
-                      onClick={() => fixMany(fixableOpenIds)}
-                      disabled={fixingBulk || jobRunning}
-                      className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-[var(--border)] bg-[var(--bg-2)] text-[12px] font-[500] text-[var(--text-2)] hover:border-[var(--border-strong)] hover:text-[var(--text-1)] disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Wand2 className="w-3 h-3" />
-                      Fix all ({fixableOpenIds.length})
-                    </button>
-                  )}
-                </div>
-
-                {!isCollapsed && (
-                  <div className="divide-y divide-[var(--border)]">
-                    {items.map((f) => {
-                      const targetHref = wikiPageToHref(f.targetPage);
-                      const pendingDismiss = dismissing.has(f.id);
-                      const isFixing = f.status === "fixing";
-                      const rowFixable = FIXABLE_CATEGORIES.has(f.category);
-                      const rowResearchable = RESEARCHABLE_CATEGORIES.has(f.category);
-                      return (
-                        <div
-                          key={f.id}
-                          className={`px-4 py-3 flex items-start gap-3 ${isFixing ? "opacity-60" : ""}`}
-                        >
-                          {rowFixable && !isFixing ? (
-                            <input
-                              type="checkbox"
-                              checked={selected.has(f.id)}
-                              onChange={() => toggleSelected(f.id)}
-                              className="mt-1.5 shrink-0 accent-[var(--primary)] cursor-pointer"
-                              aria-label="Select finding"
-                            />
-                          ) : (
-                            <span
-                              className="w-2 h-2 rounded-full mt-1.5 shrink-0"
-                              style={{
-                                backgroundColor:
-                                  f.severity === "warn"
-                                    ? "var(--red)"
-                                    : meta?.color ?? "var(--text-3)",
-                              }}
-                            />
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <div className="text-[13px] font-[550] text-[var(--text-1)] flex items-center gap-2">
-                              {f.title}
-                              {isFixing && (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-[550] px-1.5 py-px rounded-full bg-[var(--green-dim)] text-[var(--green)]">
-                                  <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                                  Fixing
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-[12px] text-[var(--text-3)] mt-0.5 leading-relaxed">
-                              {f.description}
-                            </div>
-                            {f.suggestedAction && (
-                              <div className="text-[11px] text-[var(--text-4)] mt-1 italic">
-                                Suggested: {f.suggestedAction}
-                              </div>
-                            )}
-                            {f.targetPage && (
-                              <div className="mt-1.5">
-                                {targetHref ? (
-                                  <Link
-                                    href={targetHref}
-                                    className="inline-flex items-center gap-1 text-[11px] font-mono text-[var(--primary)] hover:underline"
-                                  >
-                                    {f.targetPage}
-                                    <ExternalLink className="w-2.5 h-2.5" />
-                                  </Link>
-                                ) : (
-                                  <span className="text-[11px] font-mono text-[var(--text-4)]">
-                                    {f.targetPage}
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            {rowFixable && !isFixing && (
-                              <button
-                                onClick={() => fixOne(f.id)}
-                                disabled={jobRunning}
-                                title="Fix with Claude"
-                                className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-[500] text-[var(--text-3)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-1)] disabled:opacity-40 disabled:cursor-not-allowed"
-                              >
-                                <Wand2 className="w-3 h-3" />
-                                Fix
-                              </button>
-                            )}
-                            {rowResearchable && !isFixing && (
-                              <button
-                                onClick={() =>
-                                  router.push(
-                                    `/sources?tab=research&topic=${encodeURIComponent(f.title)}`
-                                  )
-                                }
-                                title="Research new sources to close this gap"
-                                className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-[500] text-[var(--text-3)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-1)]"
-                              >
-                                <Search className="w-3 h-3" />
-                                Research
-                              </button>
-                            )}
-                            {!isFixing && (
-                              <button
-                                onClick={() => dismiss(f.id)}
-                                disabled={pendingDismiss}
-                                title="Dismiss"
-                                className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-4)] hover:text-[var(--text-2)] disabled:opacity-40"
-                              >
-                                {pendingDismiss ? (
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                ) : (
-                                  <X className="w-3.5 h-3.5" />
-                                )}
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
                 )}
               </div>
-            );
-          })}
+              {!isCollapsed &&
+                items.map((f) => {
+                  const sevClass = severityClass(f.severity, f.category);
+                  const isFixing = f.status === "fixing" || busy.has(f.id);
+                  const isGone = gone.has(f.id);
+                  return (
+                    <div
+                      key={f.id}
+                      className={`finding ${sevClass}${isFixing ? " fixing" : ""}${isGone ? " gone" : ""}`}
+                    >
+                      <div className="body">
+                        <div className="cat">{f.category.replace(/_/g, " ")}</div>
+                        <div className="t">{f.title}</div>
+                        <div className="d">{f.description}</div>
+                        {f.targetPage && (
+                          <button
+                            type="button"
+                            className="tgt"
+                            onClick={() => {
+                              const slug = f.targetPage!.includes(":")
+                                ? f.targetPage!.split(":").slice(-1)[0]
+                                : f.targetPage!;
+                              router.push(`/wiki?slug=${encodeURIComponent(slug)}`);
+                            }}
+                            style={{ background: "none", border: "none", cursor: "pointer" }}
+                          >
+                            Open target · {f.targetPage}
+                          </button>
+                        )}
+                      </div>
+                      <div className="acts">
+                        {f.status === "open" && FIXABLE_CATEGORIES.has(f.category) && (
+                          <button
+                            className="btn primary"
+                            onClick={() => fixOne(f)}
+                            disabled={isFixing}
+                            title={f.suggestedAction ?? "Apply suggested fix"}
+                          >
+                            {isFixing ? "Fixing…" : "Fix"}
+                          </button>
+                        )}
+                        {f.status === "open" && f.category === "promotion_candidate" && f.targetPage && (
+                          <>
+                            <button
+                              className="btn primary"
+                              onClick={() => promote(f, "move")}
+                              disabled={isFixing}
+                              title="Move this child page to the parent wiki (wikilinks get rewritten)"
+                            >
+                              {isFixing ? "Promoting…" : "Promote (move)"}
+                            </button>
+                            <button
+                              className="btn"
+                              onClick={() => promote(f, "copy")}
+                              disabled={isFixing}
+                              title="Copy to parent — both locations remain valid"
+                            >
+                              Copy to parent
+                            </button>
+                          </>
+                        )}
+                        {f.status === "open" && (f.category === "recurring_theme" || f.category === "parent_gap") && (
+                          <button
+                            className="btn primary"
+                            onClick={() => setConceptModal({ finding: f, title: f.title })}
+                            disabled={isFixing}
+                            title="Scaffold a new concept page from this finding"
+                          >
+                            Create concept
+                          </button>
+                        )}
+                        {f.status === "open" && (f.category === "suggested_question" || f.category === "parent_gap") && (
+                          <button
+                            className="btn"
+                            onClick={() => researchGap(f)}
+                            disabled={isFixing}
+                            title="Open Research with this as the topic"
+                          >
+                            Research →
+                          </button>
+                        )}
+                        {f.status !== "dismissed" && (
+                          <button className="btn red" onClick={() => dismiss(f)} disabled={isFixing}>
+                            Dismiss
+                          </button>
+                        )}
+                        {f.status === "dismissed" && (
+                          <span className="seal ghost" style={{ justifyContent: "center" }}>
+                            Dismissed
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          );
+        })
+      )}
+
+      {conceptModal && (
+        <div className="note-modal-bg" onClick={() => !conceptBusy && setConceptModal(null)}>
+          <div className="note-modal" style={{ width: 500 }} onClick={(e) => e.stopPropagation()}>
+            <div className="note-modal-head">
+              <h3>
+                Create <em>concept</em>
+              </h3>
+              <button className="x" onClick={() => setConceptModal(null)} disabled={conceptBusy}>
+                ×
+              </button>
+            </div>
+            <div className="note-modal-body">
+              <label className="note-field">
+                <span className="lab">Concept title</span>
+                <input
+                  autoFocus
+                  type="text"
+                  value={conceptModal.title}
+                  onChange={(e) => setConceptModal({ ...conceptModal, title: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void createConcept();
+                    if (e.key === "Escape" && !conceptBusy) setConceptModal(null);
+                  }}
+                />
+              </label>
+              <div
+                style={{
+                  fontFamily: "var(--font-inst)",
+                  fontStyle: "italic",
+                  fontSize: 13,
+                  color: "var(--ink-3)",
+                }}
+              >
+                A scaffolded concept page will be written to <b>wiki/concepts/</b> and this finding will close.
+              </div>
+            </div>
+            <div className="note-modal-foot">
+              <button className="btn ghost" onClick={() => setConceptModal(null)} disabled={conceptBusy}>
+                Cancel
+              </button>
+              <button
+                className="btn primary"
+                onClick={() => void createConcept()}
+                disabled={conceptBusy || !conceptModal.title.trim()}
+              >
+                {conceptBusy ? "Scaffolding…" : "Create"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
+  );
+}
+
+export default function EditPage() {
+  return (
+    <Suspense fallback={null}>
+      <EditInner />
+    </Suspense>
   );
 }

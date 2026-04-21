@@ -1,6 +1,14 @@
 import { NextRequest } from "next/server";
 import { db } from "@/db";
-import { projects } from "@/db/schema";
+import {
+  projects,
+  sources,
+  jobs,
+  chatSessions,
+  chatMessages,
+  lintFindings,
+  wikiPages,
+} from "@/db/schema";
 import { eq } from "drizzle-orm";
 import fs from "fs";
 import { hasChildren, projectRoot } from "@/lib/projects";
@@ -87,7 +95,33 @@ export async function DELETE(
     }
   }
 
-  // Delete from DB
+  // Cascade-delete rows that FK into this projectId. SQLite doesn't enforce
+  // ON DELETE CASCADE on our schema, so skipping this step leaves the final
+  // project DELETE to trip a FK constraint → 500.
+  try {
+    db.delete(lintFindings).where(eq(lintFindings.projectId, projectId)).run();
+  } catch {}
+  try {
+    db.delete(sources).where(eq(sources.projectId, projectId)).run();
+  } catch {}
+  try {
+    db.delete(jobs).where(eq(jobs.projectId, projectId)).run();
+  } catch {}
+  try {
+    const sess = db
+      .select({ id: chatSessions.id })
+      .from(chatSessions)
+      .where(eq(chatSessions.projectId, projectId))
+      .all();
+    for (const s of sess) {
+      db.delete(chatMessages).where(eq(chatMessages.sessionId, s.id)).run();
+    }
+    db.delete(chatSessions).where(eq(chatSessions.projectId, projectId)).run();
+  } catch {}
+  try {
+    db.delete(wikiPages).where(eq(wikiPages.projectId, projectId)).run();
+  } catch {}
+
   db.delete(projects).where(eq(projects.id, projectId)).run();
 
   return Response.json({ success: true });

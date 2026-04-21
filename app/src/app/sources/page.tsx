@@ -1,17 +1,15 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { useToast } from "@/components/toast-provider";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useProject } from "@/components/project-switcher";
-import { Breadcrumbs } from "@/components/breadcrumbs";
-import { NoteComposerModal } from "@/components/note-composer-modal";
-import { PenLine } from "lucide-react";
-
-/* ──────────────────────────── Types ──────────────────────────── */
+import { useToast } from "@/components/toast-provider";
+import { EditorialBreadcrumbs } from "@/components/editorial/wiki/breadcrumbs";
+import { NoteComposerModal } from "@/components/editorial/note-composer-modal";
 
 interface Source {
   id: number;
+  projectId: number;
   title: string;
   type: string;
   filePath: string;
@@ -33,197 +31,338 @@ interface ResearchResult {
   summary: string;
   tags: string[];
   status: "pending" | "approved" | "skipped" | "bookmarked";
-  ingestProgress?: { current: number; total: number };
 }
 
-/* ──────────────────────── Helper: SVG icons ──────────────────── */
+type Tab = "library" | "research";
+type KindFilter = "" | "pdf" | "web" | "note";
+type SortMode = "relevance" | "stream";
 
-function SearchIcon({ size = 14 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-    >
-      <circle cx="6.5" cy="6.5" r="5" />
-      <line x1="10.5" y1="10.5" x2="15" y2="15" />
-    </svg>
-  );
+const KIND_LABEL: Record<"pdf" | "web" | "note", string> = {
+  pdf: "PDF",
+  web: "URL",
+  note: "Note",
+};
+const KIND_ORDER: ("pdf" | "web" | "note")[] = ["pdf", "web", "note"];
+const DAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
+
+/** Project-scoped research persistence — each project keeps its own
+ *  query + candidate list in localStorage, so switching projects
+ *  preserves work-in-progress on both sides. */
+const researchQueryKey = (projectId: number) => `sb_research:${projectId}:query`;
+const researchResultsKey = (projectId: number) => `sb_research:${projectId}:results`;
+
+function parseMeta(meta: string | null): Record<string, unknown> {
+  if (!meta) return {};
+  try {
+    return JSON.parse(meta);
+  } catch {
+    return {};
+  }
 }
 
-function CheckIcon({ size = 12 }: { size?: number }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-    >
-      <polyline points="3,8 7,12 13,4" />
-    </svg>
-  );
+function subtitleFor(s: Source): string {
+  const m = parseMeta(s.meta);
+  if (s.author) return s.author;
+  const domain = m.domain as string | undefined;
+  if (domain) return domain;
+  const label = KIND_LABEL[s.type as "pdf" | "web" | "note"] ?? s.type.toUpperCase();
+  const d = new Date(s.createdAt);
+  return `${label} · ${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
 }
 
-function BookmarkIcon() {
-  return (
-    <svg
-      width="11"
-      height="11"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-    >
-      <path d="M3 2h10v13l-5-3.5L3 15V2z" />
-    </svg>
-  );
+function extractFor(s: Source): string {
+  const m = parseMeta(s.meta);
+  const summary = (m.summary as string | undefined) ?? (m.description as string | undefined);
+  if (summary) return summary;
+  if (s.type === "web") return "Web source · awaiting ingestion.";
+  if (s.type === "note") return "Captured note · awaiting ingestion.";
+  return "Pending source · awaiting ingestion.";
 }
 
-function CrossProjectIcon() {
-  return (
-    <svg
-      width="12"
-      height="12"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-    >
-      <circle cx="6" cy="6" r="5" />
-      <circle cx="11" cy="11" r="5" />
-    </svg>
-  );
+function externalUrlFor(s: Source): string | null {
+  if (s.type === "web" && s.filePath && /^https?:\/\//.test(s.filePath)) return s.filePath;
+  const m = parseMeta(s.meta);
+  const url = (m.url as string | undefined) ?? (m.source_url as string | undefined);
+  if (url && /^https?:\/\//.test(url)) return url;
+  return null;
 }
 
-/* ──────────────────────────── Page ──────────────────────────── */
+function dayOfWeek(iso: string): number {
+  return new Date(iso).getDay();
+}
 
-// Page default is a thin Suspense wrapper around SourcesPageInner; the
-// inner component is what uses useSearchParams(). Next.js 16 requires
-// the boundary for prerender — see STO-1759.
+function relevanceClass(pct: number): string {
+  if (pct >= 85) return "hi";
+  if (pct >= 70) return "mid";
+  return "lo";
+}
 
-/**
- * Resolve a human-readable subtitle for a source card.
- *
- * `author` is the ideal — it's already human. If absent, `meta` may contain
- * a JSON blob from the ingest pipeline — parse it and prefer known fields
- * (`domain`, `summary`). Fall back to the type label so cards never render
- * raw JSON braces again. Previously the subtitle was `author ?? meta ??
- * "Unknown"`, which dumped `{"tags":[...],...}` directly into the UI for
- * every programmatically-created note.
- */
-function humanizeSubtitle(s: Source): string {
-  if (s.author && s.author.trim()) return s.author;
-  if (s.meta && s.meta.trim().startsWith("{")) {
+function IntakePageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { activeProject } = useProject();
+  const { addToast } = useToast();
+  const projectId = activeProject?.id ?? null;
+
+  // ── Tab state ────────────────────────────────────────────────────
+  const urlTab = searchParams.get("tab");
+  const [tab, setTab] = useState<Tab>(urlTab === "research" ? "research" : "library");
+
+  // ── Library state ────────────────────────────────────────────────
+  const [sources, setSources] = useState<Source[]>([]);
+  const [kind, setKind] = useState<KindFilter>("");
+  const [approving, setApproving] = useState<Set<number>>(new Set());
+  const [slideOut, setSlideOut] = useState<Set<number>>(new Set());
+  const [dragActive, setDragActive] = useState(false);
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [quickUrl, setQuickUrl] = useState("");
+  const [quickBusy, setQuickBusy] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // ── Research state (project-scoped persistence) ─────────────────
+  const [researchQuery, setResearchQuery] = useState<string>("");
+  const [results, setResults] = useState<ResearchResult[]>([]);
+  const [maxResults, setMaxResults] = useState(8);
+  const [sortMode, setSortMode] = useState<SortMode>("relevance");
+  const [isSearching, setIsSearching] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+  const nextResultId = useRef<number>(0);
+
+  // ── Load project-scoped research state when project changes ─────
+  useEffect(() => {
+    if (projectId === null) return;
     try {
-      const parsed = JSON.parse(s.meta) as Record<string, unknown>;
-      if (typeof parsed.domain === "string" && parsed.domain) return parsed.domain;
-      if (typeof parsed.summary === "string" && parsed.summary) return parsed.summary;
+      const q = localStorage.getItem(researchQueryKey(projectId)) ?? "";
+      const rRaw = localStorage.getItem(researchResultsKey(projectId));
+      const r: ResearchResult[] = rRaw ? JSON.parse(rRaw) : [];
+      setResearchQuery(q);
+      setResults(r);
+      // Bump the id counter past any persisted ids so new results don't collide
+      const maxId = r
+        .map((x) => Number(x.id.replace(/^r/, "")))
+        .filter((n) => Number.isFinite(n))
+        .reduce((a, b) => Math.max(a, b), -1);
+      nextResultId.current = maxId + 1;
+    } catch {}
+  }, [projectId]);
+
+  // ── Persist on change (scoped to current project) ───────────────
+  useEffect(() => {
+    if (projectId === null) return;
+    try {
+      localStorage.setItem(researchResultsKey(projectId), JSON.stringify(results));
+    } catch {}
+  }, [results, projectId]);
+
+  useEffect(() => {
+    if (projectId === null) return;
+    try {
+      localStorage.setItem(researchQueryKey(projectId), researchQuery);
+    } catch {}
+  }, [researchQuery, projectId]);
+
+  // ── Sources fetch ────────────────────────────────────────────────
+  const fetchSources = useCallback(async () => {
+    if (projectId === null) return;
+    try {
+      const res = await fetch(`/api/sources?projectId=${projectId}`);
+      if (res.ok) {
+        const d = await res.json();
+        setSources(d.sources ?? []);
+      }
+    } catch {}
+  }, [projectId]);
+
+  useEffect(() => {
+    fetchSources();
+    const interval = window.setInterval(fetchSources, 4000);
+    return () => window.clearInterval(interval);
+  }, [fetchSources]);
+
+  const filtered = useMemo(() => {
+    let list = [...sources];
+    list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    if (kind) list = list.filter((s) => s.type === kind);
+    return list;
+  }, [sources, kind]);
+
+  const kindCounts = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const s of sources) c[s.type] = (c[s.type] ?? 0) + 1;
+    return c;
+  }, [sources]);
+
+  const weekBuckets = useMemo(() => {
+    const days: number[] = [0, 0, 0, 0, 0, 0, 0];
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    for (const s of sources) {
+      const t = new Date(s.createdAt).getTime();
+      if (t >= cutoff) days[dayOfWeek(s.createdAt)] += 1;
+    }
+    const today = new Date().getDay();
+    const rotated: number[] = [];
+    for (let i = 1; i <= 7; i++) rotated.push(days[(today + i) % 7]);
+    return rotated;
+  }, [sources]);
+
+  const statusCounts = useMemo(() => {
+    const c = { pending: 0, ingesting: 0, failed: 0, ingested: 0 };
+    for (const s of sources) {
+      if (s.status === "pending") c.pending++;
+      else if (s.status === "ingesting") c.ingesting++;
+      else if (s.status === "failed") c.failed++;
+      else if (s.status === "ingested") c.ingested++;
+    }
+    return c;
+  }, [sources]);
+
+  const weekTotal = weekBuckets.reduce((a, b) => a + b, 0);
+  const weekMax = Math.max(1, ...weekBuckets);
+
+  // ── Library actions ─────────────────────────────────────────────
+  async function approve(s: Source) {
+    if (s.status !== "pending" || approving.has(s.id)) return;
+    setApproving((p) => new Set(p).add(s.id));
+    try {
+      const res = await fetch(`/api/sources/${s.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "ingest" }),
+      });
+      if (!res.ok) throw new Error();
+      addToast({ type: "success", title: "Approved · page synthesized", description: s.title });
+      window.setTimeout(() => setSlideOut((p) => new Set(p).add(s.id)), 1100);
+      window.setTimeout(() => {
+        setSources((p) => p.filter((x) => x.id !== s.id));
+        setApproving((p) => {
+          const n = new Set(p);
+          n.delete(s.id);
+          return n;
+        });
+        setSlideOut((p) => {
+          const n = new Set(p);
+          n.delete(s.id);
+          return n;
+        });
+      }, 1600);
     } catch {
-      // fall through to type label
+      addToast({ type: "error", title: "Couldn't approve" });
+      setApproving((p) => {
+        const n = new Set(p);
+        n.delete(s.id);
+        return n;
+      });
     }
   }
-  const typeLabel = s.type.charAt(0).toUpperCase() + s.type.slice(1);
-  return typeLabel;
-}
 
-export default function SourcesPage() {
-  return (
-    <Suspense fallback={null}>
-      <SourcesPageInner />
-    </Suspense>
-  );
-}
-
-function SourcesPageInner() {
-  const searchParams = useSearchParams();
-  const { addToast } = useToast();
-  const { activeProject } = useProject();
-  const [tab, setTab] = useState<"library" | "research">("library");
-  const [noteModalOpen, setNoteModalOpen] = useState(false);
-  const [sources, setSources] = useState<Source[]>([]);
-  const [dragOver, setDragOver] = useState(false);
-  // Research state lives in localStorage — survives tab close, reload,
-  // and project switches. User explicitly asked for this; the keys aren't
-  // scoped by project so a run is visible regardless of which project is
-  // selected in the sidebar.
-  const [researchQuery, setResearchQuery] = useState(() => {
-    if (typeof window !== "undefined") return localStorage.getItem("sb_research_query") ?? "";
-    return "";
-  });
-  const [results, setResults] = useState<ResearchResult[]>(() => {
-    if (typeof window !== "undefined") {
-      try { return JSON.parse(localStorage.getItem("sb_research_results") ?? "[]"); } catch { return []; }
-    }
-    return [];
-  });
-  const [isSearching, setIsSearching] = useState(false);
-  const [maxResults, setMaxResults] = useState(8);
-  const [sortMode, setSortMode] = useState<"relevance" | "original">("relevance");
-  const [quickUrl, setQuickUrl] = useState("");
-  const [addingUrl, setAddingUrl] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const abortRef = useRef<AbortController | null>(null);
-  const nextResultId = useRef(0);
-
-  // Persist research state to localStorage on every change.
-  useEffect(() => {
-    localStorage.setItem("sb_research_results", JSON.stringify(results));
-  }, [results]);
-  useEffect(() => {
-    localStorage.setItem("sb_research_query", researchQuery);
-  }, [researchQuery]);
-
-  const clearResearch = useCallback(() => {
-    setResults([]);
-    setResearchQuery("");
+  async function remove(s: Source) {
+    if (!confirm(`Delete "${s.title}"? This removes the raw file + DB row.`)) return;
     try {
-      localStorage.removeItem("sb_research_results");
-      localStorage.removeItem("sb_research_query");
+      const res = await fetch(`/api/sources/${s.id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      addToast({ type: "success", title: "Source deleted" });
+      setSources((p) => p.filter((x) => x.id !== s.id));
     } catch {
-      // quota / private mode — in-memory clear still happened
+      addToast({ type: "error", title: "Couldn't delete" });
     }
-  }, []);
+  }
 
-  /* ── Fetch sources (poll while any are ingesting) ── */
-  useEffect(() => {
-    const fetchSources = () => {
-      const qp = activeProject ? `?projectId=${activeProject.id}` : "";
-      fetch(`/api/sources${qp}`)
-        .then((r) => r.json())
-        .then((d) => setSources(d.sources ?? []))
-        .catch(() => {});
-    };
+  async function uploadFiles(files: FileList | null) {
+    if (!files || files.length === 0 || !projectId) return;
+    for (const file of Array.from(files)) {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("projectId", String(projectId));
+      fd.append("ingest", "false");
+      try {
+        const res = await fetch("/api/sources/upload", { method: "POST", body: fd });
+        if (!res.ok) throw new Error();
+        addToast({ type: "success", title: `Queued · ${file.name}` });
+      } catch {
+        addToast({ type: "error", title: `Upload failed · ${file.name}` });
+      }
+    }
     fetchSources();
-    const interval = setInterval(fetchSources, 3000);
-    return () => clearInterval(interval);
-  }, [activeProject]);
+  }
 
-  /* ── Research stream ──
-     append=true keeps existing results and passes their URLs as
-     excludeUrls so the model avoids returning duplicates; results that
-     come back duplicate anyway are dropped client-side. */
+  async function submitQuickUrl() {
+    const q = quickUrl.trim();
+    if (!q || !projectId) return;
+    setQuickBusy(true);
+    try {
+      const isUrl = /^https?:\/\//.test(q);
+      if (isUrl) {
+        // Derive a title from the URL so the endpoint's title+url guard passes
+        let parsed: URL | null = null;
+        try { parsed = new URL(q); } catch {}
+        const host = parsed?.hostname?.replace(/^www\./, "") ?? q;
+        const lastPath = (parsed?.pathname ?? "").split("/").filter(Boolean).slice(-1)[0] ?? "";
+        const derivedTitle = lastPath
+          ? `${host} · ${lastPath.replace(/[-_]+/g, " ")}`
+          : host;
+        const res = await fetch("/api/sources/ingest-web", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: q, title: derivedTitle, domain: host, projectId, ingest: false }),
+        });
+        if (!res.ok) throw new Error();
+        addToast({ type: "success", title: "Web source queued" });
+        setQuickUrl("");
+        fetchSources();
+      } else {
+        // Not a URL → switch to research tab + kick off
+        setQuickUrl("");
+        setResearchQuery(q);
+        setTab("research");
+        router.replace(`/sources?tab=research`);
+        window.setTimeout(() => startResearch(q), 40);
+      }
+    } catch {
+      addToast({ type: "error", title: "Couldn't queue" });
+    } finally {
+      setQuickBusy(false);
+    }
+  }
+
+  // ── Research: SSE stream ────────────────────────────────────────
+  // Tracks which topic produced the currently-held results. When a user
+  // types a *new* topic and hits Commission, we confirm before wiping —
+  // when they hit Commission without changing the topic (or use Load more),
+  // we preserve the existing list and just append.
+  const [resultsTopic, setResultsTopic] = useState<string>("");
+  useEffect(() => {
+    // On project switch, sync resultsTopic from persisted query if we have results
+    if (results.length > 0 && !resultsTopic) setResultsTopic(researchQuery);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
+
   const runResearch = useCallback(
     async (topicOverride: string | undefined, append: boolean) => {
       const topic = (topicOverride ?? researchQuery).trim();
-      if (!topic || isSearching) return;
+      if (!topic || isSearching || !projectId) return;
 
-      // Build the exclusion set from the CURRENT results (append mode) or
-      // fresh (replace mode). Use a local Set that grows as new unique
-      // results stream in — prevents dupes within a single run too.
+      // If the topic matches the existing results' topic, always append
+      // (preserve prior work). Only wipe when the topic genuinely changes.
+      const topicChanged = resultsTopic && resultsTopic !== topic && results.length > 0;
+      const effectiveAppend = append || (!topicChanged && results.length > 0);
+
+      if (topicChanged && !append) {
+        const ok = window.confirm(
+          `Replace ${results.length} result${results.length === 1 ? "" : "s"} for "${resultsTopic}" with a fresh search for "${topic}"?`
+        );
+        if (!ok) return;
+      }
+
       const seenUrls = new Set<string>(
-        append ? results.map((r) => r.url).filter(Boolean) : []
+        effectiveAppend ? results.map((r) => r.url).filter(Boolean) : []
       );
       let addedThisRun = 0;
 
-      if (!append) {
+      if (!effectiveAppend) {
         setResults([]);
         nextResultId.current = 0;
       }
+      setResultsTopic(topic);
       setIsSearching(true);
 
       const controller = new AbortController();
@@ -235,6 +374,7 @@ function SourcesPageInner() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             topic,
+            projectId,
             maxResults,
             excludeUrls: append ? Array.from(seenUrls) : undefined,
           }),
@@ -243,6 +383,7 @@ function SourcesPageInner() {
 
         if (!res.ok || !res.body) {
           setIsSearching(false);
+          addToast({ type: "error", title: "Research failed to start" });
           return;
         }
 
@@ -253,26 +394,56 @@ function SourcesPageInner() {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split("\n");
           buffer = lines.pop() ?? "";
 
           for (const line of lines) {
-            if (!line.startsWith("data: ")) continue;
-            const payload = line.slice(6);
+            // The endpoint emits SSE-framed lines: `data: {json}`
+            // AND/OR raw `RESULT:{json}` lines depending on provider.
+            let payload: string | null = null;
+            if (line.startsWith("data: ")) {
+              payload = line.slice(6);
+            } else if (line.startsWith("data:")) {
+              payload = line.slice(5);
+            } else if (line.startsWith("RESULT:")) {
+              // Raw form — parse the JSON directly
+              try {
+                const json = JSON.parse(line.slice(7));
+                const url = json.url ?? "";
+                if (url && seenUrls.has(url)) continue;
+                if (url) seenUrls.add(url);
+                const r: ResearchResult = {
+                  id: `r${nextResultId.current++}`,
+                  title: json.title ?? "Untitled",
+                  url,
+                  domain: json.domain ?? "",
+                  author: json.author ?? "Unknown",
+                  type: json.type ?? "Article",
+                  summary: json.summary ?? "",
+                  relevance: json.relevance ?? 50,
+                  tags: json.tags ?? [],
+                  status: "pending",
+                };
+                setResults((prev) => [...prev, r]);
+                addedThisRun++;
+              } catch {}
+              continue;
+            } else {
+              continue;
+            }
+
             try {
               const evt = JSON.parse(payload);
-              if (evt.type === "content") {
+              if (evt.type === "content" && typeof evt.text === "string") {
                 const text: string = evt.text;
                 if (text.startsWith("RESULT:")) {
                   try {
                     const json = JSON.parse(text.slice(7));
                     const url = json.url ?? "";
-                    // Drop dupes — models sometimes return the excluded list anyway
                     if (url && seenUrls.has(url)) continue;
                     if (url) seenUrls.add(url);
-                    const result: ResearchResult = {
+                    const r: ResearchResult = {
                       id: `r${nextResultId.current++}`,
                       title: json.title ?? "Untitled",
                       url,
@@ -284,41 +455,70 @@ function SourcesPageInner() {
                       tags: json.tags ?? [],
                       status: "pending",
                     };
-                    setResults((prev) => [...prev, result]);
+                    setResults((prev) => [...prev, r]);
                     addedThisRun++;
-                  } catch {
-                    // malformed JSON line, skip
-                  }
-                } else if (text.trim() === "DONE") {
-                  setIsSearching(false);
+                  } catch {}
                 }
+              } else if (evt.type === "error" && typeof evt.text === "string") {
+                addToast({
+                  type: "error",
+                  title: "Research unavailable",
+                  description: evt.text,
+                });
               } else if (evt.type === "done") {
-                setIsSearching(false);
+                // stream will end naturally
               }
             } catch {
-              // malformed SSE payload, skip
+              // Not JSON — check if the payload itself contains RESULT: (some providers)
+              if (payload.startsWith("RESULT:")) {
+                try {
+                  const json = JSON.parse(payload.slice(7));
+                  const url = json.url ?? "";
+                  if (url && seenUrls.has(url)) continue;
+                  if (url) seenUrls.add(url);
+                  const r: ResearchResult = {
+                    id: `r${nextResultId.current++}`,
+                    title: json.title ?? "Untitled",
+                    url,
+                    domain: json.domain ?? "",
+                    author: json.author ?? "Unknown",
+                    type: json.type ?? "Article",
+                    summary: json.summary ?? "",
+                    relevance: json.relevance ?? 50,
+                    tags: json.tags ?? [],
+                    status: "pending",
+                  };
+                  setResults((prev) => [...prev, r]);
+                  addedThisRun++;
+                } catch {}
+              }
             }
           }
         }
 
-        // Load-more with zero additions → let the user know the pool is dry
-        if (append && addedThisRun === 0) {
+        if (effectiveAppend && addedThisRun === 0) {
           addToast({
             type: "info",
             title: "No new sources found",
             description: "The model couldn't turn up anything beyond what's already listed.",
           });
+        } else if (!effectiveAppend) {
+          addToast({ type: "success", title: `Found ${addedThisRun} source${addedThisRun === 1 ? "" : "s"}` });
+        } else {
+          addToast({ type: "success", title: `Added ${addedThisRun} more` });
         }
       } catch (err: unknown) {
         if (err instanceof DOMException && err.name === "AbortError") {
           // user cancelled
+        } else {
+          addToast({ type: "error", title: "Research failed" });
         }
       } finally {
         setIsSearching(false);
         abortRef.current = null;
       }
     },
-    [researchQuery, isSearching, maxResults, results, addToast]
+    [researchQuery, isSearching, maxResults, results, resultsTopic, projectId, addToast]
   );
 
   const startResearch = useCallback(
@@ -326,647 +526,507 @@ function SourcesPageInner() {
     [runResearch]
   );
 
-  const loadMoreResearch = useCallback(
-    () => runResearch(undefined, true),
-    [runResearch]
-  );
+  const loadMore = useCallback(() => runResearch(undefined, true), [runResearch]);
 
   const cancelResearch = useCallback(() => {
     abortRef.current?.abort();
     setIsSearching(false);
   }, []);
 
-  /* ── Auto-trigger research from URL params ──
-     Used by /lint and the /wiki synthesis detail pane to hand off a
-     knowledge-gap topic: /sources?tab=research&topic=<encoded>.
-     Runs once per page load; ref gate prevents re-trigger on re-renders. */
-  const autoResearchRan = useRef(false);
+  const clearResearch = useCallback(() => {
+    abortRef.current?.abort();
+    setIsSearching(false);
+    setResults([]);
+    setResearchQuery("");
+    setResultsTopic("");
+    if (projectId !== null) {
+      try {
+        localStorage.removeItem(researchQueryKey(projectId));
+        localStorage.removeItem(researchResultsKey(projectId));
+      } catch {}
+    }
+  }, [projectId]);
+
+  // ── Auto-trigger from URL params (Ledger → Intake handoff) ─────
+  const autoRan = useRef(false);
   useEffect(() => {
-    if (autoResearchRan.current) return;
-    const urlTab = searchParams.get("tab");
+    if (autoRan.current) return;
     const urlTopic = searchParams.get("topic");
     if (urlTab === "research") setTab("research");
-    if (urlTopic && urlTopic.trim()) {
-      autoResearchRan.current = true;
+    if (urlTopic && projectId !== null) {
+      autoRan.current = true;
       setResearchQuery(urlTopic);
-      // Fire with explicit topic — don't rely on the state update flushing first.
       startResearch(urlTopic);
+      router.replace("/sources?tab=research");
     }
-  }, [searchParams, startResearch]);
+  }, [searchParams, urlTab, projectId, router, startResearch]);
 
-  /* ── Refresh sources helper ── */
-  const refreshSources = useCallback(async () => {
-    const qp = activeProject ? `?projectId=${activeProject.id}` : "";
-    const d = await fetch(`/api/sources${qp}`).then((r) => r.json());
-    setSources(d.sources ?? []);
-  }, [activeProject]);
+  // ── Research result actions ─────────────────────────────────────
+  async function setResultStatus(id: string, status: ResearchResult["status"]) {
+    setResults((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
 
-  /* ── Delete source ── */
-  const deleteSource = useCallback(async (id: number) => {
-    if (!confirm("Delete this source and its raw file?")) return;
-    const res = await fetch(`/api/sources/${id}`, { method: "DELETE" });
-    if (res.ok) refreshSources();
-  }, [refreshSources]);
-
-  /* ── Trigger ingest on pending source ── */
-  const triggerIngest = useCallback(async (id: number) => {
-    await fetch(`/api/sources/${id}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "ingest" }),
-    });
-    refreshSources();
-  }, [refreshSources]);
-
-  /* ── Quick add URL ── */
-  const addUrl = useCallback(async () => {
-    const url = quickUrl.trim();
-    if (!url || addingUrl) return;
-
-    // Basic URL validation
-    let parsed: URL;
-    try {
-      parsed = new URL(url.startsWith("http") ? url : `https://${url}`);
-    } catch {
-      alert("Please enter a valid URL");
-      return;
-    }
-
-    setAddingUrl(true);
-    try {
-      // Extract title from URL path as a reasonable default; ingestion will improve it
-      const fallbackTitle = parsed.hostname.replace(/^www\./, "") + parsed.pathname;
-      const res = await fetch("/api/sources/ingest-web", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: fallbackTitle,
-          url: parsed.toString(),
-          domain: parsed.hostname.replace(/^www\./, ""),
-          projectId: activeProject?.id ?? 1,
-        }),
-      });
-      if (res.ok) {
-        setQuickUrl("");
-        refreshSources();
-      }
-    } catch {
-      // ignore — user can retry
-    } finally {
-      setAddingUrl(false);
-    }
-  }, [quickUrl, addingUrl, refreshSources, activeProject]);
-
-  /* ── Upload handler ── */
-  const uploadFiles = useCallback(async (files: FileList | File[]) => {
-    const fd = new FormData();
-    for (const f of files) fd.append("files", f);
-    if (activeProject) fd.append("projectId", String(activeProject.id));
-    const res = await fetch("/api/sources/upload", {
-      method: "POST",
-      body: fd,
-    });
-    if (res.ok) refreshSources();
-  }, [refreshSources, activeProject]);
-
-  /* ── Drag & drop ── */
-  const handleDrop = useCallback(
-    (e: React.DragEvent) => {
-      e.preventDefault();
-      setDragOver(false);
-      if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files);
-    },
-    [uploadFiles]
-  );
-
-  /* ── Research result actions ── */
-  const setResultStatus = useCallback(
-    async (id: string, status: ResearchResult["status"]) => {
-      setResults((prev) =>
-        prev.map((r) =>
-          r.id === id
-            ? {
-                ...r,
-                status,
-                ...(status === "approved"
-                  ? { ingestProgress: { current: 0, total: 12 } }
-                  : {}),
-              }
-            : r
-        )
-      );
-
-      if (status === "approved") {
-        const result = results.find((r) => r.id === id);
-        if (!result) return;
-
-        try {
-          await fetch("/api/sources/ingest-web", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              title: result.title,
-              url: result.url,
-              domain: result.domain,
-              author: result.author,
-              type: result.type,
-              summary: result.summary,
-              tags: result.tags,
-              projectId: activeProject?.id ?? 1,
-            }),
-          });
-          refreshSources();
-        } catch {
-          // job submission failed — leave the UI as approved
+    if (status === "approved") {
+      const result = results.find((r) => r.id === id);
+      if (!result || !projectId) return;
+      try {
+        const res = await fetch("/api/sources/ingest-web", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: result.title,
+            url: result.url,
+            domain: result.domain,
+            author: result.author,
+            type: result.type,
+            summary: result.summary,
+            tags: result.tags,
+            projectId,
+            ingest: false,
+          }),
+        });
+        if (res.ok) {
+          addToast({ type: "success", title: `Queued · ${result.domain || result.url}` });
+          fetchSources();
+        } else {
+          throw new Error();
         }
+      } catch {
+        addToast({ type: "error", title: "Couldn't queue source" });
       }
-    },
-    [results, refreshSources, activeProject]
-  );
+    }
+  }
 
-  const approvedCount = results.filter((r) => r.status === "approved").length;
-  const foundCount = results.length;
-
-  /* Display-time sort — keeps `results` in insertion order for dedup +
-     load-more logic, but renders them sorted when the user asks for it. */
-  const displayedResults = useMemo(() => {
-    if (sortMode === "original") return results;
-    // stable sort by relevance desc; ties keep insertion order
-    return [...results].sort((a, b) => b.relevance - a.relevance);
+  const visibleResults = useMemo(() => {
+    const list = results.filter((r) => r.status !== "skipped");
+    if (sortMode === "relevance") {
+      // Stable sort: relevance desc, ties keep insertion order
+      return [...list].sort((a, b) => b.relevance - a.relevance);
+    }
+    return list;
   }, [results, sortMode]);
+  const approvedCount = results.filter((r) => r.status === "approved").length;
+  const totalCount = results.length;
 
-  /* ── Relevance badge class ── */
-  const relClass = (pct: number) => {
-    if (pct >= 90) return "bg-[var(--green-dim)] text-[var(--green)]";
-    if (pct >= 80) return "bg-[var(--blue-dim)] text-[var(--blue)]";
-    return "bg-[var(--bg-2)] text-[var(--text-3)]";
-  };
+  // ── Drop handlers ────────────────────────────────────────────────
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragActive(false);
+    uploadFiles(e.dataTransfer.files);
+  }
+  function onDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    setDragActive(true);
+  }
+  function onDragLeave(e: React.DragEvent) {
+    e.preventDefault();
+    setDragActive(false);
+  }
 
-  /* ── Type dot color ── */
-  const typeDotColor = (type: string) => {
-    if (type === "pdf") return "var(--red)";
-    if (type === "web") return "var(--blue)";
-    return "var(--orange)";
-  };
-
+  // ── Render ───────────────────────────────────────────────────────
   return (
-    <div className="p-8 max-w-[960px]">
-      <Breadcrumbs project={activeProject} />
-      {/* ── Page Header ── */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-[22px] font-[650] text-[var(--text-1)] tracking-tight leading-tight">
-            Sources
-          </h1>
-          <p className="text-sm text-[var(--text-3)] mt-1">
-            Manage raw materials and discover new sources
-          </p>
-        </div>
-        <div className="flex items-center gap-2 shrink-0 mt-0.5">
-          <button
-            onClick={() => setNoteModalOpen(true)}
-            className="flex items-center gap-1.5 text-xs text-[var(--primary-fg)] bg-[var(--primary)] border border-transparent px-3 py-1.5 rounded-md cursor-pointer transition-opacity hover:opacity-90"
-          >
-            <PenLine className="w-3.5 h-3.5" />
-            New note
-          </button>
-          <button className="flex items-center gap-1.5 text-xs text-[var(--text-3)] bg-[var(--bg-2)] border border-[var(--border)] px-3 py-1.5 rounded-md cursor-pointer transition-all hover:border-[var(--primary)] hover:text-[var(--primary)]">
-            <CrossProjectIcon />
-            Cross-project search
-          </button>
+    <div className="pad">
+      <EditorialBreadcrumbs tail="Intake" />
+
+      <div className="sec-head">
+        <h1>
+          The <em>Intake.</em>
+        </h1>
+        <div className="rail-meta">
+          <div>
+            <b>{sources.length}</b> sources
+          </div>
+          <div>
+            <b>{statusCounts.pending}</b> pending
+          </div>
+          <div>
+            <b>{weekTotal}</b> this week
+          </div>
         </div>
       </div>
 
-      <NoteComposerModal
-        open={noteModalOpen}
-        onClose={() => setNoteModalOpen(false)}
-        onSubmitted={() => {
-          refreshSources();
-          setNoteModalOpen(false);
-        }}
-      />
-
-      {/* ── Tabs ── */}
-      <div className="flex border-b border-[var(--border)] mb-6">
+      <div className="intake-tabs">
         <button
-          onClick={() => setTab("library")}
-          className={`px-4 py-2 text-[13px] font-medium cursor-pointer border-b-2 -mb-px transition-all ${
-            tab === "library"
-              ? "text-[var(--text-1)] border-[var(--primary)]"
-              : "text-[var(--text-3)] border-transparent hover:text-[var(--text-2)]"
-          }`}
+          type="button"
+          className={`intake-tab${tab === "library" ? " on" : ""}`}
+          onClick={() => {
+            setTab("library");
+            router.replace("/sources");
+          }}
         >
-          Library{" "}
-          <span
-            className={`font-mono text-[11px] ml-1 ${
-              tab === "library"
-                ? "text-[var(--primary)]"
-                : "text-[var(--text-4)]"
-            }`}
-          >
-            {sources.length}
-          </span>
+          Library <span className="c">{sources.length}</span>
         </button>
         <button
-          onClick={() => setTab("research")}
-          className={`px-4 py-2 text-[13px] font-medium cursor-pointer border-b-2 -mb-px transition-all ${
-            tab === "research"
-              ? "text-[var(--text-1)] border-[var(--primary)]"
-              : "text-[var(--text-3)] border-transparent hover:text-[var(--text-2)]"
-          }`}
+          type="button"
+          className={`intake-tab${tab === "research" ? " on" : ""}`}
+          onClick={() => {
+            setTab("research");
+            router.replace("/sources?tab=research");
+          }}
         >
-          Research{" "}
-          <span
-            className={`font-mono text-[11px] ml-1 ${
-              tab === "research"
-                ? "text-[var(--primary)]"
-                : "text-[var(--text-4)]"
-            }`}
-          >
-            {results.length}
-          </span>
+          Research {totalCount > 0 && <span className="c">{totalCount}</span>}
         </button>
       </div>
 
-      {/* ═══════════ LIBRARY TAB ═══════════ */}
-      {tab === "library" && (
-        <div>
-          {/* Drop zone */}
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragOver(true);
-            }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-            className={`border-[1.5px] border-dashed rounded-lg py-7 text-center text-[13px] cursor-pointer transition-all mb-5 ${
-              dragOver
-                ? "border-[var(--primary)] bg-[var(--primary-dim)] text-[var(--text-2)]"
-                : "border-[var(--border-strong)] text-[var(--text-3)] hover:border-[var(--primary)] hover:bg-[var(--primary-dim)] hover:text-[var(--text-2)]"
-            }`}
-          >
-            <div className="text-xl mb-1.5 opacity-40">+</div>
-            Drop files here or click to upload
-            <div className="text-[11px] text-[var(--text-4)] mt-1">
-              PDF, Markdown, Text, HTML
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept=".pdf,.md,.txt,.html,.htm"
-              className="hidden"
-              onChange={(e) => {
-                if (e.target.files?.length) uploadFiles(e.target.files);
-              }}
-            />
-          </div>
-
-          {/* Quick add URL */}
-          <div className="flex gap-2 mb-6">
-            <input
-              value={quickUrl}
-              onChange={(e) => setQuickUrl(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") addUrl();
-              }}
-              placeholder="Or paste a URL to add directly..."
-              disabled={addingUrl}
-              className="flex-1 bg-[var(--bg-0)] border border-[var(--border-input)] rounded-lg px-3.5 py-2.5 text-sm text-[var(--text-1)] outline-none transition-all placeholder:text-[var(--text-4)] focus:border-[var(--primary)] focus:shadow-[0_0_0_3px_var(--ring)] disabled:opacity-50"
-            />
-            <button
-              onClick={addUrl}
-              disabled={addingUrl || !quickUrl.trim()}
-              className="bg-[var(--primary)] text-[var(--primary-fg)] text-[13px] font-semibold px-[18px] py-2.5 border-none rounded-lg cursor-pointer transition-all whitespace-nowrap hover:bg-[var(--primary-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {addingUrl ? "Adding..." : "Add URL"}
-            </button>
-          </div>
-
-          {/* Source cards grid */}
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-2">
-            {sources.map((s) => (
-              <div
-                key={s.id}
-                className="bg-[var(--surface-card)] border border-[var(--border)] rounded-lg px-4 py-3.5 transition-all hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-sm)] group relative"
-              >
-                {/* Delete button */}
-                <button
-                  onClick={() => deleteSource(s.id)}
-                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-[var(--text-4)] hover:text-[var(--red)] transition-all p-1"
-                  title="Delete source"
-                >
-                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
-                    <path d="M4 4l8 8M12 4l-8 8" />
-                  </svg>
-                </button>
-                <div className="font-mono text-[10px] font-medium uppercase tracking-wide text-[var(--text-4)] mb-1.5 flex items-center gap-1.5">
-                  <span
-                    className="w-1.5 h-1.5 rounded-full"
-                    style={{ background: typeDotColor(s.type) }}
-                  />
-                  {s.type.toUpperCase()}
-                </div>
-                <div className="text-[13px] font-semibold text-[var(--text-1)] leading-snug mb-1">
-                  {s.title}
-                </div>
-                <div className="text-[11px] text-[var(--text-3)]">
-                  {humanizeSubtitle(s)} &middot;{" "}
-                  {new Date(s.createdAt).toLocaleDateString("en-US", {
-                    month: "short",
-                    year: "numeric",
-                  })}
-                </div>
-                <div
-                  className={`flex items-center gap-1 mt-2 text-[11px] font-[550] ${
-                    s.status === "ingested"
-                      ? "text-[var(--green)]"
-                      : s.status === "ingesting"
-                        ? "text-[var(--primary)]"
-                        : "text-[var(--orange)]"
-                  }`}
-                >
-                  {s.status === "ingesting" ? (
-                    <span className="inline-block w-[10px] h-[10px] border-[1.5px] border-[var(--border-strong)] border-t-[var(--primary)] rounded-full animate-spin" />
-                  ) : (
-                    <span className="w-[5px] h-[5px] rounded-full bg-current" />
-                  )}
-                  {s.status === "ingested" && (
-                    <>Ingested &middot; {s.pageCount ?? 0} pages</>
-                  )}
-                  {s.status === "ingesting" && <>Ingesting...</>}
-                  {s.status === "pending" && (
-                    <button
-                      onClick={() => triggerIngest(s.id)}
-                      className="text-[var(--primary)] underline underline-offset-2 hover:text-[var(--primary-hover)] cursor-pointer"
-                    >
-                      Start ingestion
-                    </button>
-                  )}
-                  {s.status === "failed" && (
-                    <button
-                      onClick={() => triggerIngest(s.id)}
-                      className="text-[var(--red)] underline underline-offset-2 hover:text-[var(--text-2)] cursor-pointer"
-                    >
-                      Retry ingestion
-                    </button>
-                  )}
-                </div>
+      {tab === "library" ? (
+        <div key="library-tab" className="intake-tab-panel sources-layout">
+          <div>
+            <div className="drop-tools">
+              <div className="drop-url">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6">
+                  <path d="M6.5 9.5a2 2 0 012.83 0l2 2a2 2 0 010 2.83l-1.5 1.5a2 2 0 01-2.83 0l-.5-.5M9.5 6.5a2 2 0 00-2.83 0l-2 2a2 2 0 000 2.83l.5.5" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Paste a URL to ingest, or type a topic → Research tab"
+                  value={quickUrl}
+                  onChange={(e) => setQuickUrl(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") submitQuickUrl();
+                  }}
+                  disabled={quickBusy}
+                />
               </div>
-            ))}
-          </div>
-
-          {sources.length === 0 && (
-            <div className="text-center text-[var(--text-4)] text-sm py-12">
-              No sources yet. Drop a file above to get started.
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ═══════════ RESEARCH TAB ═══════════ */}
-      {tab === "research" && (
-        <div>
-          {/* Search input */}
-          <div className="flex gap-2 mb-5">
-            <input
-              value={researchQuery}
-              onChange={(e) => setResearchQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") startResearch();
-              }}
-              placeholder="Enter a research topic..."
-              className="flex-1 bg-[var(--bg-0)] border border-[var(--border-input)] rounded-lg px-3.5 py-2.5 text-sm text-[var(--text-1)] outline-none transition-all placeholder:text-[var(--text-4)] focus:border-[var(--primary)] focus:shadow-[0_0_0_3px_var(--ring)]"
-            />
-            <div className="flex items-center gap-2 bg-[var(--bg-2)] border border-[var(--border)] rounded-lg px-3 py-1.5 shrink-0">
-              <span className="text-[11px] font-medium text-[var(--text-3)] whitespace-nowrap">Max</span>
-              <select
-                value={maxResults}
-                onChange={(e) => setMaxResults(Number(e.target.value))}
-                className="bg-transparent text-[13px] font-semibold text-[var(--text-1)] outline-none cursor-pointer"
-              >
-                {[5, 8, 12, 15, 20].map((n) => (
-                  <option key={n} value={n}>{n}</option>
-                ))}
-              </select>
-            </div>
-            <button
-              onClick={() => startResearch()}
-              disabled={isSearching || !researchQuery.trim()}
-              className="bg-[var(--primary)] text-[var(--primary-fg)] text-[13px] font-semibold px-[18px] py-2.5 border-none rounded-lg cursor-pointer flex items-center gap-1.5 transition-all whitespace-nowrap hover:bg-[var(--primary-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <SearchIcon />
-              {isSearching ? "Searching..." : "Research"}
-            </button>
-          </div>
-
-          {/* Live status — honest spinner + count, no fake progress bar.
-              Previously a fixed 65% "progress" div which misled users about
-              how far along the search actually was. */}
-          {isSearching && (
-            <div className="flex items-center gap-2.5 px-4 py-3 bg-[var(--primary-dim)] border border-[rgba(13,148,136,0.15)] rounded-lg mb-5 text-[13px] text-[var(--primary)]">
-              <span className="inline-block w-3.5 h-3.5 border-2 border-[rgba(13,148,136,0.2)] border-t-[var(--primary)] rounded-full animate-spin shrink-0" />
-              <span className="flex-1">
-                {results.length === 0
-                  ? "Searching the web…"
-                  : `${results.length} source${results.length === 1 ? "" : "s"} found so far…`}
-              </span>
-              <button
-                onClick={cancelResearch}
-                className="text-[var(--text-3)] text-xs cursor-pointer underline underline-offset-2 shrink-0 hover:text-[var(--text-2)] bg-transparent border-none p-0"
-              >
-                Cancel
+              <button className="btn primary" onClick={submitQuickUrl} disabled={quickBusy || !quickUrl.trim()}>
+                {quickBusy ? "Queueing…" : "Commission →"}
               </button>
             </div>
-          )}
 
-          {/* Bulk actions bar */}
-          <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-[var(--bg-2)] border border-[var(--border)] rounded-lg text-xs text-[var(--text-3)]">
-            <span>
-              <span className="font-semibold text-[var(--text-2)]">
-                {foundCount}
-              </span>{" "}
-              found
-            </span>
-            <span className="opacity-30">&middot;</span>
-            <span>
-              <span className="font-semibold text-[var(--text-2)]">
-                {approvedCount}
-              </span>{" "}
-              approved
-            </span>
-            <button className="ml-auto text-[11px] font-semibold px-2.5 py-1 rounded-md border border-[var(--border)] bg-[var(--bg-0)] text-[var(--text-3)] cursor-pointer transition-all hover:border-[var(--border-strong)] hover:text-[var(--text-2)]">
-              Skip remaining
-            </button>
-            <button className="text-[11px] font-semibold px-2.5 py-1 rounded-md border border-transparent bg-[var(--primary-dim)] text-[var(--primary)] cursor-pointer transition-all hover:bg-[rgba(13,148,136,0.15)]">
-              Approve all
+            <div style={{ display: "flex", gap: 12, marginBottom: 18, alignItems: "stretch" }}>
+              <div
+                className={`drop${dragActive ? " drag" : ""}`}
+                style={{ flex: 1, marginBottom: 0 }}
+                onClick={() => fileInputRef.current?.click()}
+                onDrop={onDrop}
+                onDragOver={onDragOver}
+                onDragLeave={onDragLeave}
+              >
+                <h4>
+                  Drop <em>any</em> file, or click to upload.
+                </h4>
+                <p>PDF, Markdown, text, audio, image — anything lands as a pending source.</p>
+                <input ref={fileInputRef} type="file" multiple hidden onChange={(e) => uploadFiles(e.target.files)} />
+              </div>
+              <button
+                type="button"
+                onClick={() => setNoteOpen(true)}
+                style={{
+                  border: "2px dashed var(--rule)",
+                  background: "var(--paper-2)",
+                  padding: "0 22px",
+                  cursor: "pointer",
+                  fontFamily: "var(--font-serif)",
+                  fontSize: 17,
+                  letterSpacing: "-0.01em",
+                  color: "var(--ink)",
+                  minWidth: 180,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 4,
+                  transition: "all 180ms",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "var(--paper-3)";
+                  e.currentTarget.style.borderColor = "var(--accent)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "var(--paper-2)";
+                  e.currentTarget.style.borderColor = "var(--rule)";
+                }}
+              >
+                <span style={{ fontFamily: "var(--font-inst)", fontStyle: "italic", color: "var(--accent)", fontSize: 22, lineHeight: 1 }}>§</span>
+                <span>New note</span>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: 9.5, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--ink-4)" }}>
+                  Write markdown
+                </span>
+              </button>
+            </div>
+
+            <div className="intake">
+              {filtered.length === 0 ? (
+                <div
+                  style={{
+                    fontFamily: "var(--font-inst)",
+                    fontStyle: "italic",
+                    fontSize: 15,
+                    color: "var(--ink-3)",
+                    padding: "28px 0",
+                  }}
+                >
+                  {kind ? `No ${KIND_LABEL[kind]} sources yet.` : "No sources in this project yet — drop one above."}
+                </div>
+              ) : (
+                filtered.map((s, i) => {
+                  const isPending = s.status === "pending";
+                  const isApproved = approving.has(s.id);
+                  const isSliding = slideOut.has(s.id);
+                  const rowClass = `intake-row${isApproved ? " approved" : ""}${isSliding ? " slide-out" : ""}`;
+                  const kindLbl = KIND_LABEL[s.type as "pdf" | "web" | "note"] ?? s.type.toUpperCase();
+                  const extUrl = externalUrlFor(s);
+                  return (
+                    <div key={s.id} className={rowClass}>
+                      <div className="num">{String(i + 1).padStart(3, "0")}</div>
+                      <div className="stamp-card">
+                        <div className="k">{kindLbl}</div>
+                        <div className="s">{s.id}</div>
+                      </div>
+                      <div className="body">
+                        <div className="t">
+                          {extUrl ? (
+                            <a href={extUrl} target="_blank" rel="noreferrer noopener" style={{ color: "inherit", textDecoration: "none" }}>
+                              {s.title}
+                            </a>
+                          ) : (
+                            s.title
+                          )}
+                        </div>
+                        <div className="sub">
+                          {extUrl ? (
+                            <a className="link" href={extUrl} target="_blank" rel="noreferrer noopener">
+                              {subtitleFor(s)}
+                            </a>
+                          ) : (
+                            subtitleFor(s)
+                          )}
+                        </div>
+                        <div className="ext">{extractFor(s)}</div>
+                      </div>
+                      <div className="acts">
+                        <span className={`seal ${isPending ? "acc" : s.status === "failed" ? "red" : "ghost"}`}>
+                          {s.status}
+                        </span>
+                        {isPending && !isApproved && (
+                          <button className="btn primary" onClick={() => approve(s)}>
+                            Approve
+                          </button>
+                        )}
+                        <button className="btn red" onClick={() => remove(s)} disabled={isApproved}>
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          <aside>
+            <div className="fr-card">
+              <h4>Filter by kind</h4>
+              <button type="button" className={`fr-row${kind === "" ? " on" : ""}`} onClick={() => setKind("")}>
+                <span className="d" />
+                <span>All</span>
+                <span className="c">{sources.length}</span>
+              </button>
+              {KIND_ORDER.map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  className={`fr-row${kind === k ? " on" : ""}`}
+                  onClick={() => setKind(k)}
+                >
+                  <span className="d" />
+                  <span>{KIND_LABEL[k]}</span>
+                  <span className="c">{kindCounts[k] ?? 0}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="fr-card">
+              <h4>Queue health</h4>
+              <div className="fr-stat">
+                <span>Pending</span>
+                <span className="v">{statusCounts.pending}</span>
+              </div>
+              <div className="fr-stat">
+                <span>Ingesting</span>
+                <span className="v">{statusCounts.ingesting}</span>
+              </div>
+              <div className="fr-stat">
+                <span>Failed</span>
+                <span className="v">{statusCounts.failed}</span>
+              </div>
+            </div>
+          </aside>
+        </div>
+      ) : (
+        // ── Research tab ──────────────────────────────────────────
+        <div key="research-tab" className="intake-tab-panel" style={{ paddingTop: 18, maxWidth: 960 }}>
+          <div className="drop-tools">
+            <div className="drop-url">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <circle cx="7" cy="7" r="5" />
+                <line x1="10.5" y1="10.5" x2="14" y2="14" />
+              </svg>
+              <input
+                type="text"
+                placeholder="A topic, an open question, a name…"
+                value={researchQuery}
+                onChange={(e) => setResearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !isSearching) startResearch();
+                }}
+                disabled={isSearching}
+              />
+            </div>
+            <button
+              className="btn primary"
+              onClick={() => startResearch()}
+              disabled={!researchQuery.trim() || isSearching}
+            >
+              {isSearching
+                ? "Searching…"
+                : totalCount > 0 && resultsTopic === researchQuery.trim()
+                  ? "Find more →"
+                  : totalCount > 0
+                    ? "New search →"
+                    : "Commission →"}
             </button>
           </div>
 
-          {/* Results label + sort toggle + clear all */}
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-xs font-semibold text-[var(--text-4)] uppercase tracking-wide">
-              Discovered Sources
-            </div>
-            <div className="flex items-center gap-3 text-[11px]">
-              {results.length > 1 && (
-                <div className="flex items-center gap-1">
-                  <span className="text-[var(--text-4)]">Sort</span>
-                  <button
-                    onClick={() => setSortMode("relevance")}
-                    className={`px-2 py-0.5 rounded transition-colors ${
-                      sortMode === "relevance"
-                        ? "bg-[var(--primary-dim)] text-[var(--primary)] font-[550]"
-                        : "text-[var(--text-3)] hover:text-[var(--text-1)]"
-                    }`}
-                  >
-                    Relevance
+          {(totalCount > 0 || isSearching) && (
+            <div className="research-controls">
+              {totalCount > 0 && !isSearching && (
+                <>
+                  <button className="btn" onClick={loadMore} disabled={!researchQuery.trim()}>
+                    + Load {maxResults} more
                   </button>
-                  <button
-                    onClick={() => setSortMode("original")}
-                    className={`px-2 py-0.5 rounded transition-colors ${
-                      sortMode === "original"
-                        ? "bg-[var(--primary-dim)] text-[var(--primary)] font-[550]"
-                        : "text-[var(--text-3)] hover:text-[var(--text-1)]"
-                    }`}
-                  >
-                    Original
+                  <button className="btn ghost" onClick={clearResearch}>
+                    Clear
                   </button>
+                </>
+              )}
+              {isSearching && (
+                <>
+                  <span className="research-live">
+                    <span className="d" />
+                    Streaming · {totalCount} found
+                  </span>
+                  <button className="btn red" onClick={cancelResearch}>
+                    Stop
+                  </button>
+                </>
+              )}
+              {!isSearching && totalCount > 0 && (
+                <span className="research-count">
+                  <b>{totalCount}</b> candidates · <b>{approvedCount}</b> queued
+                </span>
+              )}
+              {totalCount > 0 && (
+                <div className="max-sel">
+                  <span>Sort</span>
+                  <select
+                    value={sortMode}
+                    onChange={(e) => setSortMode(e.target.value as SortMode)}
+                  >
+                    <option value="relevance">Relevance</option>
+                    <option value="stream">Stream order</option>
+                  </select>
                 </div>
               )}
-              {results.length > 0 && (
-                <button
-                  onClick={clearResearch}
+              <div className="max-sel">
+                <span>Per run</span>
+                <select
+                  value={maxResults}
+                  onChange={(e) => setMaxResults(Number(e.target.value))}
                   disabled={isSearching}
-                  className="text-[var(--text-3)] hover:text-[var(--red)] transition-colors px-2 py-0.5 rounded hover:bg-[var(--bg-hover)] disabled:opacity-40 disabled:cursor-not-allowed"
-                  title="Clear all research results and the saved query"
                 >
-                  Clear all
-                </button>
-              )}
+                  <option value={4}>4</option>
+                  <option value={8}>8</option>
+                  <option value={12}>12</option>
+                  <option value={20}>20</option>
+                </select>
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Result cards */}
-          <div className="flex flex-col gap-2">
-            {displayedResults.map((r) => (
-              <div
-                key={r.id}
-                className={`bg-[var(--surface-card)] border rounded-lg px-[18px] py-4 transition-all hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-sm)] ${
-                  r.status === "approved"
-                    ? "border-[rgba(22,163,74,0.2)]"
-                    : "border-[var(--border)]"
-                }`}
-              >
-                {/* Title row */}
-                <div className="flex items-start justify-between gap-3 mb-1.5">
-                  <div className="text-sm font-semibold text-[var(--text-1)] leading-snug">
-                    {r.url ? (
-                      <a href={r.url} target="_blank" rel="noopener noreferrer" className="hover:text-[var(--primary)] transition-colors">{r.title}</a>
-                    ) : (
-                      r.title
-                    )}
+          {isSearching && <div className="research-shimmer" />}
+
+          {visibleResults.length === 0 && !isSearching ? (
+            <div className="research-empty">
+              {totalCount === 0
+                ? "No results yet. Enter a topic above and commission."
+                : "All candidates handled. Load more to continue."}
+            </div>
+          ) : (
+            <div>
+              {visibleResults.map((r, i) => {
+                const isApproved = r.status === "approved";
+                return (
+                  <div key={r.id} className={`research-row${isApproved ? " approved" : ""}`}>
+                    <div className="num">{String(i + 1).padStart(2, "0")}</div>
+                    <div className="body">
+                      <div className="t">
+                        <a href={r.url} target="_blank" rel="noreferrer noopener">
+                          {r.title}
+                        </a>
+                      </div>
+                      <div className="sub">
+                        <span className={`rel-pill ${relevanceClass(r.relevance)}`}>{r.relevance}%</span>
+                        {r.domain || (() => {
+                          try {
+                            return new URL(r.url).hostname;
+                          } catch {
+                            return r.url;
+                          }
+                        })()}
+                        {r.author && r.author !== "Unknown" && ` · ${r.author}`}
+                        {r.type && ` · ${r.type}`}
+                      </div>
+                      <div className="ext">{r.summary}</div>
+                      {r.tags && r.tags.length > 0 && (
+                        <div className="research-tags">
+                          {r.tags.slice(0, 5).map((t) => (
+                            <span key={t} className="tag">
+                              {t}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="acts">
+                      {isApproved ? (
+                        <span className="seal acc">Queued</span>
+                      ) : (
+                        <button className="btn primary" onClick={() => setResultStatus(r.id, "approved")}>
+                          Approve
+                        </button>
+                      )}
+                      <button className="btn red" onClick={() => setResultStatus(r.id, "skipped")}>
+                        Skip
+                      </button>
+                    </div>
                   </div>
-                  <span
-                    className={`font-mono text-[11px] font-medium px-[7px] py-0.5 rounded-[10px] shrink-0 ${relClass(r.relevance)}`}
-                  >
-                    {r.relevance}%
+                );
+              })}
+              {isSearching && (
+                <div className="research-empty" style={{ textAlign: "center", paddingTop: 22 }}>
+                  <span className="research-live">
+                    <span className="d" />
+                    Streaming more candidates…
                   </span>
                 </div>
-
-                {/* Meta */}
-                <div className="flex items-center gap-2 text-xs text-[var(--text-3)] mb-2">
-                  {r.url ? (
-                    <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-[var(--primary)] hover:underline">{r.domain || r.url}</a>
-                  ) : (
-                    <span>{r.domain}</span>
-                  )}
-                  <span className="w-0.5 h-0.5 rounded-full bg-[var(--text-4)]" />
-                  <span>{r.author}</span>
-                  <span className="w-0.5 h-0.5 rounded-full bg-[var(--text-4)]" />
-                  <span>{r.type}</span>
-                </div>
-
-                {/* Summary */}
-                <div className="text-[13px] leading-relaxed text-[var(--text-2)] mb-3">
-                  {r.summary}
-                </div>
-
-                {/* Tags */}
-                <div className="flex flex-wrap gap-1 mb-3">
-                  {r.tags.map((t) => (
-                    <span
-                      key={t}
-                      className="text-[11px] font-medium px-2 py-0.5 rounded bg-[var(--bg-2)] text-[var(--text-3)]"
-                    >
-                      {t}
-                    </span>
-                  ))}
-                </div>
-
-                {/* Actions or approved bar */}
-                {r.status === "approved" ? (
-                  <div className="flex items-center gap-2 text-xs font-[550] text-[var(--green)] pt-3 border-t border-[var(--border)]">
-                    <span className="inline-block w-3 h-3 border-[1.5px] border-[var(--green-dim)] border-t-[var(--green)] rounded-full animate-spin" />
-                    Approved — ingesting into wiki
-                    <span className="ml-auto font-mono text-[11px] text-[var(--text-3)]">
-                      {r.ingestProgress?.current ?? 0} /{" "}
-                      {r.ingestProgress?.total ?? 12} pages
-                    </span>
-                  </div>
-                ) : (
-                  <div className="flex gap-1.5 pt-3 border-t border-[var(--border)]">
-                    <button
-                      onClick={() => setResultStatus(r.id, "approved")}
-                      className="text-xs font-[550] px-3 py-[5px] rounded-md bg-[var(--green-dim)] text-[var(--green)] border-none cursor-pointer flex items-center gap-1 transition-all hover:bg-[rgba(22,163,74,0.15)]"
-                    >
-                      <CheckIcon /> Approve
-                    </button>
-                    <button
-                      onClick={() => setResultStatus(r.id, "skipped")}
-                      className="text-xs font-[550] px-3 py-[5px] rounded-md bg-transparent text-[var(--text-3)] border border-[var(--border)] cursor-pointer transition-all hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)]"
-                    >
-                      Skip
-                    </button>
-                    <button
-                      onClick={() => setResultStatus(r.id, "bookmarked")}
-                      className="text-xs font-[550] px-3 py-[5px] rounded-md bg-[var(--primary-dim)] text-[var(--primary)] border-none cursor-pointer flex items-center gap-1 transition-all hover:bg-[rgba(13,148,136,0.15)]"
-                    >
-                      <BookmarkIcon /> Bookmark
-                    </button>
-                    {r.url && (
-                      <a
-                        href={r.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs font-[550] px-3 py-[5px] rounded-md bg-transparent text-[var(--text-3)] border border-[var(--border)] cursor-pointer ml-auto transition-all hover:bg-[var(--bg-hover)] hover:text-[var(--text-2)] no-underline"
-                      >
-                        Preview
-                      </a>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Load more — appends another batch to the existing list,
-              skipping dupes. Hidden while searching or empty. */}
-          {!isSearching && results.length > 0 && (
-            <div className="flex justify-center mt-4">
-              <button
-                onClick={loadMoreResearch}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-[13px] font-[550] text-[var(--text-2)] bg-[var(--bg-2)] border border-[var(--border)] rounded-lg hover:border-[var(--border-strong)] hover:text-[var(--text-1)] transition-all cursor-pointer"
-                title={`Fetch up to ${maxResults} more — duplicates will be skipped`}
-              >
-                <SearchIcon />
-                Load more ({maxResults})
-              </button>
+              )}
             </div>
           )}
         </div>
       )}
+
+      <NoteComposerModal
+        open={noteOpen}
+        onClose={() => setNoteOpen(false)}
+        onSaved={() => fetchSources()}
+      />
     </div>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={null}>
+      <IntakePageInner />
+    </Suspense>
   );
 }

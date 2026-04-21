@@ -40,7 +40,7 @@ export async function POST(
     return Response.json({ error: "Invalid parent ID" }, { status: 400 });
   }
 
-  let body: { findingId?: number; childSlug?: string; pageSlug?: string };
+  let body: { findingId?: number; childSlug?: string; pageSlug?: string; mode?: "move" | "copy" };
   try {
     body = await request.json();
   } catch {
@@ -48,6 +48,7 @@ export async function POST(
   }
 
   const { findingId, childSlug, pageSlug } = body;
+  const mode: "move" | "copy" = body.mode === "copy" ? "copy" : "move";
 
   if (
     typeof findingId !== "number" ||
@@ -120,20 +121,34 @@ export async function POST(
   // Ensure destination directory exists.
   fs.mkdirSync(path.dirname(dstFile), { recursive: true });
 
-  // Move the file — rename is atomic on the same filesystem.
+  // Move or copy the file. Move keeps the page canonical at one location
+  // (original behaviour). Copy leaves both in place so the child retains
+  // a local version — wikilinks are NOT rewritten in that case because
+  // both [[child/page]] and [[parent/page]] remain valid targets.
   try {
-    fs.renameSync(srcFile, dstFile);
+    if (mode === "copy") {
+      fs.copyFileSync(srcFile, dstFile);
+    } else {
+      fs.renameSync(srcFile, dstFile);
+    }
   } catch (e) {
     return Response.json(
-      { error: `Failed to move page: ${(e as Error).message}` },
+      { error: `Failed to ${mode} page: ${(e as Error).message}` },
       { status: 500 }
     );
   }
 
-  // Rewrite wikilinks across every project's wiki/.
-  const oldLinkSlug = `${child.slug}/${cleanPageSlug}`;
-  const newLinkSlug = `${parent.slug}/${cleanPageSlug}`;
-  rewriteWikilinksInAllProjects(oldLinkSlug, newLinkSlug);
+  // Wikilink rewrite only applies to move semantics — in copy mode both
+  // locations live on and references to either one should still resolve.
+  let oldLinkSlug: string | null = null;
+  let newLinkSlug: string | null = null;
+  if (mode === "move") {
+    oldLinkSlug = `${child.slug}/${cleanPageSlug}`;
+    newLinkSlug = `${parent.slug}/${cleanPageSlug}`;
+    rewriteWikilinksInAllProjects(oldLinkSlug, newLinkSlug);
+  } else {
+    newLinkSlug = `${parent.slug}/${cleanPageSlug}`;
+  }
 
   // Mark the finding resolved (best-effort — if it's already been dismissed
   // or resolved we don't care, the move already happened).
@@ -144,6 +159,7 @@ export async function POST(
 
   return Response.json({
     success: true,
+    mode,
     childSlug: child.slug,
     parentSlug: parent.slug,
     pageSlug: cleanPageSlug,
