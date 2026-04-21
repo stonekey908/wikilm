@@ -5,6 +5,8 @@ import { EditorialSidebar } from "./editorial-sidebar";
 import { EditorialTopbar } from "./editorial-topbar";
 import { TweaksPanel } from "./tweaks-panel";
 import { KeyboardShortcuts } from "./keyboard-shortcuts";
+import { Palette } from "./palette";
+import { EditorialToastBridge } from "./editorial-toast-bridge";
 
 export function EditorialShell({ children }: { children: ReactNode }) {
   return (
@@ -20,6 +22,8 @@ export function EditorialShell({ children }: { children: ReactNode }) {
       </div>
       <TweaksPanel />
       <KeyboardShortcuts />
+      <Palette />
+      <EditorialToastBridge />
     </>
   );
 }
