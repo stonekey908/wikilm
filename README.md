@@ -50,59 +50,82 @@ Outputs can be scoped to the current page or the whole subtree, optionally nudge
 
 ## Screenshots
 
-> **Note:** Screenshots below are from v1-alpha and need to be re-captured for the v1.5-beta editorial UI. See **"Regenerating screenshots"** below.
+Captured against the `e2e-rag-test` project in Paper theme at 1440×900 @2x. Re-shoot any time with `node scripts/capture-screenshots.mjs` (dev server must be running on :3000).
+
+### Ledger (dashboard)
+`Good afternoon, E2E · RAG Test.` — the greeting picks up the active project. Below, stat run (pages / sources / concepts), recent pages, Marginalia for nudges, and the Dispatch card for firing live research without leaving the room.
+
+![Ledger dashboard](docs/screenshots/00-dashboard.png)
 
 ### Wiki — concept page
-A concept page opened in the detail pane. Everything the LLM writes is structured markdown with `[[wikilinks]]` — each link shows a hover preview card that follows the cursor. The right margin holds the table of contents; backlinks appear below the fold. Every Wiki element renders under the active theme + accent + density + face + size combo from the Tweaks panel.
+The hub concept for the project. Everything the LLM writes is structured markdown with `[[wikilinks]]` — each link shows a hover preview card that tracks the cursor. The right margin holds the generated TOC; byline strip carries words / read / backlinks / sources / type / updated.
 
-![Concept detail with wikilinks and TOC](docs/screenshots/01-wiki-with-outputs.png)
+![Retrieval-Augmented Generation concept page](docs/screenshots/01-wiki-concept.png)
 
 ### Wiki — synthesis page
-Synthesis pages are LLM-written overviews that cluster pages across a project around a theme. They regenerate automatically after each ingest (or on demand) so the "big picture" view of the knowledge base stays in sync as sources pile up. Parent-level synthesis (when enabled in Settings) cascades across children.
+Synthesis pages are LLM-written overviews that cluster pages across a project around a theme. They regenerate automatically after each ingest so the "big picture" stays in sync as sources pile up. Parent-level synthesis (opt-in in Settings) cascades across children.
 
-![Synthesis project-overview page](docs/screenshots/06-wiki-synthesis.png)
+![Project synthesis page](docs/screenshots/06-wiki-synthesis.png)
 
-### Generate output modal
-Pick a type, choose scope (this page or the whole subtree), optionally add a **focus nudge** to bias the prompt (e.g. "audience: technical" or "focus on commercial implications"). Generation runs as a background job — you can close the modal, keep working, and pick up the artifact when it lands.
+### Wiki — infographic output (v1.5-beta)
+Infographic outputs now render the PNG inline on the wiki page, boxed in the editorial ink-border style. Click the image — or the primary **Open interactive HTML ↗** button below it — to load the interactive HTML in a new tab. Ext pills force download.
 
-![Generate output modal](docs/screenshots/02-generate-modal.png)
+![Infographic output inline preview](docs/screenshots/09-wiki-infographic.png)
 
-### Lint — wiki health check
-Click **Run lint** to have the configured lint model scan the whole project for quality issues. Fix / Fix-all / Promote (move or copy) / Create concept / Research / Dismiss — all one-click.
+### Intake (Sources)
+Ingested material with humanized subtitles — never raw JSON. Two tabs: Library for existing sources, Research for live web searches that stream `RESULT:` lines you can approve into the wiki.
+
+![Sources page](docs/screenshots/04-sources.png)
+
+### Lint — The Edit
+Click **Run lint** to have the configured lint model scan the whole project for contradictions, orphans, missing cross-references, concept gaps, stale claims. Fix / Fix-all / Promote (move or copy) / Create concept / Research / Dismiss — all one-click.
 
 ![Lint findings](docs/screenshots/07-lint.png)
-
-### Dashboard — Nudges (parent-scoped findings)
-Nudges are cross-project patterns only parent-level lint can see. Promote → moves or copies the page up the tree; Create concept → populates a scaffolded page via a real wiki-grounded job.
-
-![Parent-project nudges on the dashboard](docs/screenshots/08-nudges.png)
 
 ### Dispatch (Jobs)
 Every subprocess — ingest, synthesis, lint, research, output generation, note summary — shows up here with type icon, model badge, structured status, and per-row cancel. Failures render `formatJobError` output (e.g. "Rate limited. Wait a minute and retry, or switch to Flash (higher quota).").
 
-![Jobs page showing model badges](docs/screenshots/03-jobs-page.png)
+![Jobs / Dispatch page](docs/screenshots/03-jobs.png)
 
-### Intake (Sources)
-Ingested material with humanized subtitles (domain, summary, or type label — never raw JSON). Two tabs: Library for existing sources, Research for live web searches that stream `RESULT:` lines you can approve into the wiki.
+### The Map
+Force-directed knowledge graph for the active project. Legend categories (concepts / entities / sources / outputs / synthesis) click to isolate; wheel to zoom, drag to pan. Hubs pulse — in this shot `retrieval-augmented-generation` is centre-stage.
 
-![Sources page](docs/screenshots/04-sources.png)
+![Force-directed wiki graph](docs/screenshots/10-graph.png)
 
-### In-app help
+### Settings — The Press
+Per-job-type model routing with live availability pings for Ollama + Gemini. Research is locked to grounded providers (Ollama disabled with a tooltip). Also holds the theme / accent / density / face / size tweaks, backup controls, and Claude-CLI status.
+
+![Settings — model routing](docs/screenshots/11-settings.png)
+
+### Chat (Salon)
+Ask WikiLM about the active project. Multi-turn context grounded in the project's wiki. Save a thread as a pending note with one click — summarisation runs as a job and lands in Intake.
+
+![Chat / Salon page](docs/screenshots/12-chat.png)
+
+### Compose (Dictation)
+Pick an output type, set scope, optionally add a focus nudge. Generation runs as a background job so you can close the page and come back — the artifact shows up in the wiki list when it lands.
+
+![Compose / Dictation page](docs/screenshots/13-compose.png)
+
+### Help modal
 Press `?` anywhere, or click **Help** in the sidebar footer, for a walkthrough of the idea, the flow, and what each page does.
 
 ![Help modal](docs/screenshots/05-help-modal.png)
 
+### ⌘K palette
+Natural-language intent routing across the whole app. Type a query, command, or page name; jumps to search, research, lint runs, or a specific page.
+
+![⌘K palette](docs/screenshots/14-palette.png)
+
 ### Regenerating screenshots
 
-The screenshots above still show v1-alpha. To re-shoot for v1.5-beta:
+All screenshots above are generated by `scripts/capture-screenshots.mjs` using headless Chrome via puppeteer-core (no extra deps — piggybacks on the infographic render rig). To re-shoot:
 
-1. `cd app && npm run dev`
-2. Open an existing project with real content (e.g. the `ai/llms` or `e2e-rag-test` project included in this repo)
-3. Navigate to each screen in the list above, capture at ~1440×900
-4. Save with the same filename into `docs/screenshots/` (preserves the README image links)
-5. Recommended themes for variety: Paper (default) for Wiki/Sources, Stone for Lint, Celadon for Graph, Night for Jobs
+1. `cd app && npm run dev` — dev server on :3000
+2. `cd .. && node scripts/capture-screenshots.mjs`
+3. Screenshots write to `docs/screenshots/` at 1440×900 @2x
 
-An additional screenshot worth adding for v1.5-beta: a rendered infographic output page showing the inline PNG preview + "Open interactive HTML" button.
+Edit the script to swap the target project (`PROJECT_SLUG` / `PROJECT_ID` constants) or add more pages.
 
 ## Example output
 
