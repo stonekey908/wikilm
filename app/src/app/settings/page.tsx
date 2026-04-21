@@ -14,6 +14,11 @@ interface BackupStatus {
   lastError?: string | null;
 }
 
+// Job types that require live web access. Ollama runs locally with no
+// tool-use / search protocol, so picking it here would produce answers
+// drawn purely from parametric knowledge — a footgun for research.
+const NEEDS_WEB_GROUNDING = new Set(["research"]);
+
 const JOB_TYPES = [
   { key: "ingest", label: "Ingestion", desc: "Processing raw sources into wiki pages" },
   { key: "research", label: "Research", desc: "Web search for new sources" },
@@ -250,9 +255,24 @@ export default function SettingsPage() {
                     ))}
                   </optgroup>
                   {ollamaModels.length > 0 && (
-                    <optgroup label="Ollama (local)">
+                    <optgroup
+                      label={
+                        NEEDS_WEB_GROUNDING.has(t.key)
+                          ? "Ollama (local) — no web grounding"
+                          : "Ollama (local)"
+                      }
+                    >
                       {ollamaModels.map((m) => (
-                        <option key={m.name} value={`ollama:${m.name}`}>
+                        <option
+                          key={m.name}
+                          value={`ollama:${m.name}`}
+                          disabled={NEEDS_WEB_GROUNDING.has(t.key)}
+                          title={
+                            NEEDS_WEB_GROUNDING.has(t.key)
+                              ? "Ollama runs locally and has no web access. Pick Claude or Gemini for research."
+                              : undefined
+                          }
+                        >
                           {m.name}
                         </option>
                       ))}
