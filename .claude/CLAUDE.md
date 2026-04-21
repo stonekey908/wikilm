@@ -179,18 +179,19 @@ This is a general-purpose knowledge base. Topics are handled via tags in frontma
 
 ## Current Phase
 
-**v1.5-beta shipped to `main`.** `feat/editorial-frontend` merged as a non-ff merge commit at `4677548` and tagged `v1.5-beta`. Pre-merge main is preserved at tag `v1-alpha` (commit `2687d13`). Both tags pushed.
+**v1.5-beta post-stabilisation on `main`.** Follow-up session after the v1.5-beta cut shipped four reliability fixes + a README polish + new quantum project content. No tag bump — still v1.5-beta.
 
-What v1.5-beta carries over v1-alpha:
-- Full editorial-brutalist UI (themes/accents/densities/faces/sizes, ⌘K palette, hover preview cards via portal + rAF, visible `?` help icon in topbar)
-- Multi-provider model routing per job type (Claude aliases + explicit IDs, Gemini preview models, Ollama local) with live availability pings
-- Structured error classification: `provider_unavailable` / `model_not_found` / `rate_limited` / `auth_failed` — rendered via `formatJobError` across /jobs + /compose
-- Research Ollama guard (UI disables + endpoint hard-blocks — no web grounding)
-- Inline PNG preview + "Open interactive HTML" button on infographic output pages; ext pills force download
-- `scripts/capture-screenshots.mjs` — puppeteer-core rig that shoots all 13 README screenshots at 1440×900 @2x. Screenshots committed to `docs/screenshots/` against the e2e-rag-test project.
-- README overhauled for v1.5-beta with Versions table pointing at both tags.
+What landed since the last handoff:
+- project-tree `⋯` menu (Add child / Move / Delete) actually fires again. Outer doc listener was on `mousedown`, inner menu only stopped `click` propagation → buttons unmounted before click. Fixed with `onMouseDown` stopPropagation on `.proj-menu`.
+- Backup status endpoint now returns `lastCompletedAt` so Settings' "Last: <ago>" reads the fresh timestamp instead of always showing "never".
+- `streamClaude` buffers stderr and only emits `type:"error"` on non-zero exit. Gemini `-y` prints a YOLO banner to stderr on every run — was being toasted as "Research unavailable" even on successful runs.
+- `runGeminiJob` got the same treatment: stderr buffered, only persisted to `jobs.error` when exit code != 0. Fixes the "job failed — YOLO mode enabled" ghost on successful Gemini jobs.
+- Gemini hard-blocked for research in Settings + `streamClaude`, same pattern as Ollama. The CLI exposes `google_web_search` in its tool list but does not reliably call it in headless `-p` mode — the model fabricates URLs (bare domains, no paths). Claude is the only trusted research provider.
+- Synthesis now defers until the job queue is fully idle. `triggerSynthesisUpdate` only flags `synthesisPending = true`; `flushSynthesisIfIdle()` (called from `drainQueue` + synthesis's own `onComplete`) fires when `runningProcesses + inFlight{Ollama,Gemini} + jobQueue === 0`. Any number of back-to-back ingest batches collapse into exactly one synthesis at the end.
+- README gained an "AI-led install (recommended)" section — paste-prompt handoff that drives Claude Code through SETUP.md interactively, with manual install preserved below.
+- New `projects/quantum` — 46 real wiki pages on QC × ML (concepts, entities, sources, synthesis, log, per-project `.claude/CLAUDE.md`).
 
-Outstanding (non-editorial WikiLM tickets): STO-1770 (cascade source removal on delete, Low) and STO-1767 (MCP v2 destructive ops, Low). Both purely additive / nice-to-have.
+Outstanding (non-editorial WikiLM tickets): STO-1770 (cascade source removal on delete, Low) and STO-1767 (MCP v2 destructive ops, Low). New candidate: reliable Gemini research grounding via stream-json parsing or SDK migration — filed as a follow-up below, no ticket opened yet.
 
 ## Known Issues
 
@@ -200,6 +201,8 @@ Outstanding (non-editorial WikiLM tickets): STO-1770 (cascade source removal on 
 - Synthesis pending flag is in-memory only — if server restarts during a synthesis burst, follow-up is lost (next ingest re-triggers; not a data-loss issue, just a staleness window)
 - Research results don't stream as found — Claude's tool-use pattern emits all `RESULT:` lines in the final text phase (investigation ticket STO-1750 cancelled)
 - Ollama streaming for research/chat still unsupported — `streamClaude` emits a type-specific error for `ollama:*` models (research: "no web grounding", chat: "streaming not wired"). UI blocks Ollama for research entirely via `NEEDS_WEB_GROUNDING` set in Settings.
+- Gemini also blocked for research for the same reason — CLI exposes `google_web_search` but doesn't call it reliably in headless mode; fabricates URLs. Claude is the only trusted research provider until grounding is re-engineered. See gotchas + follow-up below.
+- Chat `CONTEXT_LIMIT = 12` turns — long threads silently drop their earliest messages. Full history persists to DB; only the prompt window is capped. No cross-session memory. No auto-file chat → wiki (manual "Save as note" only).
 - Local directory is still `~/SecondBrain/` and DB file is still `secondbrain.db` — deferred per user preference ("leave it as long as everything else is ok")
 - Ingest prompt can reference entities without creating pages → dangling wikilinks (tightened in STO-1765 but not zero-risk — "wikilink discipline" rule is soft guidance, not enforced by code)
 - MCP v1 omits destructive ops (move/delete/promote) — tracked as STO-1767
@@ -244,14 +247,72 @@ Outstanding (non-editorial WikiLM tickets): STO-1770 (cascade source removal on 
 - **README screenshots were never committed** → image links existed but `docs/screenshots/*.png` didn't → fix: `scripts/capture-screenshots.mjs` drives headless Chrome (piggy-backs on the `puppeteer-core` already vendored for infographic PNG rendering). Seeds `localStorage.activeProject` before navigation. Run from repo root with dev server on :3000.
 - **Help modal (`?` key) had no visible affordance** → added a `?` icon button to the topbar next to the type-tweaks icon that dispatches the existing `editorial:open-help` window event.
 - **Gemini CLI rate-limits on rapid Pro calls** → 429 Too Many Requests from cloudcode-pa.googleapis.com; recovers after ~20s. Classified as `rate_limited` with actionable message "switch to Flash (higher quota)".
+- **Project-tree `⋯` menu buttons did nothing** → outer doc listener fired on `mousedown`; inner menu only stopped `click` propagation → mousedown on Add child / Move / Delete bubbled up, `setMenuFor(null)` unmounted the button before click could fire → fix: add `onMouseDown={(e) => e.stopPropagation()}` to `.proj-menu` alongside the existing onClick stopPropagation. Lesson: if a document listener is on `mousedown`, children must also stop `mousedown` — stopping only `click` isn't enough.
+- **Settings "Last backup" showed "never" even after a run** → backend wrote `last_backup_at` to settings; GET /api/backup/status returned `{ lastBackupAt }`; UI read `backupStatus.lastCompletedAt` (undefined) → key-name mismatch → fix: status GET now returns `lastCompletedAt`, `lastStartedAt`, `running`, `lastError` alongside `lastBackupAt` so the existing `BackupStatus` interface is satisfied.
+- **Gemini `-y` YOLO banner read as a failure** → `gemini -p ... -y` writes "YOLO mode is enabled. All tool calls will be automatically approved." to stderr on every run. `runGeminiJob` was persisting stderr to `jobs.error` on every chunk → UI showed the job as failed even when it exited 0 → fix: buffer stderr in memory, only write to `jobs.error` on close when exit code != 0 (and set `cleaned = null` on success). Same pattern applied to `streamClaude` — stderr buffered, `type:"error"` frame only emitted on non-zero exit → no more "Research unavailable" toasts from benign YOLO noise.
+- **Gemini CLI fabricates URLs in headless `-p` mode** → the CLI's tool list includes `google_web_search`, but in non-interactive `-p -y` mode with flash/pro preview the model answers from parametric knowledge and returns bare-domain URLs (e.g. `https://n1n.ai` for a "blog post"). Confirmed with probes — even explicit "Use google_web_search to find ..." prompts produce hallucinated results → fix: block Gemini for research same way Ollama is blocked. Settings disables Gemini options in the research dropdown; `streamClaude` emits a type-specific error frame if research picks `gemini:*`. Claude is the only trusted research provider today.
+- **Synthesis ran mid-batch and produced stale snapshots** → `triggerSynthesisUpdate` fired immediately when `synthesisInFlight === false`, so two ingest batches close together each triggered a synthesis (the first on still-changing data). Coalescing only collapsed overlapping bursts — it didn't wait for the queue to drain → fix: every trigger just flags `synthesisPending = true`; new `flushSynthesisIfIdle()` (called from `drainQueue` tail and synthesis's own `onComplete`) fires the run only when `runningProcesses + inFlight{Ollama,Gemini} + jobQueue.length === 0`. Any number of back-to-back batches collapse into one synthesis at the end.
+
+## Follow-up: Reliable Gemini research grounding (ticketable)
+
+Gemini is blocked from research because the CLI doesn't invoke `google_web_search` reliably in headless mode. Paths to re-enable, in order of preference:
+1. Switch Gemini CLI invocation to `-o stream-json`, parse tool_use frames, reject results that didn't follow a `google_web_search` call. Minimum-change path.
+2. Move off the CLI for Gemini entirely and use the Gemini SDK (`tools: [{googleSearch: {}}]` grounding config). Documented supported path; CLI headless grounding is not.
+3. Optional belt-and-braces: server-side HEAD-check on returned URLs before emitting `RESULT:` to the client. Would also protect against any Claude grounding slips.
+
+No ticket filed this session — flag when ready to land it.
 
 ## Last Session
 
 ```
-**Date:** 2026-04-21 (multi-hour session — v1.5-beta cut + model eval + screenshots)
+**Date:** 2026-04-21 (follow-up, v1.5-beta stabilisation)
 **Who:** Claude session
 **What was done:**
 
+Four reliability fixes + README polish + new quantum project content. No tag bump — still on v1.5-beta. Commits (all pushed to origin/main):
+
+- c186721 fix: project menu, backup timestamp, research false-alarms + Gemini fabrication
+- 54c6010 fix(jobs): stop persisting Gemini YOLO-banner stderr; defer synthesis to queue-idle
+- 851b876 docs(README): add AI-led install walkthrough
+- f255497 content: add quantum project — 46 wiki pages on QC + ML
+
+Bugs surfaced by the user and fixed:
+
+1. **Project-tree `⋯` menu didn't do anything** — Add child / Move / Delete buttons were silent; delete attempts failed. Root cause: the doc listener that closes the inline menu fires on `mousedown`; the menu container only stopped `click` propagation. So `mousedown` on a button bubbled up, menu unmounted, `click` never fired. Fix: add `onMouseDown stopPropagation` to `.proj-menu`. (`app/src/components/editorial/editorial-project-tree.tsx`)
+
+2. **Backup "Last updated" always showed "never"** — backup endpoint wrote `last_backup_at` to settings and upsert worked, but GET /api/backup/status returned `{ lastBackupAt }` while the UI read `backupStatus.lastCompletedAt`. Fix: status GET now returns `lastCompletedAt` + `lastStartedAt` + `running` + `lastError` to match the `BackupStatus` interface. (`app/src/app/api/backup/status/route.ts`)
+
+3. **"Research unavailable" toast on successful runs** — `streamClaude` forwarded every stderr chunk as a `type:"error"` frame. Gemini `-y` prints "YOLO mode is enabled" to stderr on every invocation. Fix: buffer stderr, only emit `type:"error"` on non-zero exit. (`app/src/lib/claude-runner.ts`)
+
+4. **"Job failed — YOLO mode enabled" on completed Gemini jobs** — same class of bug in `runGeminiJob`: stderr was persisted to `jobs.error` mid-run. Fix: buffer stderr, only commit to `jobs.error` on close if exit != 0; set `cleaned = null` on success. (`app/src/lib/gemini-runner.ts`)
+
+5. **Gemini research returns fabricated URLs** — user reported hallucinated links. Investigated: CLI tool list includes `google_web_search`, but headless `-p -y` mode doesn't reliably call it. Probed `gemini-3-flash-preview` with explicit tool instructions and still got bare-domain URLs with no paths. Fix: hard-block Gemini for research, mirror Ollama's pattern. Settings disables the optgroup for research with tooltip explanation; `streamClaude` emits a type-specific error if research picks `gemini:*`. (`settings/page.tsx`, `claude-runner.ts`)
+
+6. **Synthesis ran mid-batch (twice when two batches landed close together)** — coalescing used `synthesisInFlight`/`synthesisPending` flags; fired immediately when nothing was in flight. User asked: "wait until everything in the queue is done, then synthesize once." Fix: trigger only flags `synthesisPending = true`. New `flushSynthesisIfIdle()` (called from `drainQueue` + synthesis `onComplete`) fires when `runningProcesses + inFlight{Ollama,Gemini} + jobQueue.length === 0`. All triggers in a burst collapse into one synthesis at the end. (`app/src/lib/claude-runner.ts`)
+
+Content + docs:
+- README: added "AI-led install (recommended)" section — paste-prompt handoff that drives Claude Code through SETUP.md, manual install preserved.
+- `projects/quantum/` (47 files): new real wiki on QC × ML with concepts (QAOA, quantum kernels, NISQ, surface codes, post-quantum crypto, QNN, QSVM, QKNN, etc.), entities (Google Quantum AI, IBM, Microsoft, Nvidia, Oratomic, Classiq, bqp bosonq psi, Preskill, Huang), sources, synthesis, log, per-project `.claude/CLAUDE.md`.
+
+Investigations with no code change:
+- Chat memory audit: `/chat` IS passing transcript history on every send. `sendMessage` builds `Human:/Assistant:` transcript from `messages[]`, caps at `CONTEXT_LIMIT = 12`, wraps with a multi-turn scaffold. DB persists full thread. Session reload hydrates messages. User confirmed "not goldfishing" after inspecting a live thread — the "I will start by reading wiki/index.md…" preamble is model style, not memory loss. Potential tightening: tell the model not to announce its reads. No change made.
+
+**What's next:**
+- STO-1770: Cascade source removal — delete source + sweep wiki pages it seeded. Still Low, still deferred.
+- STO-1767: MCP v2 destructive ops. Low.
+- Reliable Gemini research grounding (see "Follow-up" section above): stream-json + tool-use verification, or move Gemini off CLI to SDK with `googleSearch` grounding. Ticketable.
+- Optional: remove the "I will start by reading…" preamble in chat by tweaking the prompt wrapper.
+- Optional: bump chat `CONTEXT_LIMIT` or introduce summarise-older-turns to avoid silent drop-off.
+- Optional: mobile-responsive UI polish. Editorial UI hasn't been mobile-tuned yet.
+- Optional: expose via LAN or cloudflared tunnel (still no auth — add basic auth before public exposure).
+
+**Branch:** main (clean, pushed to origin at f255497; still on v1.5-beta — no retag this session).
+**Blockers:** None.
+```
+
+## Prior Session (2026-04-21 — v1.5-beta cut + model eval + screenshots)
+
+```
 v1.5-beta released on main. Summary of commits since prior handoff at 2687d13:
 
 - 9ad14c7 fix(wiki): preview card — portal out of zoom, cursor-accurate, no flicker
@@ -266,28 +327,15 @@ v1.5-beta released on main. Summary of commits since prior handoff at 2687d13:
 - 9b71703 docs: capture v1.5-beta screenshots via puppeteer-core
 - 79d9f89 fix(topbar): visible help (?) button next to the tweaks icon
 
-Major work:
-1. Hover preview card fully rewritten — portal out of .content (which has `zoom: var(--fs-scale)`) to document.body, rAF-batched transform mutation on a ref (React state only {visible, data}), CSS transitions limited to opacity. Killed flicker, tracking drift, and first-hover flash.
-2. E2E eval on the e2e-rag-test project (29 pages of real RAG surveys) — graph health, orphan check, cross-source tension coverage all clean.
-3. Full provider ping matrix: Claude (sonnet/opus/haiku + explicit IDs), Gemini (3-flash-preview, 3-pro-preview, 3.1-pro-preview) — bare `-flash`/`-pro` return 404 as expected, Ollama (qwen2.5-coder, gemma4:e4b). All green.
-4. Surfaced + fixed 4 graceful-failure gaps: (a) chat+research SSE consumers silently dropped `type:"error"` frames; (b) Ollama jobs with bad model names returned raw 404 stacks; (c) /jobs+/compose showed raw `[code] msg` brackets instead of `formatJobError` titles; (d) Gemini stderr stack traces (429, 404, auth) weren't classified. All fixed with structured errorCodes + friendly messages.
-5. Research grounding guard: UI disables Ollama options in Settings for research (tooltip + optgroup label); streamClaude error frame on research is now type-specific ("needs live web access").
-6. Infographic output pages now show the PNG inline (click to open HTML); ext pills force download via `&download=1`.
-7. Version cut: tagged current main as `v1-alpha` (preserves pre-editorial release), fast-forward merged feat/editorial-frontend into main with a summary merge commit, tagged HEAD as `v1.5-beta`. Both tags pushed.
-8. README rewritten top-to-bottom for v1.5-beta with Versions table.
-9. Screenshots: built scripts/capture-screenshots.mjs — puppeteer-core driven rig (piggybacks on the Chrome discovery + puppeteer-core we vendored for infographic PNG rendering). Seeds `localStorage.activeProject` then navigates each route at 1440×900 @2x. Captured 13 screenshots against e2e-rag-test and committed them to docs/screenshots/. README image references updated.
-10. User-visible `?` help button added to the topbar (circle-with-?-glyph) next to the type-tweaks icon. Dispatches the existing editorial:open-help event.
-
-**What's next:**
-- STO-1770: Cascade source removal — delete source + sweep wiki pages it seeded. Still Low, still deferred.
-- STO-1767: MCP v2 destructive ops (move/delete/promote preview-confirm pairs). Low. Easy to land when wanted.
-- Optional: mobile-responsive UI polish. Editorial UI hasn't been mobile-tuned yet.
-- Optional: expose via LAN or cloudflared tunnel for remote/mobile access (still no auth — don't expose broadly without basic auth).
-- Optional: evaluate adding Ollama SSE streaming support so chat+research aren't hard-blocked. Research grounding would still be absent, but chat could work.
-- Consider filing tickets for v1.5-beta follow-up: (a) the `model:chat` stale DB row from earlier underscore/colon bug — low-priority cleanup; (b) v2 of screenshot rig to also capture the Tweaks panel and the Running Jobs panel.
-
-**Branch:** main (clean, pushed to origin at 79d9f89; tags `v1-alpha` and `v1.5-beta` both on origin).
-**Blockers:** None.
+Hover preview card rewritten — portal out of .content `zoom`, rAF-batched transform on a ref, CSS transitions limited to opacity.
+E2E eval on e2e-rag-test (29 pages): graph health, orphan check, cross-source tension coverage clean.
+Provider ping matrix: Claude sonnet/opus/haiku + IDs; Gemini 3-flash-preview / 3-pro-preview / 3.1-pro-preview (bare `-flash`/`-pro` = 404); Ollama qwen2.5-coder, gemma4:e4b. All green.
+Graceful-failure: SSE consumers now handle `type:"error"`; Ollama/Gemini errors classified with `errorCode` + friendly titles; /jobs+/compose use `formatJobError`.
+Research grounding guard: Ollama disabled in Settings for research (this session extended to Gemini).
+Infographic output pages render PNG inline (click → HTML); ext pills force download.
+Version cut: tagged `v1-alpha` on pre-merge main, merged `feat/editorial-frontend` → `v1.5-beta`. Both tags pushed.
+README rewritten for v1.5-beta; `scripts/capture-screenshots.mjs` runs puppeteer-core at 1440×900 @2x, writes 13 PNGs to `docs/screenshots/`.
+User-visible `?` help button in the topbar.
 ```
 
 ## Prior Session (2026-04-19 — output generation + note capture)
