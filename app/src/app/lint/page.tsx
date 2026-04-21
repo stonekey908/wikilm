@@ -6,6 +6,17 @@ import { useProject } from "@/components/project-switcher";
 import { useToast } from "@/components/toast-provider";
 import { EditorialBreadcrumbs } from "@/components/editorial/wiki/breadcrumbs";
 
+/** Matches lib/lint.ts FIXABLE_CATEGORIES — the lint/fix pipeline only
+ *  knows how to repair these. Suggested questions + nudge-family findings
+ *  (promotion/theme/gap) are user-driven, not auto-fixable. */
+const FIXABLE_CATEGORIES = new Set([
+  "orphan",
+  "missing_concept",
+  "missing_cross_ref",
+  "stale_claim",
+  "contradiction",
+]);
+
 interface Finding {
   id: number;
   projectId: number;
@@ -198,6 +209,62 @@ function EditInner() {
     }
   }
 
+  async function fixCategory(cat: string, items: Finding[]) {
+    if (!projectId) return;
+    const ids = items
+      .filter((f) => f.status === "open" && FIXABLE_CATEGORIES.has(f.category))
+      .map((f) => f.id);
+    if (ids.length === 0) {
+      addToast({ type: "info", title: "Nothing auto-fixable in this category" });
+      return;
+    }
+    ids.forEach((id) => mark(id, true));
+    try {
+      const res = await fetch("/api/lint/fix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ findingIds: ids, projectId }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? "fix failed");
+      }
+      const d = await res.json();
+      addToast({
+        type: "success",
+        title: `Fixing ${ids.length} in ${cat}`,
+        description: "Synthesis will refresh automatically after all fixes complete.",
+      });
+      // Follow the bulk-fix job so the list refreshes when it finishes
+      if (d.jobId) {
+        const poll = window.setInterval(async () => {
+          try {
+            const jr = await fetch(`/api/claude/job/${d.jobId}`);
+            if (jr.ok) {
+              const j = await jr.json();
+              if (j.status === "completed" || j.status === "failed" || j.status === "cancelled") {
+                window.clearInterval(poll);
+                ids.forEach((id) => mark(id, false));
+                fetchFindings();
+              }
+            }
+          } catch {}
+        }, 3000);
+      }
+    } catch (err: unknown) {
+      ids.forEach((id) => mark(id, false));
+      addToast({ type: "error", title: err instanceof Error ? err.message : "Couldn't queue bulk fix" });
+    }
+  }
+
+  function researchGap(f: Finding) {
+    // Hand the suggested question / gap off to the real research stream
+    // by navigating to /sources with the topic pre-filled. The Research
+    // tab auto-fires on mount when ?topic= is present.
+    const topic = f.title;
+    router.push(`/sources?tab=research&topic=${encodeURIComponent(topic)}`);
+  }
+
   function toggleGroup(cat: string) {
     setCollapsed((p) => {
       const n = new Set(p);
@@ -278,19 +345,35 @@ function EditInner() {
       ) : (
         grouped.map(([cat, items]) => {
           const isCollapsed = collapsed.has(cat);
+          const isFixable = FIXABLE_CATEGORIES.has(cat);
+          const openInCat = items.filter((f) => f.status === "open").length;
           return (
             <div key={cat} className="edit-group">
-              <button
-                type="button"
-                className={`edit-group-head${isCollapsed ? " collapsed" : ""}`}
-                onClick={() => toggleGroup(cat)}
-              >
-                <span className="chev-sm">▾</span>
-                <span className="lab">
-                  <em>{CATEGORY_LABEL[cat] ?? cat}</em>
-                </span>
-                <span className="c">{items.length}</span>
-              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <button
+                  type="button"
+                  className={`edit-group-head${isCollapsed ? " collapsed" : ""}`}
+                  style={{ flex: 1 }}
+                  onClick={() => toggleGroup(cat)}
+                >
+                  <span className="chev-sm">▾</span>
+                  <span className="lab">
+                    <em>{CATEGORY_LABEL[cat] ?? cat}</em>
+                  </span>
+                  <span className="c">{items.length}</span>
+                </button>
+                {isFixable && openInCat > 1 && (
+                  <button
+                    type="button"
+                    className="btn sm primary"
+                    style={{ marginBottom: 10 }}
+                    onClick={() => fixCategory(cat, items)}
+                    title={`Queue a bulk fix for all open ${cat.replace(/_/g, " ")} findings — synthesis refreshes after`}
+                  >
+                    Fix all · {openInCat}
+                  </button>
+                )}
+              </div>
               {!isCollapsed &&
                 items.map((f) => {
                   const sevClass = severityClass(f.severity, f.category);
@@ -322,7 +405,7 @@ function EditInner() {
                         )}
                       </div>
                       <div className="acts">
-                        {f.status === "open" && (
+                        {f.status === "open" && FIXABLE_CATEGORIES.has(f.category) && (
                           <button
                             className="btn primary"
                             onClick={() => fixOne(f)}
@@ -330,6 +413,16 @@ function EditInner() {
                             title={f.suggestedAction ?? "Apply suggested fix"}
                           >
                             {isFixing ? "Fixing…" : "Fix"}
+                          </button>
+                        )}
+                        {f.status === "open" && (f.category === "suggested_question" || f.category === "parent_gap") && (
+                          <button
+                            className="btn primary"
+                            onClick={() => researchGap(f)}
+                            disabled={isFixing}
+                            title="Open Research with this as the topic"
+                          >
+                            Research →
                           </button>
                         )}
                         {f.status !== "dismissed" && (
