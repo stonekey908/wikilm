@@ -396,15 +396,17 @@ body::after {
 .content::-webkit-scrollbar { width: 8px; }
 .content::-webkit-scrollbar-thumb { background: var(--rule-faint); }
 
-.view { display: block; opacity: 1; animation: vfade 340ms cubic-bezier(.2, .7, .2, 1) both; }
-@keyframes vfade { 0% { opacity: 0.001; transform: translateY(6px); } 100% { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .view { animation: none; } }
+.view { display: block; opacity: 1; }
 
 .pad { padding: 0 28px 80px; max-width: 1440px; margin: 0 auto; }
-/* Prevent sub-pixel jitter on tab switches that re-mount similarly-sized
-   headings: stabilize the baseline across routes. */
+/* All section pages begin with a consistent vertical rhythm:
+   breadcrumbs row (fixed height) → masthead. Prevents h1s jittering
+   up/down between route swaps that use different masthead variants. */
+.breadcrumbs { padding: 36px 0 12px; min-height: 72px; box-sizing: content-box; }
 .pad > .breadcrumbs { min-height: 36px; }
-.sec-head { contain: layout style; }
+.sec-head { padding: 8px 0 22px; }
+.ledger-head { padding: 8px 0 24px; }
+.art-masthead { padding: 0 0 22px; }
 
 /* ══ Tweaks panel ══ */
 .tweaks {
@@ -1289,9 +1291,10 @@ body::after {
 
 .research-controls {
   display: flex; gap: 10px; align-items: center;
-  padding: 16px 0 22px;
+  padding: 10px 0 16px;
   flex-wrap: wrap;
 }
+.research-controls:empty { display: none; padding: 0; }
 .research-controls .btn { padding: 10px 18px; font-size: 11px; }
 .research-controls .max-sel {
   display: flex; align-items: center; gap: 8px;

@@ -821,7 +821,7 @@ function IntakePageInner() {
         </div>
       ) : (
         // ── Research tab ──────────────────────────────────────────
-        <div style={{ paddingTop: 28, maxWidth: 960 }}>
+        <div style={{ paddingTop: 18, maxWidth: 960 }}>
           <div className="drop-tools">
             <div className="drop-url">
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -854,59 +854,61 @@ function IntakePageInner() {
             </button>
           </div>
 
-          <div className="research-controls">
-            {totalCount > 0 && !isSearching && (
-              <>
-                <button className="btn" onClick={loadMore} disabled={!researchQuery.trim()}>
-                  + Load {maxResults} more
-                </button>
-                <button className="btn ghost" onClick={clearResearch}>
-                  Clear
-                </button>
-              </>
-            )}
-            {isSearching && (
-              <>
-                <span className="research-live">
-                  <span className="d" />
-                  Streaming · {totalCount} found
+          {(totalCount > 0 || isSearching) && (
+            <div className="research-controls">
+              {totalCount > 0 && !isSearching && (
+                <>
+                  <button className="btn" onClick={loadMore} disabled={!researchQuery.trim()}>
+                    + Load {maxResults} more
+                  </button>
+                  <button className="btn ghost" onClick={clearResearch}>
+                    Clear
+                  </button>
+                </>
+              )}
+              {isSearching && (
+                <>
+                  <span className="research-live">
+                    <span className="d" />
+                    Streaming · {totalCount} found
+                  </span>
+                  <button className="btn red" onClick={cancelResearch}>
+                    Stop
+                  </button>
+                </>
+              )}
+              {!isSearching && totalCount > 0 && (
+                <span className="research-count">
+                  <b>{totalCount}</b> candidates · <b>{approvedCount}</b> queued
                 </span>
-                <button className="btn red" onClick={cancelResearch}>
-                  Stop
-                </button>
-              </>
-            )}
-            {!isSearching && totalCount > 0 && (
-              <span className="research-count">
-                <b>{totalCount}</b> candidates · <b>{approvedCount}</b> queued
-              </span>
-            )}
-            {totalCount > 0 && (
+              )}
+              {totalCount > 0 && (
+                <div className="max-sel">
+                  <span>Sort</span>
+                  <select
+                    value={sortMode}
+                    onChange={(e) => setSortMode(e.target.value as SortMode)}
+                  >
+                    <option value="relevance">Relevance</option>
+                    <option value="stream">Stream order</option>
+                  </select>
+                </div>
+              )}
               <div className="max-sel">
-                <span>Sort</span>
+                <span>Per run</span>
                 <select
-                  value={sortMode}
-                  onChange={(e) => setSortMode(e.target.value as SortMode)}
+                  value={maxResults}
+                  onChange={(e) => setMaxResults(Number(e.target.value))}
+                  disabled={isSearching}
                 >
-                  <option value="relevance">Relevance</option>
-                  <option value="stream">Stream order</option>
+                  <option value={4}>4</option>
+                  <option value={8}>8</option>
+                  <option value={12}>12</option>
+                  <option value={20}>20</option>
                 </select>
               </div>
-            )}
-            <div className="max-sel">
-              <span>Per run</span>
-              <select
-                value={maxResults}
-                onChange={(e) => setMaxResults(Number(e.target.value))}
-                disabled={isSearching}
-              >
-                <option value={4}>4</option>
-                <option value={8}>8</option>
-                <option value={12}>12</option>
-                <option value={20}>20</option>
-              </select>
             </div>
-          </div>
+          )}
 
           {isSearching && <div className="research-shimmer" />}
 
