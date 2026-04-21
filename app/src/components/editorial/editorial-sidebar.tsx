@@ -2,8 +2,10 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Suspense } from "react";
 import { FOLIO, VIEW_ORDER, viewFromPath, type EditorialView } from "./folio-map";
 import { EditorialProjectTree } from "./editorial-project-tree";
+import { ChatSessionsSidebar } from "./chat-sessions-sidebar";
 
 const NAV_ICONS: Record<EditorialView, React.ReactNode> = {
   dashboard: (
@@ -25,6 +27,13 @@ const NAV_ICONS: Record<EditorialView, React.ReactNode> = {
   sources: (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
       <path d="M2 4a2 2 0 012-2h4l2 2h4a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2z" />
+    </svg>
+  ),
+  chat: (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M2 3h12v8H5l-3 3z" />
+      <line x1="5" y1="6" x2="11" y2="6" />
+      <line x1="5" y1="8.5" x2="9" y2="8.5" />
     </svg>
   ),
   jobs: (
@@ -49,6 +58,12 @@ const NAV_ICONS: Record<EditorialView, React.ReactNode> = {
   compose: (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
       <path d="M3 12l1-4 7-7 3 3-7 7-4 1z" />
+    </svg>
+  ),
+  settings: (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <circle cx="8" cy="8" r="2" />
+      <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.5 3.5l1.4 1.4M11.1 11.1l1.4 1.4M3.5 12.5l1.4-1.4M11.1 4.9l1.4-1.4" />
     </svg>
   ),
 };
@@ -107,6 +122,11 @@ export function EditorialSidebar() {
 
         <div className="sb-lab">Projects</div>
         <EditorialProjectTree />
+
+        <div className="sb-lab">Conversations</div>
+        <Suspense fallback={null}>
+          <ChatSessionsSidebar />
+        </Suspense>
       </nav>
 
       <div className="side-foot">
