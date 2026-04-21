@@ -111,6 +111,7 @@ function WikiPageInner() {
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("");
   const [sortKey, setSortKey] = useState<SortKey>("recent");
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const { onHover, onLeave, PreviewCard } = useWikiPreview(projectId);
 
@@ -344,17 +345,46 @@ function WikiPageInner() {
               : "No pages in this project yet."}
           </div>
         ) : grouped ? (
-          grouped.map(([type, pages]) => (
-            <div key={type} className="picker-group">
-              <div className="picker-group-head">
-                <span className="lab">
-                  <em>{TYPE_LABEL[type] ?? type}</em>
-                </span>
-                <span className="c">{pages.length}</span>
+          grouped.map(([type, pages]) => {
+            const isOpen = !collapsed.has(type);
+            return (
+              <div key={type} className="picker-group">
+                <button
+                  type="button"
+                  className="picker-group-head"
+                  style={{ width: "100%", background: "none", border: "none", cursor: "pointer", fontFamily: "inherit" }}
+                  onClick={() =>
+                    setCollapsed((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(type)) next.delete(type);
+                      else next.add(type);
+                      return next;
+                    })
+                  }
+                >
+                  <span
+                    className="chev-sm"
+                    style={{
+                      fontFamily: "var(--font-mono)",
+                      fontSize: 10,
+                      color: "var(--ink-4)",
+                      display: "inline-block",
+                      transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)",
+                      transition: "transform 140ms",
+                      marginRight: 4,
+                    }}
+                  >
+                    ▾
+                  </span>
+                  <span className="lab">
+                    <em>{TYPE_LABEL[type] ?? type}</em>
+                  </span>
+                  <span className="c">{pages.length}</span>
+                </button>
+                {isOpen && pages.map((p, i) => renderRow(p, i))}
               </div>
-              {pages.map((p, i) => renderRow(p, i))}
-            </div>
-          ))
+            );
+          })
         ) : (
           filtered.map(renderRow)
         )}

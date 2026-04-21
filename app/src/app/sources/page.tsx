@@ -781,28 +781,6 @@ function IntakePageInner() {
             </div>
 
             <div className="fr-card">
-              <h4>This week</h4>
-              <div className="fr-chart">
-                {weekBuckets.map((v, i) => (
-                  <div
-                    key={i}
-                    className={`bar${v === weekMax && weekMax > 0 ? " peak" : ""}`}
-                    style={{ height: `${(v / weekMax) * 100}%` }}
-                    title={`${v} source${v === 1 ? "" : "s"}`}
-                  />
-                ))}
-              </div>
-              <div className="fr-chart-labels">
-                {(() => {
-                  const labels: string[] = [];
-                  const today = new Date().getDay();
-                  for (let i = 1; i <= 7; i++) labels.push(DAY_LABELS[(today + i) % 7]);
-                  return labels.map((l, i) => <span key={i}>{l}</span>);
-                })()}
-              </div>
-            </div>
-
-            <div className="fr-card">
               <h4>Queue health</h4>
               <div className="fr-stat">
                 <span>Pending</span>

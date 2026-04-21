@@ -22,43 +22,69 @@ interface Session {
 }
 
 function renderBubbleHtml(md: string): string {
-  let h = md.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  h = h.replace(/```(\w*)\n([\s\S]*?)```/g, (_m, _l, c) => `<pre><code>${c.trimEnd()}</code></pre>`);
-  h = h.replace(/`([^`]+)`/g, "<code>$1</code>");
-  h = h.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-  h = h.replace(/(^|[^*])\*([^*]+)\*(?!\*)/g, "$1<em>$2</em>");
-  h = h.replace(/\[\[([^\]]+)\]\]/g, (_m, t) => {
-    const raw = String(t);
-    const pipe = raw.indexOf("|");
-    const target = pipe !== -1 ? raw.slice(0, pipe) : raw;
-    const label = pipe !== -1 ? raw.slice(pipe + 1) : (raw.split("/").pop() ?? raw).replace(/-/g, " ");
-    return `<a class="wikilink" href="/wiki?slug=${encodeURIComponent(target)}">${label}</a>`;
+  const esc = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const inline = (s: string): string => {
+    let h = esc(s);
+    h = h.replace(/`([^`]+)`/g, "<code>$1</code>");
+    h = h.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    h = h.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>");
+    h = h.replace(/\[\[([^\]]+)\]\]/g, (_m, t) => {
+      const raw = String(t);
+      const pipe = raw.indexOf("|");
+      const target = pipe !== -1 ? raw.slice(0, pipe) : raw;
+      const label = pipe !== -1 ? raw.slice(pipe + 1) : (raw.split("/").pop() ?? raw).replace(/-/g, " ");
+      return `<a class="wikilink" href="/wiki?slug=${encodeURIComponent(target)}">${label}</a>`;
+    });
+    h = h.replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer noopener">$1</a>');
+    return h;
+  };
+
+  // Pull fenced code blocks out first so their internals don't get
+  // inline-formatted or line-split.
+  const codeBlocks: string[] = [];
+  md = md.replace(/```(\w*)\n([\s\S]*?)```/g, (_m, _lang, code) => {
+    const id = codeBlocks.length;
+    codeBlocks.push(`<pre><code>${esc(code.replace(/\n+$/, ""))}</code></pre>`);
+    return `\u0000CODE${id}\u0000`;
   });
-  h = h.replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer noopener">$1</a>');
-  const lines = h.split("\n");
+
+  // Split on blank lines → blocks. Each block becomes a single <p>, <h*>,
+  // <ul>, <ol>, or <hr>. Inside a block, single newlines are preserved as
+  // <br/> so paragraph text wraps naturally without splitting.
+  const blocks = md.split(/\n{2,}/);
   const out: string[] = [];
-  let inList = false;
-  let listKind: "ul" | "ol" | null = null;
-  for (const l of lines) {
-    const ulM = l.match(/^[-*]\s+(.*)$/);
-    const olM = l.match(/^\d+\.\s+(.*)$/);
-    if (ulM) {
-      if (!inList || listKind !== "ul") { if (inList) out.push(`</${listKind}>`); out.push("<ul>"); inList = true; listKind = "ul"; }
-      out.push(`<li>${ulM[1]}</li>`);
+  for (const raw of blocks) {
+    const b = raw.replace(/^\n+|\n+$/g, "");
+    if (!b) continue;
+    if (/^\u0000CODE(\d+)\u0000$/.test(b.trim())) {
+      out.push(b.trim());
       continue;
     }
-    if (olM) {
-      if (!inList || listKind !== "ol") { if (inList) out.push(`</${listKind}>`); out.push("<ol>"); inList = true; listKind = "ol"; }
-      out.push(`<li>${olM[1]}</li>`);
+    if (/^-{3,}$|^_{3,}$|^\*{3,}$/.test(b.trim())) {
+      out.push("<hr/>");
       continue;
     }
-    if (inList) { out.push(`</${listKind}>`); inList = false; listKind = null; }
-    if (l.trim() === "") { out.push(""); continue; }
-    if (/^---+$/.test(l.trim())) { out.push("<hr/>"); continue; }
-    out.push(`<p>${l}</p>`);
+    const hMatch = b.match(/^(#{1,3})\s+(.+)$/);
+    if (hMatch && !b.includes("\n")) {
+      const level = hMatch[1].length;
+      out.push(`<h${level}>${inline(hMatch[2])}</h${level}>`);
+      continue;
+    }
+    const lines = b.split("\n");
+    if (lines.every((l) => /^[-*]\s+/.test(l.trim()))) {
+      out.push("<ul>" + lines.map((l) => `<li>${inline(l.trim().replace(/^[-*]\s+/, ""))}</li>`).join("") + "</ul>");
+      continue;
+    }
+    if (lines.every((l) => /^\d+\.\s+/.test(l.trim()))) {
+      out.push("<ol>" + lines.map((l) => `<li>${inline(l.trim().replace(/^\d+\.\s+/, ""))}</li>`).join("") + "</ol>");
+      continue;
+    }
+    out.push("<p>" + inline(b).replace(/\n/g, "<br/>") + "</p>");
   }
-  if (inList && listKind) out.push(`</${listKind}>`);
-  return out.join("\n");
+
+  // Re-inject code blocks
+  return out.join("\n").replace(/\u0000CODE(\d+)\u0000/g, (_m, idx) => codeBlocks[Number(idx)] ?? "");
 }
 
 function SalonInner() {
