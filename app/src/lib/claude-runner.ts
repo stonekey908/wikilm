@@ -124,7 +124,7 @@ interface JobOptions {
   prompt: string;
   projectCwd: string;
   projectId: number;
-  type: "ingest" | "query" | "lint" | "fix" | "research" | "synthesis" | "output" | "note-summary";
+  type: "ingest" | "query" | "lint" | "fix" | "research" | "synthesis" | "output" | "note-summary" | "concept-fill";
   title: string;
   onComplete?: (status: "completed" | "failed") => void;
 }
@@ -166,17 +166,19 @@ export function streamClaude({ prompt, projectCwd, type }: StreamOptions): Reada
   // given stream via the dev server log.
   console.log(`[stream] type=${type ?? "chat"} model=${model}`);
 
-  // Ollama doesn't plug into this SSE envelope yet — surface a clean error
-  // instead of letting the user wonder why nothing happened.
+  // Ollama has no web grounding (research) and doesn't plug into our SSE
+  // envelope (chat). Surface a clean, type-specific error instead of letting
+  // the user wonder why nothing happened.
   if (model.startsWith("ollama:")) {
+    const text =
+      type === "research"
+        ? "Research needs live web access, but Ollama runs locally with no web-grounding. Pick Claude or Gemini for research."
+        : "Ollama streaming isn't wired into chat yet. Pick Claude or Gemini for this operation.";
     return new ReadableStream({
       start(controller) {
         controller.enqueue(
           encoder.encode(
-            `data: ${JSON.stringify({
-              type: "error",
-              text: "Ollama streaming isn't supported for research/chat yet. Pick Claude or Gemini for this operation.",
-            })}\n\n`
+            `data: ${JSON.stringify({ type: "error", text })}\n\n`
           )
         );
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "done", code: 1 })}\n\n`));

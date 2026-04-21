@@ -4,7 +4,8 @@ import path from "path";
 import { db } from "@/db";
 import { lintFindings } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { getProject, hasChildren, slugifyName, wikiDir } from "@/lib/projects";
+import { getProject, hasChildren, projectRoot, slugifyName, wikiDir } from "@/lib/projects";
+import { startJob } from "@/lib/claude-runner";
 
 /**
  * POST /api/wiki/concept-scaffold
@@ -57,12 +58,10 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "Project not found" }, { status: 404 });
   }
 
-  if (!hasChildren(projectId)) {
-    return Response.json(
-      { error: "Concept scaffolding targets parent projects only" },
-      { status: 400 }
-    );
-  }
+  // Concept scaffolding was originally parent-only; we've relaxed it so
+  // individual projects can scaffold concepts too — the fill job reads
+  // whatever wiki is at `projectCwd` and works with that.
+  void hasChildren;
 
   const slug = slugifyName(title);
   if (!slug) {
@@ -117,6 +116,50 @@ _(placeholder — flesh out what we know, open questions, and how this relates t
     .where(eq(lintFindings.id, findingId))
     .run();
 
+  // Fire a concept-fill job: Claude reads the wiki + evidencing pages and
+  // replaces the placeholder with a real TL;DR + Notes. The job runs under
+  // the `concept-fill` model setting (see /settings → Concept drafting).
+  let jobId: number | null = null;
+  try {
+    const evidenceNote =
+      evidencingSlugs.length > 0
+        ? `The user flagged these pages as evidencing this concept — read them first to ground your draft:\n${evidencingSlugs.map((s) => `- [[${s}]]`).join("\n")}\n\n`
+        : "";
+    const prompt = `You are drafting a concept page for the WikiLM wiki.
+
+**Concept title:** ${title.trim()}
+
+**Target file:** \`wiki/concepts/${slug}.md\` (already scaffolded — overwrite in place).
+
+${evidenceNote}Steps:
+1. Read \`wiki/index.md\` to orient yourself in the project.
+2. Walk the wiki looking for every page that already references "${title.trim()}" (or close variants). Those are your source material.
+3. Rewrite \`wiki/concepts/${slug}.md\` with this structure:
+   - Keep the existing frontmatter (\`type: concept\`). Add a \`tags:\` array with 3–5 relevant tags drawn from referring pages.
+   - \`# ${title.trim()}\`
+   - A **one-paragraph TL;DR** (3–5 sentences) that defines the concept in the user's voice — not an encyclopedia entry.
+   - A \`## Why it matters\` section explaining why this concept earned its own page (why we pulled it out, not just what it is).
+   - A \`## Evidence\` section listing the referring pages as \`- [[wikilink]] — <one-line gloss of what that page says about this concept>\`.
+   - A \`## Connections\` section listing 3–7 related concept/entity pages already in the wiki, each as \`- [[page]] — <one-line relation>\`. Prefer pages that already exist.
+   - A \`## Open questions\` section with 2–4 bullets of genuinely unresolved aspects — not rhetorical framing.
+
+**Constraints:**
+- Every \`[[wikilink]]\` must point at an existing page (check before writing — use the slug exactly as it appears on disk).
+- Do not invent claims. Every specific statement is backed by an evidencing page.
+- Do not touch any file other than \`wiki/concepts/${slug}.md\`.
+- Append one line to \`wiki/log.md\`: \`## [${today}] update | Filled concept: ${slug}\`.`;
+
+    jobId = await startJob({
+      prompt,
+      projectCwd: projectRoot(project),
+      projectId: project.id,
+      type: "concept-fill",
+      title: `Fill concept: ${title.trim()}`,
+    });
+  } catch (err) {
+    console.error("[concept-scaffold] couldn't queue fill job:", err);
+  }
+
   return Response.json(
     {
       success: true,
@@ -124,6 +167,7 @@ _(placeholder — flesh out what we know, open questions, and how this relates t
       projectSlug: project.slug,
       slug,
       filePath: `concepts/${slug}.md`,
+      fillJobId: jobId,
     },
     { status: 201 }
   );

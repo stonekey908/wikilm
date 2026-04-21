@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Share2, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
 import { useProject } from "@/components/project-switcher";
-import { Breadcrumbs } from "@/components/breadcrumbs";
+import { EditorialBreadcrumbs } from "@/components/editorial/wiki/breadcrumbs";
+import { forceLayout, type LaidEdge, type LaidNode } from "@/components/editorial/map/force-layout";
 
 interface GraphNode {
   id: string;
@@ -14,615 +14,401 @@ interface GraphNode {
   projectId: number;
   projectSlug: string;
 }
-
 interface GraphEdge {
-  from: string; // node id
-  to: string; // node id
+  from: string;
+  to: string;
   crossProject: boolean;
 }
 
-type Scope = "project" | "subtree";
+const BASE_WIDTH = 1000;
+const BASE_HEIGHT = 640;
 
-// Type colors match wiki page TYPE_CONFIG — used in "This project" scope
-// where every node shares a project, so the type palette communicates more.
-const TYPE_COLORS: Record<string, string> = {
-  source: "var(--blue)",
-  entity: "var(--orange)",
-  concept: "var(--primary)",
-  comparison: "var(--chart-3)",
-  synthesis: "var(--chart-4)",
-  query: "var(--green)",
-  output: "var(--chart-5)",
-  index: "var(--text-3)",
-  unknown: "var(--text-4)",
+const TYPE_COLOR_VAR: Record<string, string> = {
+  synthesis: "var(--accent)",
+  concept: "var(--blue)",
+  entity: "var(--amber)",
+  source: "var(--ink)",
+  comparison: "var(--green)",
+  query: "var(--red)",
+  output: "var(--accent)",
 };
 
-// Force-directed layout (Fruchterman-Reingold-ish):
-//   - all nodes repel each other (Coulomb-like)
-//   - edges attract their endpoints (Hooke-like)
-//   - small gravity toward center keeps the graph on screen
-//   - same-type repulsion is mildly dampened → soft clusters by type
-// Simulation runs synchronously in a useMemo up to MAX_ITER steps with a
-// cooling schedule; final positions are static. Deterministic seed (ring
-// by id order) makes layout stable across reloads.
-const MAX_ITER = 300;
-const NODE_PAD = 12;
+const TYPE_LABEL: Record<string, string> = {
+  synthesis: "Synthesis",
+  concept: "Concepts",
+  entity: "Entities",
+  source: "Sources",
+  comparison: "Comparisons",
+  query: "Queries",
+  output: "Outputs",
+};
 
-function computeLayout(
-  nodes: GraphNode[],
-  edges: GraphEdge[],
-  width: number,
-  height: number,
-  clusterKey: (n: GraphNode) => string
-): Map<string, { x: number; y: number }> {
-  const positions = new Map<string, { x: number; y: number }>();
-  if (nodes.length === 0) return positions;
-
-  const cx = width / 2;
-  const cy = height / 2;
-  const area = width * height;
-  // Ideal edge length: spreads nodes to fill the canvas roughly evenly.
-  const k = Math.sqrt(area / nodes.length) * 0.85;
-  const kRep = k * k;
-  const kAttrInv = 1 / k;
-
-  // Deterministic seed: ring by id ordering — same nodes + edges produce
-  // the same final layout on every reload.
-  const seeded = new Map<
-    string,
-    { x: number; y: number; cluster: string }
-  >();
-  const initRadius = Math.min(width, height) * 0.3;
-  nodes.forEach((n, i) => {
-    const angle = (i / nodes.length) * Math.PI * 2;
-    seeded.set(n.id, {
-      x: cx + initRadius * Math.cos(angle),
-      y: cy + initRadius * Math.sin(angle),
-      cluster: clusterKey(n),
-    });
-  });
-
-  const ids = nodes.map((n) => n.id);
-  let temperature = Math.min(width, height) * 0.1;
-  const cooling = temperature / (MAX_ITER + 1);
-
-  for (let iter = 0; iter < MAX_ITER; iter++) {
-    const forces = new Map<string, { fx: number; fy: number }>();
-    for (const s of ids) forces.set(s, { fx: 0, fy: 0 });
-
-    // Repulsive forces between every pair
-    for (let i = 0; i < ids.length; i++) {
-      const a = seeded.get(ids[i])!;
-      for (let j = i + 1; j < ids.length; j++) {
-        const b = seeded.get(ids[j])!;
-        const dx = a.x - b.x;
-        const dy = a.y - b.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist < 0.01) continue; // degenerate pair — next iter will split
-        // Same-cluster nodes repel ~15% less so they cluster gently.
-        const sameCluster = a.cluster === b.cluster ? 0.85 : 1;
-        const mag = (kRep / dist) * sameCluster;
-        const fx = (dx / dist) * mag;
-        const fy = (dy / dist) * mag;
-        const fa = forces.get(ids[i])!;
-        const fb = forces.get(ids[j])!;
-        fa.fx += fx;
-        fa.fy += fy;
-        fb.fx -= fx;
-        fb.fy -= fy;
+function clusteringCoef(nodes: LaidNode[], edges: LaidEdge[]): number {
+  if (nodes.length < 3) return 0;
+  const nbrs = new Map<string, Set<string>>();
+  for (const n of nodes) nbrs.set(n.id, new Set());
+  for (const e of edges) {
+    nbrs.get(e.from)?.add(e.to);
+    nbrs.get(e.to)?.add(e.from);
+  }
+  let sum = 0;
+  let counted = 0;
+  for (const n of nodes) {
+    const neigh = Array.from(nbrs.get(n.id) ?? []);
+    if (neigh.length < 2) continue;
+    let triangles = 0;
+    for (let i = 0; i < neigh.length; i++) {
+      for (let j = i + 1; j < neigh.length; j++) {
+        if (nbrs.get(neigh[i])?.has(neigh[j])) triangles++;
       }
     }
-
-    // Attractive forces along edges
-    for (const e of edges) {
-      const a = seeded.get(e.from);
-      const b = seeded.get(e.to);
-      if (!a || !b) continue;
-      const dx = a.x - b.x;
-      const dy = a.y - b.y;
-      const dist = Math.hypot(dx, dy) || 0.01;
-      const mag = dist * dist * kAttrInv;
-      const fx = (dx / dist) * mag;
-      const fy = (dy / dist) * mag;
-      forces.get(e.from)!.fx -= fx;
-      forces.get(e.from)!.fy -= fy;
-      forces.get(e.to)!.fx += fx;
-      forces.get(e.to)!.fy += fy;
-    }
-
-    // Weak center gravity so isolated clusters don't drift off-screen
-    const centerK = 0.015;
-    for (const s of ids) {
-      const p = seeded.get(s)!;
-      forces.get(s)!.fx -= (p.x - cx) * centerK;
-      forces.get(s)!.fy -= (p.y - cy) * centerK;
-    }
-
-    // Apply capped displacement + clamp to canvas
-    for (const s of ids) {
-      const p = seeded.get(s)!;
-      const f = forces.get(s)!;
-      const fmag = Math.hypot(f.fx, f.fy) || 1;
-      const capped = Math.min(fmag, temperature);
-      p.x += (f.fx / fmag) * capped;
-      p.y += (f.fy / fmag) * capped;
-      p.x = Math.max(NODE_PAD, Math.min(width - NODE_PAD, p.x));
-      p.y = Math.max(NODE_PAD, Math.min(height - NODE_PAD, p.y));
-    }
-
-    temperature = Math.max(0.1, temperature - cooling);
+    const possible = (neigh.length * (neigh.length - 1)) / 2;
+    sum += triangles / possible;
+    counted++;
   }
-
-  for (const [id, p] of seeded) {
-    positions.set(id, { x: p.x, y: p.y });
-  }
-  return positions;
+  return counted === 0 ? 0 : sum / counted;
 }
 
-export default function GraphPage() {
+export default function MapPage() {
   const router = useRouter();
-  const { activeProject, projects, setActiveProject } = useProject();
-  const activeProjectId = activeProject?.id ?? 1;
-  const [nodes, setNodes] = useState<GraphNode[]>([]);
-  const [edges, setEdges] = useState<GraphEdge[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [scope, setScope] = useState<Scope>("project");
+  const { activeProject } = useProject();
+  const projectId = activeProject?.id ?? null;
 
-  // Pan + zoom transform
+  const [rawNodes, setRawNodes] = useState<GraphNode[]>([]);
+  const [rawEdges, setRawEdges] = useState<GraphEdge[]>([]);
+  const [hoverId, setHoverId] = useState<string | null>(null);
+  const [activeType, setActiveType] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
-  const panRef = useRef<{ startX: number; startY: number; panX: number; panY: number } | null>(null);
-  const svgRef = useRef<SVGSVGElement>(null);
-
-  // Canvas dimensions
-  const [size, setSize] = useState({ w: 1000, h: 700 });
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // Does the active project have any children? Controls whether we show the
-  // scope toggle at all (flat projects don't need it).
-  const hasChildren = useMemo(
-    () => projects.some((p) => p.parentId === activeProjectId),
-    [projects, activeProjectId]
-  );
-
-  // Coerce to "project" whenever the active project has no children — the
-  // toggle is hidden in that case, so an orphaned "subtree" selection (e.g.
-  // user toggled on a nested project, then switched to a flat one) would
-  // otherwise send a bogus scope param. Derived, not a post-render effect.
-  const effectiveScope: Scope = hasChildren ? scope : "project";
+  const [dragging, setDragging] = useState(false);
+  const dragStart = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
 
   useEffect(() => {
+    if (projectId === null) return;
     let cancelled = false;
-    fetch(`/api/wiki/graph?projectId=${activeProjectId}&scope=${effectiveScope}`)
+    fetch(`/api/wiki/graph?projectId=${projectId}`)
       .then((r) => r.json())
-      .then((data: { nodes: GraphNode[]; edges: GraphEdge[] }) => {
-        if (cancelled) return;
-        setNodes(data.nodes ?? []);
-        setEdges(data.edges ?? []);
+      .then((d: { nodes: GraphNode[]; edges: GraphEdge[] }) => {
+        if (!cancelled) {
+          setRawNodes(d.nodes ?? []);
+          setRawEdges(d.edges ?? []);
+        }
       })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [activeProjectId, effectiveScope]);
+  }, [projectId]);
 
-  // Observe container size so layout adapts
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => {
-      setSize({ w: el.clientWidth, h: el.clientHeight });
+  const { nodes, edges, bounds } = useMemo(() => {
+    if (rawNodes.length === 0)
+      return {
+        nodes: [] as LaidNode[],
+        edges: [] as LaidEdge[],
+        bounds: { width: BASE_WIDTH, height: BASE_HEIGHT },
+      };
+    const layoutScale = Math.max(1, Math.sqrt(rawNodes.length / 40));
+    const width = BASE_WIDTH * layoutScale;
+    const height = BASE_HEIGHT * layoutScale;
+    const result = forceLayout({
+      nodes: rawNodes.map((n) => ({ id: n.id, type: n.type, title: n.title, slug: n.slug })),
+      edges: rawEdges,
+      width: BASE_WIDTH,
+      height: BASE_HEIGHT,
+      iterations: 260,
     });
-    ro.observe(el);
-    setSize({ w: el.clientWidth, h: el.clientHeight });
-    return () => ro.disconnect();
-  }, []);
+    return { ...result, bounds: { width, height } };
+  }, [rawNodes, rawEdges]);
 
-  // Map projectId -> color lookup for subtree-mode node coloring and legend.
-  // In subtree mode, prefer a deterministic distinct palette over the user's
-  // picked colors so clusters stay visually separable even when two projects
-  // happen to share the default teal. Projects beyond the palette fall back
-  // to their own color.
-  const SUBTREE_PALETTE = useMemo(
-    () => [
-      "var(--chart-1)",
-      "var(--chart-2)",
-      "var(--chart-3)",
-      "var(--chart-4)",
-      "var(--chart-5)",
-      "#f59e0b", // amber
-      "#ec4899", // pink
-      "#14b8a6", // teal
-    ],
-    []
-  );
-  const projectColor = useMemo(() => {
-    const m = new Map<number, string>();
-    if (effectiveScope === "subtree") {
-      // Deterministic ordering: by project id so assignment is stable.
-      const ordered = [...projects].sort((a, b) => a.id - b.id);
-      ordered.forEach((p, i) => {
-        m.set(p.id, SUBTREE_PALETTE[i % SUBTREE_PALETTE.length]);
-      });
-    } else {
-      for (const p of projects) m.set(p.id, p.color);
-    }
-    return m;
-  }, [projects, effectiveScope, SUBTREE_PALETTE]);
+  const WIDTH = bounds.width;
+  const HEIGHT = bounds.height;
 
-  const projectName = useMemo(() => {
-    const m = new Map<number, string>();
-    for (const p of projects) m.set(p.id, p.name);
-    return m;
-  }, [projects]);
-
-  // In subtree mode, cluster by project (so same-project nodes attract); in
-  // project mode, cluster by type (preserves the existing behavior).
-  const clusterKey = useMemo(
-    () =>
-      effectiveScope === "subtree"
-        ? (n: GraphNode) => String(n.projectId)
-        : (n: GraphNode) => n.type,
-    [effectiveScope]
-  );
-
-  const positions = useMemo(
-    () => computeLayout(nodes, edges, size.w, size.h, clusterKey),
-    [nodes, edges, size.w, size.h, clusterKey]
-  );
-
-  // Which projects actually have nodes in the current graph? Drives the
-  // per-project legend in subtree mode.
-  const visibleProjectIds = useMemo(() => {
-    const seen = new Set<number>();
-    for (const n of nodes) seen.add(n.projectId);
-    return Array.from(seen);
+  const typeCounts = useMemo(() => {
+    const c = new Map<string, number>();
+    for (const n of nodes) c.set(n.type, (c.get(n.type) ?? 0) + 1);
+    return c;
   }, [nodes]);
 
-  // Highlighted set: the hovered node + its neighbors
-  const highlightedIds = useMemo(() => {
-    if (!hoveredId) return new Set<string>();
-    const set = new Set<string>([hoveredId]);
+  const clustering = useMemo(() => clusteringCoef(nodes, edges), [nodes, edges]);
+
+  // Identify hub (most-connected node) for the central pulse
+  const hubId = useMemo(() => {
+    const deg = new Map<string, number>();
     for (const e of edges) {
-      if (e.from === hoveredId) set.add(e.to);
-      if (e.to === hoveredId) set.add(e.from);
+      deg.set(e.from, (deg.get(e.from) ?? 0) + 1);
+      deg.set(e.to, (deg.get(e.to) ?? 0) + 1);
     }
-    return set;
-  }, [hoveredId, edges]);
+    let best = "";
+    let bestDeg = -1;
+    for (const [k, v] of deg) {
+      if (v > bestDeg) {
+        bestDeg = v;
+        best = k;
+      }
+    }
+    return best || nodes[0]?.id || "";
+  }, [edges, nodes]);
 
-  function handleMouseDown(e: React.MouseEvent) {
-    panRef.current = {
-      startX: e.clientX,
-      startY: e.clientY,
-      panX: pan.x,
-      panY: pan.y,
+  const tooltipNode = hoverId ? nodes.find((n) => n.id === hoverId) : null;
+
+  const onNodeClick = useCallback(
+    (n: LaidNode) => {
+      router.push(`/wiki?slug=${encodeURIComponent(n.slug)}`);
+    },
+    [router]
+  );
+
+  function edgeVisible(e: LaidEdge): boolean {
+    if (!activeType) return true;
+    const a = nodes.find((n) => n.id === e.from);
+    const b = nodes.find((n) => n.id === e.to);
+    if (!a || !b) return false;
+    // Show an edge only when BOTH endpoints are the active type —
+    // keeps the filtered view visually tight.
+    return a.type === activeType && b.type === activeType;
+  }
+
+  function nodeVisible(n: LaidNode): boolean {
+    if (!activeType) return true;
+    return n.type === activeType;
+  }
+
+  // Build an SVG coordinate → screen coordinate mapper for the tooltip.
+  // The SVG uses preserveAspectRatio="xMidYMid meet" inside a responsive
+  // container; we read bbox on demand to position the tooltip over hover.
+  const [svgRect, setSvgRect] = useState<DOMRect | null>(null);
+  useEffect(() => {
+    function update() {
+      if (svgRef.current) setSvgRect(svgRef.current.getBoundingClientRect());
+    }
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [nodes.length]);
+
+  const tooltipPos = useMemo(() => {
+    if (!tooltipNode || !svgRect) return null;
+    const scale = Math.min(svgRect.width / WIDTH, svgRect.height / HEIGHT);
+    const offsetX = (svgRect.width - WIDTH * scale) / 2;
+    const offsetY = (svgRect.height - HEIGHT * scale) / 2;
+    return {
+      left: offsetX + tooltipNode.x * scale,
+      top: offsetY + tooltipNode.y * scale,
     };
-  }
-  function handleMouseMove(e: React.MouseEvent) {
-    if (!panRef.current) return;
-    setPan({
-      x: panRef.current.panX + (e.clientX - panRef.current.startX),
-      y: panRef.current.panY + (e.clientY - panRef.current.startY),
-    });
-  }
-  function handleMouseUp() {
-    panRef.current = null;
-  }
-
-  function handleWheel(e: React.WheelEvent) {
-    const delta = -e.deltaY * 0.001;
-    setZoom((z) => Math.max(0.3, Math.min(3, z + delta)));
-  }
-
-  function resetView() {
-    setPan({ x: 0, y: 0 });
-    setZoom(1);
-  }
-
-  // Navigate into the wiki for a given node. In subtree mode the clicked
-  // node may belong to a descendant project — flip the active project first
-  // so /wiki opens in the right context.
-  function navigateToNode(n: GraphNode) {
-    if (n.projectId !== activeProjectId) {
-      const destProject = projects.find((p) => p.id === n.projectId);
-      if (destProject) setActiveProject(destProject);
-    }
-    router.push(`/wiki?slug=${encodeURIComponent(n.slug)}`);
-  }
-
-  function colorForNode(n: GraphNode): string {
-    if (effectiveScope === "subtree") {
-      return projectColor.get(n.projectId) ?? TYPE_COLORS.unknown;
-    }
-    return TYPE_COLORS[n.type] ?? TYPE_COLORS.unknown;
-  }
-
-  const nodeRadius = 6;
-  // In project mode the legend maps type -> color. In subtree mode it maps
-  // project -> color; cross-project edges get a second swatch below.
-  const legendEntries: { key: string; color: string; label: string }[] =
-    effectiveScope === "subtree"
-      ? visibleProjectIds.map((id) => ({
-          key: `proj-${id}`,
-          color: projectColor.get(id) ?? TYPE_COLORS.unknown,
-          label: projectName.get(id) ?? `project ${id}`,
-        }))
-      : Object.entries(TYPE_COLORS)
-          .filter(([type]) => nodes.some((n) => n.type === type))
-          .map(([type, color]) => ({ key: type, color, label: type }));
+  }, [tooltipNode, svgRect]);
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="px-8 pt-6 pb-3 border-b border-[var(--border)] flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <Breadcrumbs project={activeProject} />
-          <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-[22px] font-[650] text-[var(--text-1)] tracking-tight leading-tight">
-              Graph
-            </h1>
-            {hasChildren && (
-              <div
-                className="inline-flex items-center rounded-md border border-[var(--border)] bg-[var(--bg-1)] p-0.5 text-[12px]"
-                role="tablist"
-                aria-label="Graph scope"
-              >
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={scope === "project"}
-                  onClick={() => setScope("project")}
-                  className={`px-2.5 py-1 rounded-sm transition-colors cursor-pointer ${
-                    scope === "project"
-                      ? "bg-[var(--bg-2)] text-[var(--text-1)] font-[550]"
-                      : "text-[var(--text-3)] hover:text-[var(--text-1)]"
-                  }`}
-                >
-                  This project
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={scope === "subtree"}
-                  onClick={() => setScope("subtree")}
-                  className={`px-2.5 py-1 rounded-sm transition-colors cursor-pointer ${
-                    scope === "subtree"
-                      ? "bg-[var(--bg-2)] text-[var(--text-1)] font-[550]"
-                      : "text-[var(--text-3)] hover:text-[var(--text-1)]"
-                  }`}
-                >
-                  Whole subtree
-                </button>
-              </div>
-            )}
+    <div className="pad">
+      <EditorialBreadcrumbs tail="Map" />
+
+      <div className="sec-head">
+        <h1>
+          The <em>Map.</em>
+        </h1>
+        <div className="rail-meta">
+          <div>
+            <b>{nodes.length}</b> nodes
           </div>
-          <p className="text-sm text-[var(--text-3)] mt-1">
-            {loading
-              ? "Loading..."
-              : `${nodes.length} nodes, ${edges.length} connections${
-                  effectiveScope === "subtree" && visibleProjectIds.length > 1
-                    ? ` · ${visibleProjectIds.length} projects`
-                    : ""
-                }`}
-          </p>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <button
-            onClick={() => setZoom((z) => Math.min(3, z + 0.2))}
-            className="p-2 rounded-md border border-[var(--border)] bg-[var(--bg-1)] text-[var(--text-3)] hover:border-[var(--border-strong)] hover:text-[var(--text-1)] transition-all cursor-pointer"
-            title="Zoom in"
-          >
-            <ZoomIn className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => setZoom((z) => Math.max(0.3, z - 0.2))}
-            className="p-2 rounded-md border border-[var(--border)] bg-[var(--bg-1)] text-[var(--text-3)] hover:border-[var(--border-strong)] hover:text-[var(--text-1)] transition-all cursor-pointer"
-            title="Zoom out"
-          >
-            <ZoomOut className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={resetView}
-            className="p-2 rounded-md border border-[var(--border)] bg-[var(--bg-1)] text-[var(--text-3)] hover:border-[var(--border-strong)] hover:text-[var(--text-1)] transition-all cursor-pointer"
-            title="Reset view"
-          >
-            <Maximize2 className="w-3.5 h-3.5" />
-          </button>
+          <div>
+            <b>{edges.length}</b> edges
+          </div>
+          <div>
+            Clustering <b>{clustering.toFixed(2)}</b>
+          </div>
+          <div>Layout · Force-dir.</div>
         </div>
       </div>
 
-      {/* Graph canvas */}
-      <div
-        ref={containerRef}
-        className="flex-1 relative overflow-hidden bg-[var(--bg-0)] cursor-grab active:cursor-grabbing"
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onWheel={handleWheel}
-      >
-        {loading ? (
-          <div className="flex items-center justify-center h-full text-[13px] text-[var(--text-3)]">
-            Building graph...
-          </div>
-        ) : nodes.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full">
-            <div
-              className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5"
-              style={{ backgroundColor: "var(--primary-dim)" }}
-            >
-              <Share2 className="w-7 h-7" style={{ color: "var(--primary)" }} />
-            </div>
-            <h2 className="text-[15px] font-[600] text-[var(--text-1)] mb-1.5">
-              No pages yet
-            </h2>
-            <p className="text-[13px] text-[var(--text-3)] max-w-sm text-center">
-              Add sources and ingest them — the graph will populate as pages and
-              connections are created.
-            </p>
-          </div>
+      <div className="mapwrap">
+        {rawNodes.length === 0 ? (
+          <div className="map-empty">No pages yet — the map will populate as you ingest.</div>
         ) : (
-          <svg
-            ref={svgRef}
-            width={size.w}
-            height={size.h}
-            className="absolute inset-0"
-          >
-            <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
-              {/* Edges */}
-              {edges.map((e) => {
-                const from = positions.get(e.from);
-                const to = positions.get(e.to);
-                if (!from || !to) return null;
-                const isHighlighted =
-                  hoveredId && (e.from === hoveredId || e.to === hoveredId);
-                const isDimmed = hoveredId && !isHighlighted;
-                // Cross-project edges in subtree mode: thicker + accent color
-                // so the bridges between clusters pop. In project scope this
-                // never applies because every edge is same-project.
-                const baseWidth = e.crossProject ? 1.6 : 0.8;
-                const highlightWidth = e.crossProject ? 2.4 : 1.5;
-                const baseStroke = e.crossProject
-                  ? "var(--primary)"
-                  : "var(--border-strong)";
-                const highlightStroke = "var(--primary)";
+          <>
+            <svg
+              ref={svgRef}
+              viewBox={`${-pan.x} ${-pan.y} ${WIDTH / zoom} ${HEIGHT / zoom}`}
+              preserveAspectRatio="xMidYMid meet"
+              style={{ cursor: dragging ? "grabbing" : "grab" }}
+              onMouseDown={(e) => {
+                // Only start dragging from the SVG background, not from a node
+                if ((e.target as Element).tagName === "circle") return;
+                setDragging(true);
+                dragStart.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
+              }}
+              onMouseMove={(e) => {
+                if (!dragging || !dragStart.current) return;
+                const dx = e.clientX - dragStart.current.x;
+                const dy = e.clientY - dragStart.current.y;
+                const rect = svgRef.current?.getBoundingClientRect();
+                if (!rect) return;
+                const scale = WIDTH / zoom / rect.width;
+                setPan({
+                  x: dragStart.current.panX + dx * scale,
+                  y: dragStart.current.panY + dy * scale,
+                });
+              }}
+              onMouseUp={() => {
+                setDragging(false);
+                dragStart.current = null;
+              }}
+              onMouseLeave={() => {
+                setDragging(false);
+                dragStart.current = null;
+              }}
+              onWheel={(e) => {
+                // Any wheel event zooms (no modifier needed), so trackpad
+                // pinch + scroll-to-zoom both work naturally.
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? 0.9 : 1.1;
+                setZoom((z) => Math.max(0.3, Math.min(6, z * delta)));
+              }}
+            >
+              {/* edges */}
+              {edges.map((e, i) => {
+                if (!edgeVisible(e)) return null;
+                const a = nodes.find((n) => n.id === e.from);
+                const b = nodes.find((n) => n.id === e.to);
+                if (!a || !b) return null;
                 return (
                   <line
-                    key={`${e.from}->${e.to}`}
-                    x1={from.x}
-                    y1={from.y}
-                    x2={to.x}
-                    y2={to.y}
-                    stroke={isHighlighted ? highlightStroke : baseStroke}
-                    strokeWidth={isHighlighted ? highlightWidth : baseWidth}
-                    opacity={
-                      isDimmed
-                        ? 0.1
-                        : isHighlighted
-                          ? 0.85
-                          : e.crossProject
-                            ? 0.6
-                            : 0.35
-                    }
+                    key={`e${i}`}
+                    x1={a.x}
+                    y1={a.y}
+                    x2={b.x}
+                    y2={b.y}
+                    stroke="var(--ink)"
+                    strokeWidth={e.crossProject ? 0.9 : 0.7}
+                    strokeDasharray={e.crossProject ? "4 3" : undefined}
+                    opacity={0.55}
+                    className="map-edge"
                   />
                 );
               })}
 
-              {/* Nodes */}
-              {nodes.map((n) => {
-                const p = positions.get(n.id);
-                if (!p) return null;
-                const color = colorForNode(n);
-                const isHovered = hoveredId === n.id;
-                const isHighlighted = highlightedIds.has(n.id);
-                const isDimmed = hoveredId && !isHighlighted;
+              {/* hub pulse */}
+              {hubId && nodes.length > 0 && (() => {
+                const hub = nodes.find((n) => n.id === hubId);
+                if (!hub || !nodeVisible(hub)) return null;
                 return (
-                  <g
-                    key={n.id}
-                    className="cursor-pointer"
-                    onMouseEnter={() => setHoveredId(n.id)}
-                    onMouseLeave={() => setHoveredId(null)}
-                    onClick={(ev) => {
-                      ev.stopPropagation();
-                      navigateToNode(n);
-                    }}
-                    style={{ opacity: isDimmed ? 0.2 : 1 }}
-                  >
-                    <circle
-                      cx={p.x}
-                      cy={p.y}
-                      r={isHovered ? nodeRadius + 2 : nodeRadius}
-                      fill={color}
-                      stroke={isHovered ? "var(--text-1)" : "var(--bg-0)"}
-                      strokeWidth={isHovered ? 2 : 1.5}
+                  <circle cx={hub.x} cy={hub.y} r={hub.r} fill="var(--accent)" opacity={0.5}>
+                    <animate
+                      attributeName="r"
+                      from={hub.r}
+                      to={hub.r * 3}
+                      dur="2.4s"
+                      repeatCount="indefinite"
                     />
-                    {(isHovered || zoom > 1.2) && (
+                    <animate
+                      attributeName="opacity"
+                      from="0.5"
+                      to="0"
+                      dur="2.4s"
+                      repeatCount="indefinite"
+                    />
+                  </circle>
+                );
+              })()}
+
+              {/* nodes */}
+              {nodes.map((n) => {
+                if (!nodeVisible(n)) return null;
+                const isHub = n.id === hubId;
+                const fill = isHub ? "var(--accent)" : TYPE_COLOR_VAR[n.type] ?? "var(--ink)";
+                return (
+                  <g key={n.id}>
+                    <circle
+                      cx={n.x}
+                      cy={n.y}
+                      r={n.r}
+                      fill={fill}
+                      stroke="var(--paper)"
+                      strokeWidth={1.5}
+                      className="map-node"
+                      onMouseEnter={() => setHoverId(n.id)}
+                      onMouseLeave={() => setHoverId(null)}
+                      onClick={() => onNodeClick(n)}
+                    />
+                    {n.r >= 8 && (
                       <text
-                        x={p.x}
-                        y={p.y - nodeRadius - 6}
+                        x={n.x}
+                        y={n.y + n.r + 12}
                         textAnchor="middle"
-                        className="select-none pointer-events-none"
-                        style={{
-                          fontSize: `${Math.max(10, 11 / zoom)}px`,
-                          fill: "var(--text-1)",
-                          fontWeight: isHovered ? 600 : 500,
-                          paintOrder: "stroke",
-                          stroke: "var(--bg-0)",
-                          strokeWidth: 3,
-                        }}
+                        fontFamily="var(--font-serif)"
+                        fontSize={10.5}
+                        fill="var(--ink-2)"
+                        pointerEvents="none"
                       >
-                        {n.title.length > 30 ? n.title.slice(0, 30) + "…" : n.title}
+                        {n.title.length > 28 ? n.title.slice(0, 26) + "…" : n.title}
                       </text>
                     )}
                   </g>
                 );
               })}
-            </g>
+            </svg>
 
-            {/* Legend (fixed, not affected by pan/zoom). Includes a
-                "cross-project" row at the bottom when subtree mode has
-                multiple projects visible. */}
-            {(() => {
-              const showCrossProjectSwatch =
-                effectiveScope === "subtree" && visibleProjectIds.length > 1;
-              const rowCount =
-                legendEntries.length + (showCrossProjectSwatch ? 1 : 0);
-              if (rowCount === 0) return null;
-              const rowHeight = 18;
-              const y = size.h - 16 - rowCount * rowHeight;
-              return (
-                <g transform={`translate(16, ${y})`}>
-                  {legendEntries.map((entry, i) => (
-                    <g key={entry.key} transform={`translate(0, ${i * rowHeight})`}>
-                      <circle cx={6} cy={6} r={5} fill={entry.color} />
-                      <text
-                        x={18}
-                        y={10}
-                        style={{
-                          fontSize: "11px",
-                          fill: "var(--text-3)",
-                          fontWeight: 500,
-                          textTransform:
-                            effectiveScope === "subtree" ? "none" : "capitalize",
-                        }}
-                      >
-                        {entry.label}
-                      </text>
-                    </g>
-                  ))}
-                  {showCrossProjectSwatch && (
-                    <g
-                      transform={`translate(0, ${legendEntries.length * rowHeight})`}
+            <div className="map-controls">
+              <button
+                type="button"
+                title="Zoom in"
+                onClick={() => setZoom((z) => Math.min(6, z * 1.25))}
+                disabled={zoom >= 6}
+              >
+                +
+              </button>
+              <button
+                type="button"
+                title="Zoom out"
+                onClick={() => setZoom((z) => Math.max(0.3, z * 0.8))}
+                disabled={zoom <= 0.3}
+              >
+                −
+              </button>
+              <button
+                type="button"
+                title="Recenter"
+                onClick={() => {
+                  setZoom(1);
+                  setPan({ x: 0, y: 0 });
+                }}
+              >
+                ⌖
+              </button>
+            </div>
+
+            <div className={`map-overlay${activeType ? " active" : ""}`}>
+              <h5>
+                The <em>Map</em>
+              </h5>
+              <p>Hover a node for title. Click to open.</p>
+              <div className="leg">
+                {Array.from(typeCounts.entries())
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([t, count]) => (
+                    <button
+                      key={t}
+                      type="button"
+                      className={`le${activeType === t ? " on" : ""}`}
+                      onClick={() => setActiveType((prev) => (prev === t ? null : t))}
                     >
-                      <line
-                        x1={1}
-                        y1={6}
-                        x2={11}
-                        y2={6}
-                        stroke="var(--primary)"
-                        strokeWidth={1.8}
-                      />
-                      <text
-                        x={18}
-                        y={10}
-                        style={{
-                          fontSize: "11px",
-                          fill: "var(--text-3)",
-                          fontWeight: 500,
-                        }}
-                      >
-                        cross-project link
-                      </text>
-                    </g>
-                  )}
-                </g>
-              );
-            })()}
-          </svg>
+                      <span className="d" style={{ background: TYPE_COLOR_VAR[t] ?? "var(--ink)" }} />
+                      <span>{TYPE_LABEL[t] ?? t}</span>
+                      <span className="c">{count}</span>
+                    </button>
+                  ))}
+              </div>
+            </div>
+
+            {tooltipNode && tooltipPos && (
+              <div
+                className="map-tooltip show"
+                style={{ left: tooltipPos.left, top: tooltipPos.top }}
+              >
+                <span className="t">{tooltipNode.title}</span>
+                <span className="sub">{tooltipNode.type}</span>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

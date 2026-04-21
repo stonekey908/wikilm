@@ -1,25 +1,69 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
-import { ThemeProvider } from "@/components/theme-provider";
-import { ToastProvider } from "@/components/toast-provider";
+import {
+  Crimson_Pro,
+  EB_Garamond,
+  Fraunces,
+  Instrument_Serif,
+  JetBrains_Mono,
+  Playfair_Display,
+} from "next/font/google";
 import { ProjectProvider } from "@/components/project-switcher";
-import { Sidebar } from "@/components/sidebar";
+import { ToastProvider } from "@/components/toast-provider";
+import { TweaksProvider } from "@/components/editorial/tweaks-provider";
+import { EditorialShell } from "@/components/editorial/editorial-shell";
 import "./globals.css";
 
-const inter = Inter({
-  variable: "--font-inter",
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
   subsets: ["latin"],
+  style: ["normal", "italic"],
+  weight: "variable",
+  axes: ["opsz"],
+  display: "swap",
+});
+
+const playfair = Playfair_Display({
+  variable: "--font-playfair",
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  weight: "variable",
+  display: "swap",
+});
+
+const crimson = Crimson_Pro({
+  variable: "--font-crimson",
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  weight: "variable",
+  display: "swap",
+});
+
+const garamond = EB_Garamond({
+  variable: "--font-garamond",
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  weight: "variable",
+  display: "swap",
+});
+
+const instrumentSerif = Instrument_Serif({
+  variable: "--font-instrument-serif",
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  weight: ["400"],
+  display: "swap",
 });
 
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
   subsets: ["latin"],
-  weight: ["400", "500"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "WikiLM",
-  description: "AI-powered knowledge base",
+  title: "WikiLM — Editorial",
+  description: "Personal wiki grown by an LLM",
 };
 
 export default function RootLayout({
@@ -30,24 +74,17 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${jetbrainsMono.variable}`}
+      className={`${fraunces.variable} ${playfair.variable} ${crimson.variable} ${garamond.variable} ${instrumentSerif.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >
-      <body className="h-screen overflow-hidden font-sans">
-        <ThemeProvider>
+      <body>
+        <TweaksProvider>
           <ProjectProvider>
             <ToastProvider>
-              <div className="flex h-screen">
-                <Sidebar />
-                <main className="flex flex-1 flex-col overflow-hidden min-w-0">
-                  <div className="flex-1 overflow-y-auto">
-                    {children}
-                  </div>
-                </main>
-              </div>
+              <EditorialShell>{children}</EditorialShell>
             </ToastProvider>
           </ProjectProvider>
-        </ThemeProvider>
+        </TweaksProvider>
       </body>
     </html>
   );

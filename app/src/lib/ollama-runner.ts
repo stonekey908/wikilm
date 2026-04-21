@@ -109,7 +109,37 @@ export function runOllamaJob(
       });
 
       if (!res.ok || !res.body) {
-        throw new Error(`Ollama responded with ${res.status}`);
+        // Ollama returns 404 with `{error: "model 'xxx' not found..."}` when
+        // the model isn't pulled. Surface that as a structured errorCode so
+        // the UI can render a "pull or pick another model" nudge.
+        let detail = `Ollama responded with ${res.status}`;
+        let code: "model_not_found" | "provider_unavailable" = "provider_unavailable";
+        if (res.status === 404) {
+          code = "model_not_found";
+          try {
+            const body = (await res.json()) as { error?: string };
+            if (body.error) detail = body.error;
+          } catch {
+            detail = `Ollama model "${options.model}" not found. Pull it with \`ollama pull ${options.model}\`.`;
+          }
+        } else {
+          try {
+            const body = (await res.json()) as { error?: string };
+            if (body.error) detail = body.error;
+          } catch {}
+        }
+        db.update(jobs)
+          .set({
+            status: "failed",
+            error: detail,
+            errorCode: code,
+            output,
+            completedAt: new Date().toISOString(),
+          })
+          .where(eq(jobs.id, jobId))
+          .run();
+        options.onComplete?.("failed");
+        return;
       }
 
       const reader = res.body.getReader();

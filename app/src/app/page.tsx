@@ -1,259 +1,240 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import Link from "next/link";
+import { useEffect, useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { useProject } from "@/components/project-switcher";
-import { NudgesSection } from "@/components/nudges-section";
-import {
-  BookOpen,
-  FileText,
-  Users,
-  Lightbulb,
-  Download,
-  MessageSquare,
-  Search,
-  Beaker,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  Loader2,
-  ArrowRight,
-} from "lucide-react";
+import { LedgerMarginalia } from "@/components/editorial/ledger/ledger-nudges";
+import { LedgerDispatchResearch } from "@/components/editorial/ledger/ledger-dispatch-research";
+
+interface DashboardStats {
+  sources: number;
+  wikiPages: number;
+  entities: number;
+  concepts: number;
+}
+
+interface LogEntry {
+  date: string;
+  operation: string;
+  title: string;
+  details: string;
+}
+
+interface Job {
+  id: number;
+  type: string;
+  title: string;
+  status: string;
+  progress: string | null;
+  model: string | null;
+  createdAt: string;
+}
 
 interface DashboardData {
-  stats: {
-    sources: number;
-    wikiPages: number;
-    entities: number;
-    concepts: number;
-  };
-  recentActivity: {
-    date: string;
-    operation: string;
-    title: string;
-    details: string;
-  }[];
-  activeJobs: {
-    id: number;
-    type: string;
-    title: string;
-    status: string;
-    progress: string | null;
-    startedAt: string | null;
-  }[];
-  recentJobs: {
-    id: number;
-    type: string;
-    title: string;
-    status: string;
-    startedAt: string | null;
-    completedAt: string | null;
-  }[];
+  stats: DashboardStats;
+  recentActivity: LogEntry[];
+  activeJobs: Job[];
 }
 
-const statConfig = [
-  { key: "sources" as const, label: "Sources", icon: Download, color: "var(--blue)", dimColor: "var(--blue-dim)" },
-  { key: "wikiPages" as const, label: "Wiki Pages", icon: FileText, color: "var(--primary)", dimColor: "var(--primary-dim)" },
-  { key: "entities" as const, label: "Entities", icon: Users, color: "var(--orange)", dimColor: "var(--orange-dim)" },
-  { key: "concepts" as const, label: "Concepts", icon: Lightbulb, color: "var(--green)", dimColor: "var(--green-dim)" },
-];
-
-const quickActions = [
-  { label: "Ingest source", icon: Download, href: "/sources", color: "var(--blue)" },
-  { label: "Ask a question", icon: MessageSquare, href: "/chat", color: "var(--primary)" },
-  { label: "Run lint", icon: Beaker, href: "/lint", color: "var(--orange)" },
-  { label: "Research topic", icon: Search, href: "/chat", color: "var(--green)" },
-];
-
-const operationIcons: Record<string, string> = {
-  ingest: "📥",
-  query: "❓",
-  lint: "🔍",
-  update: "✏️",
-};
-
-function statusIcon(status: string) {
-  switch (status) {
-    case "running":
-    case "queued":
-      return <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--blue)]" />;
-    case "completed":
-      return <CheckCircle2 className="w-3.5 h-3.5 text-[var(--green)]" />;
-    case "failed":
-      return <XCircle className="w-3.5 h-3.5 text-[var(--red)]" />;
-    default:
-      return <Clock className="w-3.5 h-3.5 text-[var(--text-4)]" />;
-  }
+interface WikiPage {
+  title: string;
+  type: string;
+  slug: string;
+  updatedAt: string;
 }
 
-export default function DashboardPage() {
+const DAYS_LONG = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const MONTHS_LONG = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+function formatRelative(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return "";
+  const diff = Date.now() - then;
+  const min = Math.floor(diff / 60000);
+  if (min < 2) return "just now";
+  if (min < 60) return `${min}m`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h`;
+  const d = Math.floor(hr / 24);
+  if (d < 7) return `${d}d`;
+  if (d < 30) return `${Math.floor(d / 7)}w`;
+  const mo = Math.floor(d / 30);
+  if (mo < 12) return `${mo}mo`;
+  return `${Math.floor(d / 365)}y`;
+}
+
+function roman(i: number): string {
+  const vals = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x", "xi", "xii"];
+  return vals[i] ?? `${i + 1}`;
+}
+
+export default function LedgerPage() {
+  const router = useRouter();
   const { activeProject } = useProject();
-  const activeProjectId = activeProject?.id ?? 1;
+  const projectId = activeProject?.id ?? null;
   const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const fetchData = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/dashboard?projectId=${activeProjectId}`);
-      if (res.ok) {
-        setData(await res.json());
-      }
-    } catch {
-      // silently fail, keep stale data
-    } finally {
-      setLoading(false);
-    }
-  }, [activeProjectId]);
+  const [recentPages, setRecentPages] = useState<WikiPage[]>([]);
+  const [nudgeCount, setNudgeCount] = useState<number>(0);
 
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 10000);
-    return () => clearInterval(interval);
-  }, [fetchData]);
+    if (projectId === null) return;
+    let cancelled = false;
+    fetch(`/api/dashboard?projectId=${projectId}`)
+      .then((r) => r.json())
+      .then((d: DashboardData) => {
+        if (!cancelled) setData(d);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
 
+  useEffect(() => {
+    if (projectId === null) return;
+    let cancelled = false;
+    fetch(`/api/dashboard/nudges?projectId=${projectId}`)
+      .then((r) => r.json())
+      .then((d: { promotion: unknown[]; theme: unknown[]; gap: unknown[] }) => {
+        if (cancelled) return;
+        setNudgeCount((d.promotion?.length ?? 0) + (d.theme?.length ?? 0) + (d.gap?.length ?? 0));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
+
+  useEffect(() => {
+    if (projectId === null) return;
+    let cancelled = false;
+    fetch(`/api/wiki?projectId=${projectId}`)
+      .then((r) => r.json())
+      .then((d: { pages: WikiPage[] }) => {
+        if (cancelled) return;
+        const sorted = [...(d.pages ?? [])]
+          .filter((p) => !["index", "log"].includes(p.slug))
+          .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+          .slice(0, 8);
+        setRecentPages(sorted);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
+
+  const now = useMemo(() => new Date(), []);
+  const weekday = DAYS_LONG[now.getDay()];
+  const dayMonth = `${now.getDate()} ${MONTHS_LONG[now.getMonth()]}`;
+  const year = now.getFullYear();
+
+  const projectName = activeProject?.name ?? "a new day";
   const stats = data?.stats ?? { sources: 0, wikiPages: 0, entities: 0, concepts: 0 };
+  const jobsCount = data?.activeJobs.length ?? 0;
 
   return (
-    <div className="p-8 max-w-[960px]">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-[22px] font-[650] text-[var(--text-1)] tracking-tight leading-tight">
-          Dashboard
+    <div className="pad">
+      <nav className="breadcrumbs" aria-hidden style={{ visibility: "hidden" }} />
+      <div className="ledger-head">
+        <h1>
+          Good afternoon,
+          <br />
+          <em>{projectName}.</em>
         </h1>
-        <p className="text-sm text-[var(--text-3)] mt-1">
-          Project overview and quick actions
-        </p>
+        <div className="dateline">
+          <div>{weekday}</div>
+          <div>
+            <b>{dayMonth}</b> · {year}
+          </div>
+          <div>
+            <b>{stats.wikiPages}</b> pages total
+          </div>
+          <div>
+            {jobsCount} {jobsCount === 1 ? "job" : "jobs"}
+            {nudgeCount > 0 ? ` · ${nudgeCount} ${nudgeCount === 1 ? "nudge" : "nudges"}` : ""}
+          </div>
+        </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
-        {statConfig.map((stat) => (
-          <div
-            key={stat.key}
-            className="bg-[var(--surface-card)] border border-[var(--border)] rounded-lg p-4 shadow-[var(--shadow-sm)]"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-[11px] font-semibold text-[var(--text-4)] uppercase tracking-wider">
-                {stat.label}
-              </div>
-              <div
-                className="w-7 h-7 rounded-md flex items-center justify-center"
-                style={{ backgroundColor: stat.dimColor }}
+      <div className="run" style={{ "--run-cells": 3 } as React.CSSProperties}>
+        <div className="cell">
+          <div className="idx">i</div>
+          <div className="lab">Pages</div>
+          <div className="val">{stats.wikiPages.toLocaleString()}</div>
+        </div>
+        <div className="cell">
+          <div className="idx">ii</div>
+          <div className="lab">Sources</div>
+          <div className="val">{stats.sources.toLocaleString()}</div>
+        </div>
+        <div className="cell">
+          <div className="idx">iii</div>
+          <div className="lab">Concepts</div>
+          <div className="val">{stats.concepts.toLocaleString()}</div>
+        </div>
+      </div>
+
+      <div className="ledger-body">
+        <div className="col">
+          <div className="col-head">
+            <span className="n">§</span>
+            <h2>
+              Recent <em>pages</em>
+            </h2>
+            <span className="c">{recentPages.length}</span>
+          </div>
+          {recentPages.length === 0 ? (
+            <div
+              style={{
+                fontFamily: "var(--font-inst)",
+                fontStyle: "italic",
+                fontSize: 13,
+                color: "var(--ink-3)",
+                padding: "8px 0",
+              }}
+            >
+              No pages yet in this project.
+            </div>
+          ) : (
+            recentPages.map((p, i) => (
+              <button
+                key={p.slug}
+                type="button"
+                className="entry"
+                onClick={() => router.push(`/wiki?slug=${encodeURIComponent(p.slug)}`)}
               >
-                <stat.icon className="w-3.5 h-3.5" style={{ color: stat.color }} />
-              </div>
-            </div>
-            <div className="text-2xl font-[650] text-[var(--text-1)] font-mono">
-              {loading ? "—" : stats[stat.key]}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Quick Actions */}
-      <div className="mb-8">
-        <h2 className="text-sm font-[600] text-[var(--text-2)] mb-3">Quick Actions</h2>
-        <div className="grid grid-cols-4 gap-3">
-          {quickActions.map((action) => (
-            <Link
-              key={action.label}
-              href={action.href}
-              className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg border border-[var(--border)] bg-[var(--surface-card)] shadow-[var(--shadow-sm)] hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-md)] transition-all duration-150 text-[13px] font-[500] text-[var(--text-2)]"
-            >
-              <action.icon className="w-4 h-4 shrink-0" style={{ color: action.color }} />
-              {action.label}
-            </Link>
-          ))}
-        </div>
-      </div>
-
-      {/* Nudges — parent-scoped lint findings with actions. Hidden when empty. */}
-      <NudgesSection />
-
-      <div className="grid grid-cols-2 gap-6">
-        {/* Recent Activity */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-[600] text-[var(--text-2)]">Recent Activity</h2>
-          </div>
-          <div className="bg-[var(--surface-card)] border border-[var(--border)] rounded-lg shadow-[var(--shadow-sm)] divide-y divide-[var(--border)]">
-            {!loading && data?.recentActivity && data.recentActivity.length > 0 ? (
-              data.recentActivity.map((entry, i) => (
-                <div key={i} className="px-4 py-3 flex items-start gap-3">
-                  <span className="text-base mt-0.5">{operationIcons[entry.operation] ?? "📝"}</span>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[13px] font-[500] text-[var(--text-1)] truncate">
-                      {entry.title}
-                    </div>
-                    <div className="text-[12px] text-[var(--text-4)] mt-0.5">
-                      {entry.date} &middot; {entry.operation}
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="px-4 py-8 text-center text-[13px] text-[var(--text-4)]">
-                {loading ? "Loading..." : "No recent activity"}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Active Jobs */}
-        <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-[600] text-[var(--text-2)]">Active Jobs</h2>
-            <Link
-              href="/jobs"
-              className="text-[12px] font-[500] text-[var(--primary)] hover:underline flex items-center gap-1"
-            >
-              View all <ArrowRight className="w-3 h-3" />
-            </Link>
-          </div>
-          <div className="bg-[var(--surface-card)] border border-[var(--border)] rounded-lg shadow-[var(--shadow-sm)] divide-y divide-[var(--border)]">
-            {!loading && data?.activeJobs && data.activeJobs.length > 0 ? (
-              data.activeJobs.map((job) => {
-                const progress = job.progress ? JSON.parse(job.progress) : null;
-                return (
-                  <div key={job.id} className="px-4 py-3">
-                    <div className="flex items-center gap-2 mb-1">
-                      {statusIcon(job.status)}
-                      <span className="text-[13px] font-[500] text-[var(--text-1)] truncate">
-                        {job.title}
-                      </span>
-                    </div>
-                    {progress && (
-                      <div className="mt-1.5">
-                        <div className="h-1.5 rounded-full bg-[var(--bg-3)] overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-[var(--primary)] transition-all duration-300"
-                            style={{ width: `${Math.round((progress.current / progress.total) * 100)}%` }}
-                          />
-                        </div>
-                        <div className="text-[11px] text-[var(--text-4)] mt-1">
-                          {progress.current}/{progress.total}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            ) : !loading && data?.recentJobs && data.recentJobs.length > 0 ? (
-              data.recentJobs.slice(0, 5).map((job) => (
-                <div key={job.id} className="px-4 py-3 flex items-center gap-2">
-                  {statusIcon(job.status)}
-                  <span className="text-[13px] font-[500] text-[var(--text-1)] truncate flex-1">
-                    {job.title}
+                <span className="n">{roman(i)}</span>
+                <span className="entry-body">
+                  <span className="t">{p.title}</span>
+                  <span className="sub">
+                    {p.type} · {p.slug}
                   </span>
-                  <span className="text-[11px] text-[var(--text-4)] capitalize">{job.status}</span>
-                </div>
-              ))
-            ) : (
-              <div className="px-4 py-8 text-center text-[13px] text-[var(--text-4)]">
-                {loading ? "Loading..." : "No active jobs"}
-              </div>
-            )}
+                </span>
+                <span className="when">{formatRelative(p.updatedAt)}</span>
+              </button>
+            ))
+          )}
+        </div>
+
+        <div className="col">
+          <div className="col-head">
+            <span className="n">§</span>
+            <h2>
+              <em>Marginalia</em>
+            </h2>
           </div>
+          <LedgerMarginalia />
+        </div>
+
+        <div className="col">
+          <div className="col-head">
+            <span className="n">§</span>
+            <h2>
+              The <em>Dispatch</em>
+            </h2>
+          </div>
+          <LedgerDispatchResearch activeJobs={data?.activeJobs ?? []} />
         </div>
       </div>
     </div>
