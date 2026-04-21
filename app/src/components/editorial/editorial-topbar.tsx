@@ -20,7 +20,18 @@ export function EditorialTopbar() {
         <span className="cur">{folio.name}</span>
       </div>
 
-      <div className="omnibar" aria-label="Command palette (coming in Phase 7)">
+      <div
+        className="omnibar"
+        role="button"
+        tabIndex={0}
+        onClick={() => window.dispatchEvent(new Event("editorial:open-palette"))}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            window.dispatchEvent(new Event("editorial:open-palette"));
+          }
+        }}
+      >
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8">
           <circle cx="7" cy="7" r="5" />
           <line x1="10.5" y1="10.5" x2="14" y2="14" />
