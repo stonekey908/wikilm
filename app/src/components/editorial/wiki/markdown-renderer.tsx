@@ -11,7 +11,7 @@ export interface Heading {
 
 export interface RenderOpts {
   onWikilinkClick: (target: string) => void;
-  onWikilinkHover: (el: HTMLAnchorElement, target: string) => void;
+  onWikilinkHover: (pt: { x: number; y: number }, target: string) => void;
   onWikilinkLeave: () => void;
 }
 
@@ -169,7 +169,8 @@ function renderInline(text: string, opts: RenderOpts, keyPrefix: string): React.
               e.preventDefault();
               opts.onWikilinkClick(t.target!);
             }}
-            onMouseEnter={(e) => opts.onWikilinkHover(e.currentTarget, t.target!)}
+            onMouseEnter={(e) => opts.onWikilinkHover({ x: e.clientX, y: e.clientY }, t.target!)}
+            onMouseMove={(e) => opts.onWikilinkHover({ x: e.clientX, y: e.clientY }, t.target!)}
             onMouseLeave={() => opts.onWikilinkLeave()}
           >
             {t.display}

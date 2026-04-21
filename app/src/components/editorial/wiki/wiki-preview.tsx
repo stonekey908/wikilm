@@ -71,17 +71,34 @@ export function useWikiPreview(projectId: number | null) {
     }
   };
 
+  function placeNear(px: number, py: number) {
+    // Anchor the card ~16px below-right of the cursor, clamp to viewport.
+    const W = 340;
+    const approxH = 220;
+    const margin = 16;
+    let x = px + 14;
+    let y = py + 18;
+    if (x + W > window.innerWidth - margin) x = window.innerWidth - W - margin;
+    if (x < margin) x = margin;
+    if (y + approxH > window.innerHeight - margin) y = py - approxH - 14;
+    if (y < margin) y = margin;
+    return { x, y };
+  }
+
   const onHover = useCallback(
-    (el: HTMLAnchorElement, target: string) => {
+    (pt: { x: number; y: number }, target: string) => {
       clearHide();
+      // If the card is already visible for this target, just update the
+      // position so it tracks the cursor naturally across a multi-line link.
+      if (currentTarget.current === target) {
+        const { x, y } = placeNear(pt.x, pt.y);
+        setState((s) => ({ ...s, x, y }));
+        return;
+      }
       currentTarget.current = target;
-      const rect = el.getBoundingClientRect();
-      let x = rect.left;
-      let y = rect.bottom + 10;
-      if (x + 340 > window.innerWidth - 16) x = window.innerWidth - 340 - 16;
-      if (y + 220 > window.innerHeight - 16) y = rect.top - 232;
 
       clearShow();
+      const { x: initX, y: initY } = placeNear(pt.x, pt.y);
       showTimer.current = window.setTimeout(async () => {
         if (currentTarget.current !== target) return;
 
@@ -90,7 +107,7 @@ export function useWikiPreview(projectId: number | null) {
 
         let data = CACHE.get(target);
         if (!data) {
-          setState((s) => ({ ...s, visible: true, x, y, loading: true, data: null }));
+          setState((s) => ({ ...s, visible: true, x: initX, y: initY, loading: true, data: null }));
           try {
             const url = projectId
               ? `/api/wiki/${encodeURIComponent(slug)}?projectId=${projectId}`
@@ -113,8 +130,8 @@ export function useWikiPreview(projectId: number | null) {
           }
         }
         if (currentTarget.current !== target) return;
-        setState({ visible: true, x, y, data, loading: false });
-      }, 150);
+        setState({ visible: true, x: initX, y: initY, data, loading: false });
+      }, 140);
     },
     [projectId]
   );
