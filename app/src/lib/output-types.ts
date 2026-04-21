@@ -327,6 +327,58 @@ This file will be rendered by Marp CLI into .pdf and .pptx. You MUST follow Marp
 - The first slide is a title slide.
 - 6–12 slides total including the title and the closing slide.
 
+**Marp styling — MANDATORY.** The deck MUST look designed. Replace the
+project frontmatter below with a Marp-enabled YAML header that includes a
+theme AND a custom style block. Use this template verbatim at the top of
+the file (before any slides):
+
+\`\`\`
+---
+marp: true
+theme: gaia
+paginate: true
+backgroundColor: '#0f0e0c'
+color: '#f5f0e6'
+style: |
+  section {
+    font-family: 'Georgia', 'Fraunces', serif;
+    background: linear-gradient(135deg, #0f0e0c 0%, #1a1815 60%, #2a2420 100%);
+    padding: 72px 88px;
+  }
+  section.lead {
+    background: linear-gradient(135deg, #b91c1c 0%, #0f0e0c 100%);
+    text-align: left;
+  }
+  h1 { font-size: 64px; font-weight: 300; letter-spacing: -0.03em; line-height: 1.05; margin-bottom: 28px; }
+  h2 { font-size: 42px; font-weight: 400; letter-spacing: -0.02em; border-left: 4px solid #b91c1c; padding-left: 22px; margin-bottom: 24px; }
+  h3 { font-size: 26px; color: #d4c59a; font-style: italic; }
+  p, li { font-size: 26px; line-height: 1.5; }
+  li { margin-bottom: 8px; }
+  em { color: #f7e98c; font-style: italic; }
+  strong { color: #f5f0e6; font-weight: 600; }
+  code { background: rgba(245,240,230,0.12); padding: 2px 8px; }
+  footer { color: #8a8377; font-size: 16px; letter-spacing: 0.08em; text-transform: uppercase; }
+  section::after { color: #8a8377; }
+  .kicker { display: block; font-size: 18px; letter-spacing: 0.18em; text-transform: uppercase; color: #d4c59a; margin-bottom: 16px; }
+header: ''
+footer: 'WikiLM · ${project.slug}'
+output_type: deck
+scope: ${scope}
+project_slug: ${project.slug}
+model: ${model}
+generated_at: '${new Date().toISOString()}'
+---
+\`\`\`
+
+Make the title slide use Marp's \`<!-- _class: lead -->\` directive on its
+first line so it picks up the red-gradient background. Every content slide
+opens with an \`<p class="kicker">\` dateline (e.g. "§ 03 · Methodology").
+
+When a slide needs a diagram, timeline, or comparison, render it as inline
+SVG: \`<svg viewBox="0 0 800 260" width="100%"><!-- strokes in palette --></svg>\`.
+Palette: #b91c1c (red), #d4c59a (gold), #f7e98c (highlight), #8a8377 (mute),
+#f5f0e6 (paper). Do NOT embed external image URLs.
+
 Required sequence:
 
 Slide 1 — **Title slide**: the deck title + a one-line subtitle.
@@ -345,14 +397,12 @@ Slide N — **Closing**: a one-line takeaway the audience should walk away with,
 Quality bar:
 - Prefer concrete nouns over abstractions. Every slide carries a specific claim, not a generic heading.
 - Every content slide has at least one [[wikilink]] credit line so the deck is traceable.
-- No tables. No images unless you've verified the local image path would resolve.
+- Tables allowed for comparisons. Inline SVG encouraged for any diagram or flow.
 - Marp will wrap long lines ugly — keep bullets to one visual line each.
+- Use **bold** sparingly for emphasis; *italic* for accents; h3 sub-headings render as gold italic.
 
 File requirements:
-- Start the file with YAML frontmatter:
-\`\`\`
-${frontmatterBlock("deck", scope, project, model).trim()}
-\`\`\`
+- Use the themed YAML header above as the single frontmatter block (do not add a second frontmatter).
 - Then the slides, separated by \`---\` on its own line between each.
 - Write ONLY to \`${outputRelPath}\`.
 
