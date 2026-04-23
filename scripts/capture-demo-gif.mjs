@@ -1,14 +1,22 @@
 // Scripted tour of the `product-ownership` wiki, captured as a GIF for the
-// README and articles. Uses puppeteer-core (vendored) to drive a real Chrome,
-// seeds the active project via localStorage before navigation, walks every
-// page type, and stitches the frames with ffmpeg-static.
+// README and articles.
 //
-// Usage (dev server running on :3000):
+// Scenes (≈ 22s at 12fps, ≈ 260 frames):
+//   1  Ledger intro
+//   2  Wiki article with hover preview on a wikilink
+//   3  Synthesis (project overview) with scroll + hover preview
+//   4  Chat — pre-seeded session showing a realistic multi-turn Q&A
+//   5  Lint — findings grouped by category
+//   6  Dictation — outputs list
+//   7  Ledger outro
+//
+// Requires: dev server running on :3000, product-ownership project seeded
+// with concepts + synthesis + a chat session (id resolved automatically).
+//
+// Usage:
 //   node scripts/capture-demo-gif.mjs
 // Output:
 //   docs/demo.gif
-//
-// Tuning knobs are at the top of the file — FPS, size, frames-per-scene.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -18,9 +26,7 @@ import { spawn } from "node:child_process";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "..");
 
-// Resolve both deps out of app/node_modules so this script works whether it's
-// invoked from the repo root or anywhere else — there's no package.json at
-// the repo root, so a bare `import 'puppeteer-core'` wouldn't resolve.
+// Resolve deps out of app/node_modules since there's no package.json at root.
 const puppeteer = (
   await import(
     path.join(
@@ -38,40 +44,34 @@ const puppeteer = (
 const ffmpegPath = (
   await import(path.join(repoRoot, "app", "node_modules", "ffmpeg-static", "index.js"))
 ).default;
+
 const framesDir = path.join(repoRoot, "docs", ".demo-frames");
 const outFile = path.join(repoRoot, "docs", "demo.gif");
 const paletteFile = path.join(framesDir, "palette.png");
 
 // ── Tuning ─────────────────────────────────────────────────────────
 const FPS = 12;
-const VIEWPORT = { width: 1280, height: 780, deviceScaleFactor: 1 };
+const VIEWPORT = { width: 1280, height: 800, deviceScaleFactor: 1 };
 const BASE = "http://localhost:3000";
 const PROJECT_SLUG = "product-ownership";
-// Slugs that should exist in the fixture. Resolved dynamically on first load
-// so renames don't break the capture.
+const PROJECT_ID = 18;
+
 const WIKI_CONCEPT_FALLBACKS = [
   "concepts/agentic-product-management",
   "concepts/ai-chief-of-staff",
   "concepts/agent-ops",
 ];
 
-// Number of frames per scene. 12fps × these durations:
-//   Ledger         → 1.5s
-//   Wiki picker    → 2.5s (scroll)
-//   Wiki article   → 3s
-//   Map            → 2.5s (force settle)
-//   Dictation      → 2s
-//   Chat           → 2s
-//   Back to Ledger → 1.5s
-// Total ≈ 15s.
 const SCENE_FRAMES = {
-  ledgerIntro: 18,
-  wikiPicker: 30,
-  wikiArticle: 36,
-  graph: 30,
-  dictation: 24,
-  chat: 24,
-  ledgerOutro: 18,
+  ledgerIntro: 14,
+  wikiArticle: 22,
+  wikiHover: 16,
+  synthesis: 24,
+  synthesisHover: 16,
+  chat: 40,
+  lint: 30,
+  dictation: 22,
+  ledgerOutro: 14,
 };
 
 const CHROME_CANDIDATES = [
@@ -85,7 +85,6 @@ if (!chrome) {
   console.error("No Chrome binary found.");
   process.exit(1);
 }
-
 if (!ffmpegPath) {
   console.error("ffmpeg-static didn't resolve — reinstall with `npm install`.");
   process.exit(1);
@@ -100,7 +99,6 @@ async function settle(page, ms = 400) {
   await new Promise((r) => setTimeout(r, ms));
 }
 
-/** Walk a linear frame counter so scenes stitch in order. */
 let frameIndex = 0;
 async function snap(page) {
   const name = `frame-${String(frameIndex).padStart(5, "0")}.png`;
@@ -124,22 +122,74 @@ async function captureScroll(page, count, totalScrollPx = 500) {
   }
 }
 
-/** Attempt to open a real wiki page in the active project. */
+/**
+ * Hover the nth wikilink in-article, wait for the portal-rendered preview
+ * card to appear, hold, then capture frames with the card visible. Moves the
+ * mouse off at the end to dismiss cleanly.
+ */
+async function captureWikilinkHover(page, count, nth = 2) {
+  // Give the page a tick so fonts/layout have settled.
+  await settle(page, 200);
+  const handle = await page.evaluateHandle((n) => {
+    const links = document.querySelectorAll("a.wikilink");
+    return links[n] ?? links[0] ?? null;
+  }, nth);
+  const element = handle.asElement();
+  if (!element) {
+    // No wikilinks — just hold the frame.
+    await captureStill(page, count);
+    await handle.dispose();
+    return;
+  }
+  // Scroll the wikilink into view so its preview card renders within the
+  // viewport.
+  await element.evaluate((el) => el.scrollIntoView({ block: "center" }));
+  await new Promise((r) => setTimeout(r, 250));
+  await element.hover();
+  // Preview card has a 160ms reveal transition; give it time to open.
+  await new Promise((r) => setTimeout(r, 350));
+  await captureStill(page, count);
+  // Dismiss by moving the mouse to the top-left so the next scene starts clean.
+  await page.mouse.move(4, 4);
+  await handle.dispose();
+}
+
 async function openFirstAvailableConcept(page) {
   for (const slug of WIKI_CONCEPT_FALLBACKS) {
     const url = `${BASE}/wiki?slug=${encodeURIComponent(slug)}`;
     const res = await page.goto(url, { waitUntil: "networkidle2" });
     if (res && res.ok()) {
-      await settle(page, 600);
-      // Detect the "Page not found" state — if the server returned 200 but
-      // the article view didn't hydrate, bail.
+      await settle(page, 500);
       const title = await page.$("h1");
       if (title) return;
     }
   }
-  // Last resort: picker view, still a good frame.
   await page.goto(`${BASE}/wiki`, { waitUntil: "networkidle2" });
-  await settle(page, 600);
+  await settle(page, 500);
+}
+
+async function openMostRecentChatSession(page) {
+  const sessions = await page.evaluate(async (projectId) => {
+    try {
+      const res = await fetch(`/api/chat/sessions?projectId=${projectId}`);
+      if (!res.ok) return [];
+      const d = await res.json();
+      return d.sessions ?? [];
+    } catch {
+      return [];
+    }
+  }, PROJECT_ID);
+  // Pick the longest session (most messages) so the scroll has real content.
+  let target = null;
+  if (Array.isArray(sessions) && sessions.length) {
+    target = sessions.reduce((a, b) => ((b?.messageCount ?? 0) > (a?.messageCount ?? 0) ? b : a));
+  }
+  if (target?.id) {
+    await page.goto(`${BASE}/chat?session=${target.id}`, { waitUntil: "networkidle2" });
+  } else {
+    await page.goto(`${BASE}/chat`, { waitUntil: "networkidle2" });
+  }
+  await settle(page, 800);
 }
 
 async function run() {
@@ -152,57 +202,88 @@ async function run() {
   try {
     const page = await browser.newPage();
     await page.setViewport(VIEWPORT);
-
-    // Seed the active project before navigation so the sidebar switcher picks
-    // product-ownership on first load.
     await page.evaluateOnNewDocument((slug) => {
       try {
         localStorage.setItem("activeProject", slug);
       } catch {}
     }, PROJECT_SLUG);
 
-    // ── Scene 1: Ledger intro ────────────────────────────────────────
+    // Scene 1 — Ledger intro
     console.log("Scene 1: Ledger");
     await page.goto(`${BASE}/`, { waitUntil: "networkidle2" });
     await settle(page, 1000);
     await captureStill(page, SCENE_FRAMES.ledgerIntro);
 
-    // ── Scene 2: Wiki picker (with scroll) ───────────────────────────
-    console.log("Scene 2: Wiki picker");
-    await page.goto(`${BASE}/wiki`, { waitUntil: "networkidle2" });
-    await settle(page, 700);
-    await captureStill(page, 4);
-    await captureScroll(page, SCENE_FRAMES.wikiPicker - 8, 800);
-    // Pause at bottom
-    await captureStill(page, 4);
-
-    // ── Scene 3: Wiki article with wikilinks ─────────────────────────
-    console.log("Scene 3: Wiki article");
+    // Scene 2 — Wiki article page (scroll a little to show margin cards)
+    console.log("Scene 2: Wiki article");
     await openFirstAvailableConcept(page);
-    await captureStill(page, Math.floor(SCENE_FRAMES.wikiArticle / 2));
-    await captureScroll(page, Math.ceil(SCENE_FRAMES.wikiArticle / 2), 600);
+    await captureStill(page, 6);
+    await captureScroll(page, SCENE_FRAMES.wikiArticle - 6, 500);
 
-    // ── Scene 4: Graph (force-directed) ──────────────────────────────
-    console.log("Scene 4: Map");
-    await page.goto(`${BASE}/graph`, { waitUntil: "networkidle2" });
-    await settle(page, 1500); // let the simulation settle
-    await captureStill(page, SCENE_FRAMES.graph);
+    // Scene 3 — Hover a wikilink to show the portal preview card
+    console.log("Scene 3: Wikilink hover preview");
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+    await settle(page, 300);
+    await captureWikilinkHover(page, SCENE_FRAMES.wikiHover, 2);
 
-    // ── Scene 5: Dictation (outputs list) ────────────────────────────
-    console.log("Scene 5: Dictation");
+    // Scene 4 — Synthesis page (project overview)
+    console.log("Scene 4: Synthesis");
+    await page.goto(`${BASE}/wiki?slug=${encodeURIComponent("synthesis/project-overview")}`, {
+      waitUntil: "networkidle2",
+    });
+    await settle(page, 700);
+    await captureStill(page, 6);
+    await captureScroll(page, SCENE_FRAMES.synthesis - 6, 650);
+
+    // Scene 5 — Hover wikilink on synthesis
+    console.log("Scene 5: Synthesis hover");
+    await page.evaluate(() => window.scrollTo({ top: 240, behavior: "instant" }));
+    await settle(page, 250);
+    await captureWikilinkHover(page, SCENE_FRAMES.synthesisHover, 1);
+
+    // Scene 6 — Chat (pre-seeded session)
+    console.log("Scene 6: Chat");
+    await openMostRecentChatSession(page);
+    // Ensure we start near the top of the thread for readable scroll.
+    await page.evaluate(() => {
+      const log = document.querySelector(".salon-log, .chat-log, [class*='salon']");
+      if (log && typeof log.scrollTo === "function") {
+        log.scrollTo({ top: 0, behavior: "instant" });
+      } else {
+        window.scrollTo({ top: 0, behavior: "instant" });
+      }
+    });
+    await settle(page, 300);
+    await captureStill(page, 10);
+    // Scroll the chat — try the container first, fall back to window.
+    const chatHalf = Math.floor((SCENE_FRAMES.chat - 10) / 2);
+    for (let i = 0; i < chatHalf; i++) {
+      await page.evaluate(() => {
+        const log = document.querySelector(".salon-log, .chat-log, [class*='salon']");
+        if (log && typeof log.scrollBy === "function") log.scrollBy(0, 120);
+        else window.scrollBy(0, 120);
+      });
+      await snap(page);
+      await new Promise((r) => setTimeout(r, 1000 / FPS));
+    }
+    await captureStill(page, SCENE_FRAMES.chat - 10 - chatHalf);
+
+    // Scene 7 — Lint page
+    console.log("Scene 7: Lint");
+    await page.goto(`${BASE}/lint`, { waitUntil: "networkidle2" });
+    await settle(page, 700);
+    await captureStill(page, 10);
+    await captureScroll(page, SCENE_FRAMES.lint - 10, 600);
+
+    // Scene 8 — Dictation with outputs list
+    console.log("Scene 8: Dictation");
     await page.goto(`${BASE}/compose`, { waitUntil: "networkidle2" });
     await settle(page, 700);
-    await captureStill(page, Math.floor(SCENE_FRAMES.dictation / 2));
-    await captureScroll(page, Math.ceil(SCENE_FRAMES.dictation / 2), 700);
+    await captureStill(page, 10);
+    await captureScroll(page, SCENE_FRAMES.dictation - 10, 600);
 
-    // ── Scene 6: Chat ─────────────────────────────────────────────────
-    console.log("Scene 6: Chat");
-    await page.goto(`${BASE}/chat`, { waitUntil: "networkidle2" });
-    await settle(page, 700);
-    await captureStill(page, SCENE_FRAMES.chat);
-
-    // ── Scene 7: Ledger outro ────────────────────────────────────────
-    console.log("Scene 7: Ledger outro");
+    // Scene 9 — Back to Ledger
+    console.log("Scene 9: Ledger outro");
     await page.goto(`${BASE}/`, { waitUntil: "networkidle2" });
     await settle(page, 500);
     await captureStill(page, SCENE_FRAMES.ledgerOutro);
@@ -211,7 +292,6 @@ async function run() {
   }
 }
 
-/** Run ffmpeg with a promise wrapper. */
 function ffmpeg(args) {
   return new Promise((resolve, reject) => {
     const proc = spawn(ffmpegPath, args, { stdio: ["ignore", "pipe", "pipe"] });
@@ -227,9 +307,6 @@ function ffmpeg(args) {
 
 async function encode() {
   const pattern = path.join(framesDir, "frame-%05d.png");
-
-  // Two-pass palette for smaller, higher-quality GIFs — the one-liner route
-  // looks muddy on editorial typography.
   console.log("Encoding palette…");
   await ffmpeg([
     "-y",
@@ -241,7 +318,6 @@ async function encode() {
     "fps=" + FPS + ",scale=1000:-1:flags=lanczos,palettegen=max_colors=128",
     paletteFile,
   ]);
-
   console.log("Encoding GIF…");
   await ffmpeg([
     "-y",
@@ -252,7 +328,9 @@ async function encode() {
     "-i",
     paletteFile,
     "-lavfi",
-    "fps=" + FPS + ",scale=1000:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=3",
+    "fps=" +
+      FPS +
+      ",scale=1000:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=3",
     outFile,
   ]);
 }
@@ -265,7 +343,6 @@ async function main() {
   await encode();
   const stat = fs.statSync(outFile);
   console.log(`✓ ${outFile} — ${(stat.size / 1024).toFixed(0)} KB`);
-  // Clean up frame cache — the final GIF is all we want.
   fs.rmSync(framesDir, { recursive: true, force: true });
 }
 

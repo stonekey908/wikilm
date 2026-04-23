@@ -8,7 +8,19 @@ Built around the pattern Andrej Karpathy described in his [LLM wiki gist](https:
 
 ![WikiLM tour — product-ownership project](docs/demo.gif)
 
-> 15-second tour through a real `product-ownership` wiki: Ledger → Wiki picker → concept article → force-directed Map → Dictation outputs list → Salon. Re-record any time with `node scripts/capture-demo-gif.mjs` (dev server on :3000).
+> ~16-second tour through a real `product-ownership` wiki covering every main journey:
+>
+> 1. **Ledger** — greeting, stat run, nudges.
+> 2. **Wiki article** — concept page with margin cards, scrolled.
+> 3. **Wikilink hover preview** — portal-rendered cursor-tracked preview card.
+> 4. **Synthesis** — project-overview page with *Updated · …* timestamp.
+> 5. **Synthesis hover** — a second wikilink preview on a synthesis link.
+> 6. **Salon (chat)** — a seeded multi-turn conversation about *Cursor for POs*, scrolled through to show Q/A pairs.
+> 7. **The Edit (lint)** — findings grouped by category, Fix / Dismiss actions visible.
+> 8. **Dictation** — filed outputs list with download + delete affordances.
+> 9. **Back to Ledger** — closing frame.
+>
+> Re-record any time with `node scripts/capture-demo-gif.mjs` (dev server on :3000). Frames are driven by puppeteer-core; GIF is stitched by `ffmpeg-static` — no system install required.
 
 ## What's new in v1.5-beta
 
