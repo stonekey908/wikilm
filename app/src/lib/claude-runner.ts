@@ -127,7 +127,7 @@ interface JobOptions {
   prompt: string;
   projectCwd: string;
   projectId: number;
-  type: "ingest" | "query" | "lint" | "fix" | "research" | "synthesis" | "output" | "note-summary" | "concept-fill";
+  type: "ingest" | "query" | "lint" | "fix" | "research" | "synthesis" | "output" | "note-summary" | "concept-fill" | "trail-query";
   title: string;
   onComplete?: (status: "completed" | "failed") => void;
 }

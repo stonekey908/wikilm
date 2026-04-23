@@ -30,6 +30,7 @@ const JOB_TYPES = [
   { key: "output", label: "Output", desc: "Artifact generation (deck, report, etc.)" },
   { key: "note-summary", label: "Note summary", desc: "Summarise chat as note" },
   { key: "concept-fill", label: "Concept drafting", desc: "Populate scaffolded concept pages from the wiki" },
+  { key: "trail-query", label: "Trail → query", desc: "Synthesise a wandering path into a query page" },
 ];
 
 const CLAUDE_MODELS = [

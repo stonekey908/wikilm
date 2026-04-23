@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useProject } from "@/components/project-switcher";
+import { useToast } from "@/components/toast-provider";
 import { EditorialBreadcrumbs } from "@/components/editorial/wiki/breadcrumbs";
 import {
   forceLayout,
@@ -300,6 +301,47 @@ export default function MapPage() {
     [projectId],
   );
 
+  // ── Trail (slice 5) ──────────────────────────────────────────────
+  // Records the user's wandering path as they bloom nodes. Persists per-project
+  // in localStorage so refreshes and revisits don't lose the thread. Ends only
+  // when the user saves it as a query page or hits "Clear trail" — no idle
+  // timeout. Duplicates of the immediately-previous stop are suppressed
+  // (clicking the same node to collapse + reclick to bloom shouldn't double-log).
+  interface TrailStop {
+    id: string;
+    slug: string;
+    title: string;
+    type: string;
+    ts: number;
+  }
+  const [trail, setTrail] = useState<TrailStop[]>([]);
+  const [savingTrail, setSavingTrail] = useState(false);
+  const { addToast } = useToast();
+  useEffect(() => {
+    if (projectId === null) return;
+    try {
+      const raw = window.localStorage.getItem(`wikilm.trail.${projectId}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setTrail(parsed as TrailStop[]);
+        else setTrail([]);
+      } else {
+        setTrail([]);
+      }
+    } catch {
+      setTrail([]);
+    }
+  }, [projectId]);
+  const persistTrail = useCallback(
+    (next: TrailStop[]) => {
+      setTrail(next);
+      if (projectId !== null)
+        window.localStorage.setItem(`wikilm.trail.${projectId}`, JSON.stringify(next));
+    },
+    [projectId],
+  );
+  const clearTrail = useCallback(() => persistTrail([]), [persistTrail]);
+
   // ── Selection (neighborhood view) ────────────────────────────────
   // Clicking a node selects it; clicking the SVG background deselects.
   // Double-click a node = navigate straight to the wiki page (preserves the
@@ -434,12 +476,33 @@ export default function MapPage() {
 
   const tooltipNode = hoverId ? nodes.find((n) => n.id === hoverId) : null;
 
-  // Click → select (opens sidebar). Double-click → open the wiki page.
+  // Trail-stop sequence number per visited node id (1-indexed). A node visited
+  // multiple times shows the most recent index — the badge tracks "where you
+  // are in the trail" not "how many times you've been here."
+  const trailIndexById = useMemo(() => {
+    const m = new Map<string, number>();
+    trail.forEach((s, i) => m.set(s.id, i + 1));
+    return m;
+  }, [trail]);
+
+  // Click → bloom (selection). Double-click → open the wiki page.
+  // Bloom side-effect: append to trail unless we're collapsing or this stop
+  // is the same as the most recent one already recorded.
   const onNodeClick = useCallback(
     (n: LaidNode) => {
-      setSelectedId((prev) => (prev === n.id ? null : n.id));
+      setSelectedId((prev) => {
+        if (prev === n.id) return null; // collapse
+        const last = trail[trail.length - 1];
+        if (!last || last.id !== n.id) {
+          persistTrail([
+            ...trail,
+            { id: n.id, slug: n.slug, title: n.title, type: n.type, ts: Date.now() },
+          ]);
+        }
+        return n.id;
+      });
     },
-    []
+    [trail, persistTrail],
   );
   const onNodeDoubleClick = useCallback(
     (n: LaidNode) => {
@@ -447,6 +510,43 @@ export default function MapPage() {
     },
     [router]
   );
+
+  // Save trail → query page. Spawns a Claude job that reads each stop's page
+  // and writes wiki/queries/{slug}.md. Trail clears on success so the next
+  // wander starts fresh.
+  const saveTrailAsQuery = useCallback(async () => {
+    if (projectId === null || trail.length < 2 || savingTrail) return;
+    setSavingTrail(true);
+    try {
+      const r = await fetch("/api/queries/from-trail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          trail: trail.map((s) => ({ slug: s.slug, title: s.title, type: s.type })),
+        }),
+      });
+      if (!r.ok) {
+        const body = (await r.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? `HTTP ${r.status}`);
+      }
+      addToast({
+        type: "success",
+        title: "Trail queued",
+        description: "A query page is being written from your wandering path.",
+      });
+      clearTrail();
+      setSelectedId(null);
+    } catch (e) {
+      addToast({
+        type: "error",
+        title: "Couldn't save trail",
+        description: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setSavingTrail(false);
+    }
+  }, [projectId, trail, savingTrail, addToast, clearTrail]);
 
   // Fetch the selected node's page body + resolve neighbor titles whenever
   // selection changes. Keep prior state visible while the new fetch runs.
@@ -683,6 +783,34 @@ export default function MapPage() {
                 );
               })}
 
+              {/* trail path — slice 5
+                    Connects the user's wandering path (in order). Drawn
+                    after edges + before nodes so it overlays the graph
+                    skeleton but sits beneath the node circles. Only
+                    stops that have a positioned counterpart in `nodes`
+                    are joined; stops from a different view (filtered
+                    out by Constellation) skip a segment. */}
+              {trail.length >= 2 && (() => {
+                const points = trail
+                  .map((s) => nodes.find((n) => n.id === s.id))
+                  .filter((n): n is LaidNode => Boolean(n));
+                if (points.length < 2) return null;
+                const d = points
+                  .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`)
+                  .join(" ");
+                return (
+                  <path
+                    d={d}
+                    fill="none"
+                    stroke="var(--accent)"
+                    strokeWidth={2}
+                    strokeDasharray="6 4"
+                    opacity={0.75}
+                    pointerEvents="none"
+                  />
+                );
+              })()}
+
               {/* hub pulse */}
               {hubId && nodes.length > 0 && (() => {
                 const hub = nodes.find((n) => n.id === hubId);
@@ -802,6 +930,29 @@ export default function MapPage() {
                         {n.title.length > 28 ? n.title.slice(0, 26) + "…" : n.title}
                       </text>
                     )}
+                    {trailIndexById.has(n.id) && (
+                      <g pointerEvents="none">
+                        <circle
+                          cx={n.x + baseR * scale + 4}
+                          cy={n.y - baseR * scale - 4}
+                          r={8}
+                          fill="var(--accent)"
+                          stroke="var(--paper)"
+                          strokeWidth={1.5}
+                        />
+                        <text
+                          x={n.x + baseR * scale + 4}
+                          y={n.y - baseR * scale - 1}
+                          textAnchor="middle"
+                          fontFamily="var(--font-mono)"
+                          fontSize={9}
+                          fontWeight={700}
+                          fill="var(--paper)"
+                        >
+                          {trailIndexById.get(n.id)}
+                        </text>
+                      </g>
+                    )}
                   </g>
                 );
               })}
@@ -920,6 +1071,44 @@ export default function MapPage() {
           </>
         )}
       </div>
+
+      {trail.length > 0 && (
+        <div className="trail-rail">
+          <div className="trail-head">
+            <h3>
+              The trail you&rsquo;ve <em>wandered.</em>
+            </h3>
+            <div className="trail-actions">
+              <button
+                type="button"
+                className="trail-clear"
+                onClick={clearTrail}
+                disabled={savingTrail}
+              >
+                Clear trail
+              </button>
+              <button
+                type="button"
+                className="trail-save"
+                onClick={saveTrailAsQuery}
+                disabled={savingTrail || trail.length < 2}
+                title={trail.length < 2 ? "Need at least 2 stops to synthesise" : undefined}
+              >
+                {savingTrail ? "Queuing…" : "Save as query →"}
+              </button>
+            </div>
+          </div>
+          <div className="trail-crumbs">
+            {trail.map((s, i) => (
+              <span key={`${s.id}-${i}`} className="trail-step">
+                <span className="trail-num">{i + 1}</span>
+                <span className="trail-kind">{s.type}</span>
+                <span className="trail-title">{s.title}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         .map-peek {

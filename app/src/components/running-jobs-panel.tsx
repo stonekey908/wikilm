@@ -41,6 +41,7 @@ const TYPE_ICONS: Record<string, typeof Download> = {
   synthesis: Layers,
   output: Sparkles,
   "note-summary": PenLine,
+  "trail-query": MessageSquare,
 };
 const TYPE_COLORS: Record<string, { color: string; dim: string }> = {
   ingest: { color: "var(--blue)", dim: "var(--blue-dim)" },
@@ -51,6 +52,7 @@ const TYPE_COLORS: Record<string, { color: string; dim: string }> = {
   synthesis: { color: "var(--chart-4)", dim: "rgba(139,92,246,0.08)" },
   output: { color: "var(--chart-5)", dim: "rgba(236,72,153,0.08)" },
   "note-summary": { color: "var(--orange)", dim: "var(--orange-dim)" },
+  "trail-query": { color: "var(--primary)", dim: "var(--primary-dim)" },
 };
 
 interface RunningJobsPanelProps {
