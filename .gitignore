@@ -16,6 +16,10 @@ app/.env.local
 # Backups — local-only by default. Opt in manually if you want offsite copies.
 backups/
 
+# External tooling metadata (CodeView analysis sidecars, etc.) — not part of
+# WikiLM itself, lives here only because the tooling writes to cwd.
+.codeview/
+
 # ─────────────────────────────────────────────────────────────────────
 # User content — ignored by default so the shared repo is a clean install.
 # The empty .gitkeep scaffolding stays in source control so every clone
