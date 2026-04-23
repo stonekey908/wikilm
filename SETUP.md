@@ -48,7 +48,7 @@ After one-time setup above, there are two ways to start WikiLM without a termina
 
 Behaviour notes:
 
-- If the dev server is already running, the launcher just opens the browser tab.
+- If the dev server is already running, the launcher just opens the browser tab (or PWA window — see next option).
 - Server logs go to `backups/.wikilm-dev.log` — check that if something looks wrong.
 - **Closing the browser or PWA window does NOT stop the server** — it's detached on purpose so your next launch is instant. Stop it when you want to free the port or memory.
 
@@ -69,7 +69,17 @@ Once `http://localhost:3000` is open:
 
 The manifest lives at `/manifest.webmanifest`; the app icon is a small SVG at `/icon.svg`. No extension or extra install needed.
 
-Combine both: double-click launcher to boot the server, then the installed web-app shortcut on the Dock takes you straight into the app window. Closest you can get to a native app without bundling Electron.
+### Recommended flow — keep ONE icon on the Dock
+
+Put `launch-wikilm.command` on the Dock. That's it. When you click it:
+
+- If the server isn't running, it boots in the background.
+- If it's running, nothing's re-started — just the window opens.
+- If you've installed the PWA, the launcher opens the **PWA standalone window** (no address bar, proper Dock icon). If you haven't, it falls back to a browser tab.
+
+**Don't put the PWA icon on the Dock directly.** A PWA is just a browser window — clicking it when the server is down shows a "can't connect" error that won't retry even after you start the server (you'd have to hit Cmd+R inside the PWA window). The launcher handles the ordering: start the server, wait for readiness, only then open the window.
+
+One click = fully working app. Add `stop-wikilm.command` right next to it on the Dock for one-click shutdown.
 
 ## Project Structure
 
