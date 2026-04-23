@@ -122,7 +122,10 @@ export function EditorialSidebar() {
             >
               <span className="si-num">{f.num}</span>
               <span className="si-icon">{NAV_ICONS[v]}</span>
-              <span className="si-text">{f.label}</span>
+              <span className="si-text">
+                {f.label}
+                {v === "graph" && <span className="si-beta">Beta</span>}
+              </span>
               <span className="si-count"></span>
             </button>
           );

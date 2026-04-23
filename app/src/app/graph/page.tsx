@@ -206,6 +206,36 @@ export default function MapPage() {
   const dragStart = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
 
+  // ── View mode (constellation | full) + weight encoding toggle ───
+  // Per-project preference, hydrated from localStorage on mount.
+  // Defaults: constellation + weight on. Slice 1 wires state only;
+  // slices 2 & 4 read these to filter and style nodes.
+  type MapView = "constellation" | "full";
+  const [view, setView] = useState<MapView>("constellation");
+  const [weight, setWeight] = useState<boolean>(true);
+  useEffect(() => {
+    if (projectId === null) return;
+    const v = window.localStorage.getItem(`wikilm.map.view.${projectId}`);
+    if (v === "constellation" || v === "full") setView(v);
+    const w = window.localStorage.getItem(`wikilm.map.weight.${projectId}`);
+    if (w === "on" || w === "off") setWeight(w === "on");
+  }, [projectId]);
+  const setViewPersist = useCallback(
+    (v: MapView) => {
+      setView(v);
+      if (projectId !== null) window.localStorage.setItem(`wikilm.map.view.${projectId}`, v);
+    },
+    [projectId],
+  );
+  const setWeightPersist = useCallback(
+    (w: boolean) => {
+      setWeight(w);
+      if (projectId !== null)
+        window.localStorage.setItem(`wikilm.map.weight.${projectId}`, w ? "on" : "off");
+    },
+    [projectId],
+  );
+
   // ── Selection (neighborhood view) ────────────────────────────────
   // Clicking a node selects it; clicking the SVG background deselects.
   // Double-click a node = navigate straight to the wiki page (preserves the
@@ -456,6 +486,47 @@ export default function MapPage() {
           )}
           <div>
             Clustering <b>{clustering.toFixed(2)}</b>
+          </div>
+        </div>
+      </div>
+
+      <div className="map-rail">
+        <div className="map-rail-group">
+          <span className="map-rail-lab">View</span>
+          <div className="map-seg">
+            <button
+              type="button"
+              className={`map-seg-btn${view === "constellation" ? " active" : ""}`}
+              onClick={() => setViewPersist("constellation")}
+            >
+              Constellation
+            </button>
+            <button
+              type="button"
+              className={`map-seg-btn${view === "full" ? " active" : ""}`}
+              onClick={() => setViewPersist("full")}
+            >
+              Full graph
+            </button>
+          </div>
+        </div>
+        <div className="map-rail-group">
+          <span className="map-rail-lab">Weight</span>
+          <div className="map-seg">
+            <button
+              type="button"
+              className={`map-seg-btn${weight ? " active" : ""}`}
+              onClick={() => setWeightPersist(true)}
+            >
+              On
+            </button>
+            <button
+              type="button"
+              className={`map-seg-btn${!weight ? " active" : ""}`}
+              onClick={() => setWeightPersist(false)}
+            >
+              Off
+            </button>
           </div>
         </div>
       </div>
