@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Sparkles,
   X,
@@ -163,11 +164,16 @@ export function GenerateOutputModal({
   }, [projectId, selectedType, scope, nudge, ENABLED_TYPES, onGenerated]);
 
   if (!open) return null;
+  if (typeof document === "undefined") return null;
 
   const inFlight = phase.kind === "queued" || phase.kind === "running";
   const ENABLED_TYPE = ENABLED_TYPES.find((t) => t.id === selectedType);
 
-  return (
+  // Portal to document.body so `position: fixed` resolves against the real
+  // viewport — not the `zoom: var(--fs-scale)` ancestor that wraps .content.
+  // Without the portal, clicking Generate Output from a mid-scroll wiki page
+  // opens the modal off-screen (user has to scroll down to find it).
+  return createPortal(
     <div
       className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center px-4"
       onClick={(e) => {
@@ -435,7 +441,8 @@ export function GenerateOutputModal({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
