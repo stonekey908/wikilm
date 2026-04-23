@@ -1,0 +1,617 @@
+{
+  "app/drizzle.config.ts": {
+    "title": "Database Schema Config",
+    "layer": "data",
+    "summary": "Configuration telling the Drizzle database toolkit where the SQLite database file and schema definition live."
+  },
+  "app/eslint.config.mjs": {
+    "title": "Code Linting Config",
+    "layer": "data",
+    "summary": "Configures ESLint rules for the Next.js app so code style issues get flagged during development."
+  },
+  "app/next-env.d.ts": {
+    "title": "Next.js Type Definitions",
+    "layer": "data",
+    "summary": "Auto-generated TypeScript reference file that lets the project recognize Next.js built-in types."
+  },
+  "app/next.config.ts": {
+    "title": "Next.js App Config",
+    "layer": "data",
+    "summary": "Main Next.js configuration, including the SQLite library and build tooling settings."
+  },
+  "app/postcss.config.mjs": {
+    "title": "CSS Processing Config",
+    "layer": "data",
+    "summary": "Tells the CSS build pipeline to use Tailwind for styling."
+  },
+  "app/scripts/screenshot-extras.mjs": {
+    "title": "Wiki Detail Screenshot Capture",
+    "layer": "external",
+    "summary": "Runs a headless Chrome browser to automatically capture README screenshots of wiki concept detail pages and synthesis views."
+  },
+  "app/scripts/screenshot-features.mjs": {
+    "title": "Output Features Screenshot Capture",
+    "layer": "external",
+    "summary": "Runs a headless Chrome browser to capture README screenshots of the output-generation modal, jobs page, and sources page."
+  },
+  "app/scripts/screenshot-help.mjs": {
+    "title": "Help Modal Screenshot Capture",
+    "layer": "external",
+    "summary": "Runs headless Chrome to open the app's Help modal and save a screenshot for the README."
+  },
+  "app/scripts/screenshot-note-flows.mjs": {
+    "title": "Note Flow Screenshot Capture",
+    "layer": "external",
+    "summary": "Runs headless Chrome to screenshot the New Note modal, sources page, and chat save-as-note flow for the README."
+  },
+  "app/src/app/api/admin/backfill-claude-md/route.ts": {
+    "title": "Project Config Backfill Endpoint",
+    "layer": "api",
+    "summary": "One-shot admin endpoint that ensures every nested project has its own Claude instructions file so AI subprocesses write to the correct wiki."
+  },
+  "app/src/app/api/backup/run/route.ts": {
+    "title": "Manual Backup Runner",
+    "layer": "api",
+    "summary": "Creates a timestamped snapshot of the database and wiki folder, stores it under /backups, and prunes older snapshots to keep the 14 newest."
+  },
+  "app/src/app/api/backup/status/route.ts": {
+    "title": "Backup Status Endpoint",
+    "layer": "api",
+    "summary": "Reports when the last backup ran, where it was saved, and which files it produced so the Settings page can show backup history."
+  },
+  "app/src/app/api/chat/save-as-note/route.ts": {
+    "title": "Save Chat As Note Endpoint",
+    "layer": "api",
+    "summary": "Takes a chat thread, spawns a Claude summarizer job to turn it into a structured markdown note, and files it under the project's sources as pending."
+  },
+  "app/src/app/api/chat/sessions/[id]/messages/route.ts": {
+    "title": "Add Chat Message Endpoint",
+    "layer": "api",
+    "summary": "Appends a new user or assistant message to a specific chat session and bumps the session's updated timestamp."
+  },
+  "app/src/app/api/chat/sessions/[id]/route.ts": {
+    "title": "Chat Session Detail Endpoint",
+    "layer": "api",
+    "summary": "Fetches a single chat session with all its messages, or deletes a session and its messages."
+  },
+  "app/src/app/api/chat/sessions/route.ts": {
+    "title": "Chat Sessions List Endpoint",
+    "layer": "api",
+    "summary": "Lists chat sessions scoped to the active project, or creates a new chat session with a given title."
+  },
+  "app/src/app/api/claude/job/[id]/route.ts": {
+    "title": "Claude Job Detail Endpoint",
+    "layer": "api",
+    "summary": "Fetches the status of a specific Claude AI background job, or cancels a running/queued job."
+  },
+  "app/src/app/api/claude/job/route.ts": {
+    "title": "Claude Job Creation Endpoint",
+    "layer": "api",
+    "summary": "Starts a new Claude AI background job for a given project with a prompt, type and title, and lists recent jobs."
+  },
+  "app/src/app/api/claude/stream/route.ts": {
+    "title": "Claude Chat Streaming Endpoint",
+    "layer": "api",
+    "summary": "Handles wiki-aware chat: wraps the user's prompt with instructions to consult the wiki index first, then streams Claude's answer back to the UI."
+  },
+  "app/src/app/api/dashboard/nudges/route.ts": {
+    "title": "Dashboard Nudges Endpoint",
+    "layer": "api",
+    "summary": "Returns open lint findings grouped into promotion candidates, recurring themes, gaps, and missing cross-references for the dashboard's nudges section."
+  },
+  "app/src/app/api/dashboard/route.ts": {
+    "title": "Dashboard Stats Endpoint",
+    "layer": "api",
+    "summary": "Counts wiki sources, pages, entities, and concepts and returns recent activity log entries for the dashboard."
+  },
+  "app/src/app/api/gemini/models/route.ts": {
+    "title": "Gemini Model Detection Endpoint",
+    "layer": "api",
+    "summary": "Checks whether the Gemini CLI is installed locally and lists the available Gemini models the app can use."
+  },
+  "app/src/app/api/lint/findings/[id]/fix/route.ts": {
+    "title": "Fix Lint Finding Endpoint",
+    "layer": "api",
+    "summary": "Starts an AI job to automatically fix a single wiki lint finding (e.g. missing cross-reference, orphan page)."
+  },
+  "app/src/app/api/lint/findings/[id]/route.ts": {
+    "title": "Update Lint Finding Status",
+    "layer": "api",
+    "summary": "Updates a lint finding's status — used to dismiss it, mark it resolved, or reopen it."
+  },
+  "app/src/app/api/lint/findings/route.ts": {
+    "title": "Lint Findings List Endpoint",
+    "layer": "api",
+    "summary": "Lists wiki lint findings for a project, filterable by status and scope (project-level or cross-project parent-level)."
+  },
+  "app/src/app/api/lint/fix/route.ts": {
+    "title": "Bulk Fix Lint Findings",
+    "layer": "api",
+    "summary": "Starts an AI job to fix multiple lint findings at once for a given project."
+  },
+  "app/src/app/api/lint/parent-run/[projectId]/route.ts": {
+    "title": "Parent Project Lint Runner",
+    "layer": "api",
+    "summary": "Runs a cross-project lint pass on a parent project, surfacing promotion candidates, recurring themes, and gaps across its child projects."
+  },
+  "app/src/app/api/lint/run/route.ts": {
+    "title": "Project Lint Runner",
+    "layer": "api",
+    "summary": "Starts an AI lint job against a project's wiki to find orphan pages, dangling links, and missing concepts."
+  },
+  "app/src/app/api/ollama/models/route.ts": {
+    "title": "Ollama Model Detection Endpoint",
+    "layer": "api",
+    "summary": "Checks whether Ollama is running locally and lists the models available for the app to use."
+  },
+  "app/src/app/api/projects/[id]/move/route.ts": {
+    "title": "Move Project Endpoint",
+    "layer": "api",
+    "summary": "Moves a project under a new parent in the project tree, rewriting folder paths and wikilinks; rejects cycles and name collisions."
+  },
+  "app/src/app/api/projects/[id]/outputs/delete/route.ts": {
+    "title": "Delete Generated Outputs API",
+    "layer": "api",
+    "summary": "Backend endpoint that removes all generated output files (reports, decks, infographics) sharing a base name from a project's outputs folder. Validates the name against a safe pattern to prevent directory traversal."
+  },
+  "app/src/app/api/projects/[id]/outputs/download/route.ts": {
+    "title": "Download Generated Output API",
+    "layer": "api",
+    "summary": "Backend endpoint that serves a single generated artifact (markdown, Word doc, PDF, PowerPoint, HTML, or PNG) for download from a project's outputs folder, with safety checks to prevent access outside that folder."
+  },
+  "app/src/app/api/projects/[id]/outputs/generate/route.ts": {
+    "title": "Generate Output Artifact API",
+    "layer": "api",
+    "summary": "Backend endpoint that queues an AI job to produce a report, executive summary, cheat sheet, briefing deck, or infographic from the project's wiki, then post-processes it into Word, PDF, PowerPoint, or PNG formats."
+  },
+  "app/src/app/api/projects/[id]/promote-page/route.ts": {
+    "title": "Promote Wiki Page to Parent API",
+    "layer": "api",
+    "summary": "Backend endpoint that moves a wiki page from a child project up to its parent project and rewrites every cross-project link pointing at the old location so nothing breaks."
+  },
+  "app/src/app/api/projects/[id]/route.ts": {
+    "title": "Project Detail API",
+    "layer": "api",
+    "summary": "Backend endpoint that fetches or updates a single project's details (name, description, color). Used whenever the UI needs to read or edit project metadata."
+  },
+  "app/src/app/api/projects/[id]/synthesis/parent-run/route.ts": {
+    "title": "Parent Project Synthesis Trigger API",
+    "layer": "api",
+    "summary": "Backend endpoint that asks the AI to regenerate a cross-project synthesis for a parent project that has children. Rejects projects with no children and coalesces rapid repeat requests."
+  },
+  "app/src/app/api/projects/nudge-counts/route.ts": {
+    "title": "Project Nudge Counts API",
+    "layer": "api",
+    "summary": "Backend endpoint that returns how many open suggestions (nudges) each parent project has, so the sidebar can show a badge next to projects that need attention."
+  },
+  "app/src/app/api/projects/route.ts": {
+    "title": "Projects List and Create API",
+    "layer": "api",
+    "summary": "Backend endpoint that lists all projects with their source and page counts, and creates new projects (including nested child projects with their folder scaffolding)."
+  },
+  "app/src/app/api/projects/tree/route.ts": {
+    "title": "Project Tree API",
+    "layer": "api",
+    "summary": "Backend endpoint that returns the full hierarchy of projects as a nested tree, used by the sidebar to display parent/child project relationships."
+  },
+  "app/src/app/api/settings/route.ts": {
+    "title": "App Settings API",
+    "layer": "api",
+    "summary": "Backend endpoint that reads and writes app-wide settings like which AI model to use, backup preferences, and feature toggles."
+  },
+  "app/src/app/api/sources/[id]/route.ts": {
+    "title": "Source Item API",
+    "layer": "api",
+    "summary": "Backend endpoint that deletes a single source (and its raw file) or triggers ingestion for a source currently marked as pending."
+  },
+  "app/src/app/api/sources/ingest-web/route.ts": {
+    "title": "Web URL Ingest API",
+    "layer": "api",
+    "summary": "Backend endpoint that takes a web URL, fetches and processes its content into the wiki, and tells the AI which existing entity and concept pages to reuse so duplicates aren't created."
+  },
+  "app/src/app/api/sources/research/route.ts": {
+    "title": "Source Research Stream API",
+    "layer": "api",
+    "summary": "Backend endpoint that streams AI-generated web search results for a given topic, returning each suggested source as a structured line with title, URL, summary, and relevance score."
+  },
+  "app/src/app/api/sources/route.ts": {
+    "title": "Sources List API",
+    "layer": "api",
+    "summary": "Backend endpoint that lists all sources belonging to a given project, filtered by project ID."
+  },
+  "app/src/app/api/sources/upload/route.ts": {
+    "title": "File Upload Ingest API",
+    "layer": "api",
+    "summary": "Backend endpoint that accepts uploaded files (PDFs, web pages, notes), saves them into the project's raw folder, and kicks off AI ingestion to turn them into wiki pages."
+  },
+  "app/src/app/api/sources/upload-md/route.ts": {
+    "title": "Markdown Note Upload API",
+    "layer": "api",
+    "summary": "Backend endpoint for programmatic note submission — accepts a title, markdown body, and tags, writes the note as a source file, and optionally triggers ingestion. Used by the MCP server and scripts."
+  },
+  "app/src/app/api/wiki/[slug]/route.ts": {
+    "title": "Wiki Page and Backlinks API",
+    "layer": "api",
+    "summary": "Backend endpoint that fetches a single wiki page along with every other page that links back to it, including cross-project references."
+  },
+  "app/src/app/api/wiki/concept-scaffold/route.ts": {
+    "title": "Concept Page Scaffold API",
+    "layer": "api",
+    "summary": "Backend endpoint that creates a placeholder concept page in a parent project, pre-populated with links to the child pages that evidenced the concept, then marks the originating suggestion as resolved."
+  },
+  "app/src/app/api/wiki/graph/route.ts": {
+    "title": "Wiki Graph Data API",
+    "layer": "api",
+    "summary": "Backend endpoint that builds the node-and-edge dataset for the visual graph view, showing how wiki pages link to each other within and across projects."
+  },
+  "app/src/app/api/wiki/route.ts": {
+    "title": "Wiki Pages List API",
+    "layer": "api",
+    "summary": "Backend endpoint that returns all wiki pages for a project with their titles, types, tags, and timestamps, supporting search and type filtering."
+  },
+  "app/src/app/chat/page.tsx": {
+    "title": "Chat Screen",
+    "layer": "ui",
+    "summary": "The chat page where users ask questions against their wiki. Sends messages, displays AI responses, and manages chat sessions scoped to the active project."
+  },
+  "app/src/app/compose/page.tsx": {
+    "title": "Compose Output Screen",
+    "layer": "ui",
+    "summary": "The page where users generate polished outputs (reports, decks, cheat sheets, summaries, infographics) from their wiki content by picking a type, scope, and nudge."
+  },
+  "app/src/app/graph/page.tsx": {
+    "title": "Wiki Graph View Screen",
+    "layer": "ui",
+    "summary": "The visual page that renders wiki pages as an interactive node-link graph so users can see how concepts, entities, and sources connect."
+  },
+  "app/src/app/help/page.tsx": {
+    "title": "Help Documentation Screen",
+    "layer": "ui",
+    "summary": "The in-app help page that renders topic-based documentation articles, grouped into sections, explaining how each part of the app works."
+  },
+  "app/src/app/jobs/page.tsx": {
+    "title": "Background Jobs Screen",
+    "layer": "ui",
+    "summary": "The page that lists every background AI job (ingest, research, lint, synthesis, output generation) with its status, model used, and any error messages."
+  },
+  "app/src/app/layout.tsx": {
+    "title": "App Root Layout",
+    "layer": "ui",
+    "summary": "The top-level wrapper for every page — sets up fonts, the active project switcher, toasts, theme tweaks, and the overall app shell."
+  },
+  "app/src/app/lint/page.tsx": {
+    "title": "Wiki Lint Screen",
+    "layer": "ui",
+    "summary": "The page that shows wiki quality issues (orphans, missing links, contradictions) and lets users run lint scans or auto-fix fixable findings one at a time or in batches."
+  },
+  "app/src/app/page.tsx": {
+    "title": "Dashboard Home Screen",
+    "layer": "ui",
+    "summary": "The app's landing page showing source counts, wiki page counts, recent activity, and nudges that suggest what to work on next."
+  },
+  "app/src/app/settings/page.tsx": {
+    "title": "Settings Screen",
+    "layer": "ui",
+    "summary": "The settings page where users choose AI models for each task type, adjust theme and font preferences, and manage backups."
+  },
+  "app/src/app/sources/page.tsx": {
+    "title": "Sources Library Screen",
+    "layer": "ui",
+    "summary": "The page that lists all source materials for the active project, letting users add URLs, upload files, compose notes, research new sources, and trigger ingestion."
+  },
+  "app/src/app/wiki/page.tsx": {
+    "title": "Wiki Article Reader Page",
+    "layer": "ui",
+    "summary": "The main wiki page where users read article content, see headings, and hover over links to preview connected pages."
+  },
+  "app/src/components/breadcrumbs.tsx": {
+    "title": "Nested Project Breadcrumbs",
+    "layer": "ui",
+    "summary": "Shows the 'root › child › grandchild' trail at the top of a page so users can see where they are in a nested project and click back to ancestors."
+  },
+  "app/src/components/child-projects.tsx": {
+    "title": "Child Project Cards",
+    "layer": "ui",
+    "summary": "Displays a row of clickable cards for each sub-project of the current one, letting users drill down into child projects."
+  },
+  "app/src/components/editorial/chat-sessions-sidebar.tsx": {
+    "title": "Chat History Sidebar",
+    "layer": "ui",
+    "summary": "Lists past chat conversations for the active project in a sidebar so users can reopen earlier threads."
+  },
+  "app/src/components/editorial/editorial-project-tree.tsx": {
+    "title": "Project Tree Navigator",
+    "layer": "ui",
+    "summary": "The expandable tree of projects and sub-projects in the sidebar, with a menu to add children, move, or delete projects."
+  },
+  "app/src/components/editorial/editorial-shell.tsx": {
+    "title": "App Layout Shell",
+    "layer": "ui",
+    "summary": "The overall page frame that wraps every screen with the sidebar, top bar, tweaks panel, shortcuts, toasts, and help modal."
+  },
+  "app/src/components/editorial/editorial-sidebar.tsx": {
+    "title": "Main Navigation Sidebar",
+    "layer": "ui",
+    "summary": "The left-hand sidebar with navigation icons for Wiki, Sources, Chat, Jobs and other main sections of the app."
+  },
+  "app/src/components/editorial/editorial-toast-bridge.tsx": {
+    "title": "Editorial Toast Notifications",
+    "layer": "ui",
+    "summary": "Renders pop-up status messages at the bottom of the screen in the editorial visual style whenever the app needs to notify the user."
+  },
+  "app/src/components/editorial/editorial-topbar.tsx": {
+    "title": "Page Header Bar",
+    "layer": "ui",
+    "summary": "The top bar of every page showing the current section name, folio number, and a beacon indicating running background jobs."
+  },
+  "app/src/components/editorial/folio-map.ts": {
+    "title": "Navigation Sections Registry",
+    "layer": "data",
+    "summary": "The master list of the app's nine main sections (Ledger, Wiki, Intake, Chat, Lint, Dispatch, Map, Dictation, Press) with their labels, numbers, and URL paths."
+  },
+  "app/src/components/editorial/help-modal.tsx": {
+    "title": "Quick Help Modal",
+    "layer": "ui",
+    "summary": "A glance-card pop-up that briefly explains what each section of the app does and links to the full help page."
+  },
+  "app/src/components/editorial/job-beacon.tsx": {
+    "title": "Running Job Indicator",
+    "layer": "ui",
+    "summary": "A live indicator in the top bar that shows any research, ingest, or synthesis jobs currently running, with their type and elapsed time."
+  },
+  "app/src/components/editorial/keyboard-shortcuts.tsx": {
+    "title": "Keyboard Shortcuts Handler",
+    "layer": "ui",
+    "summary": "Listens for Cmd+1 through Cmd+9 keypresses and jumps the user to the matching section of the app."
+  },
+  "app/src/components/editorial/ledger/ledger-dispatch-research.tsx": {
+    "title": "Dashboard Research Launcher",
+    "layer": "ui",
+    "summary": "Dashboard widget where the user types a research question to commission a new web-research job and watch its progress."
+  },
+  "app/src/components/editorial/ledger/ledger-nudges.tsx": {
+    "title": "Dashboard Nudges Panel",
+    "layer": "ui",
+    "summary": "Shows the user suggested actions from the parent-project linter — promote a page, create a missing concept, research a gap, or dismiss the nudge."
+  },
+  "app/src/components/editorial/map/force-layout.ts": {
+    "title": "Graph Layout Engine",
+    "layer": "utils",
+    "summary": "Calculates positions for nodes and edges in the knowledge graph using a force-directed simulation, so wiki pages spread out readably on the Map screen."
+  },
+  "app/src/components/editorial/note-composer-modal.tsx": {
+    "title": "Note Composer Modal (Editorial)",
+    "layer": "ui",
+    "summary": "Pop-up form where users type a title, tags, and markdown body to save a quick hand-written note as a pending or ingested source."
+  },
+  "app/src/components/editorial/palette.tsx": {
+    "title": "Command Palette",
+    "layer": "ui",
+    "summary": "A Cmd-K style quick-search overlay that lets users jump to any wiki page, project, or navigation section by typing a few characters."
+  },
+  "app/src/components/editorial/phase-placeholder.tsx": {
+    "title": "Section Placeholder Screen",
+    "layer": "ui",
+    "summary": "A generic 'coming soon' panel used for app sections that are still being built, showing the folio header and the ticket tracking the work."
+  },
+  "app/src/components/editorial/portal-to-body.tsx": {
+    "title": "Modal Portal Helper",
+    "layer": "ui",
+    "summary": "A tiny wrapper that renders modals and overlays directly into the page body so they escape zoom/scale effects and sit correctly on screen."
+  },
+  "app/src/components/editorial/project-switcher-dropdown.tsx": {
+    "title": "Project Switcher Dropdown",
+    "layer": "ui",
+    "summary": "The button in the sidebar that shows the current project name and opens a dropdown with the full project tree to switch between projects."
+  },
+  "app/src/components/editorial/quick-generate.tsx": {
+    "title": "Quick Output Generator",
+    "layer": "ui",
+    "summary": "A compact launcher where users pick a format (executive summary, report, cheat sheet, deck, infographic) and kick off generating that document from the current project."
+  },
+  "app/src/components/editorial/tweaks-panel.tsx": {
+    "title": "Theme Tweaks Panel",
+    "layer": "ui",
+    "summary": "Slide-out settings panel where users pick the theme color, accent, density, text size, and serif font for the editorial interface."
+  },
+  "app/src/components/editorial/tweaks-provider.tsx": {
+    "title": "Theme Tweaks State Provider",
+    "layer": "ui",
+    "summary": "React context that stores the user's current theme, font, size, and density choices and makes them available to every component in the app."
+  },
+  "app/src/components/editorial/wiki/breadcrumbs.tsx": {
+    "title": "Wiki Project Breadcrumbs",
+    "layer": "ui",
+    "summary": "Renders the clickable project path (e.g. 'coding › codeview') at the top of wiki pages, with optional back button and a trailing segment."
+  },
+  "app/src/components/editorial/wiki/markdown-renderer.tsx": {
+    "title": "Wiki Markdown Renderer",
+    "layer": "ui",
+    "summary": "Parses and displays wiki page markdown — headings, links, code blocks, and [[wikilinks]] — with hover-preview and click-to-navigate behavior."
+  },
+  "app/src/components/editorial/wiki/wiki-preview.tsx": {
+    "title": "Wiki Link Hover Preview",
+    "layer": "ui",
+    "summary": "Shows a small floating card with a page's title, type, excerpt, and tags when the user hovers over a [[wikilink]] in wiki content."
+  },
+  "app/src/components/generate-output-modal.tsx": {
+    "title": "Generate Output Modal",
+    "layer": "ui",
+    "summary": "Full modal for creating a new output document (report, deck, infographic, etc.), letting users set scope, focus nudge, and track generation progress."
+  },
+  "app/src/components/help-modal.tsx": {
+    "title": "In-App Help Modal",
+    "layer": "ui",
+    "summary": "Explains the WikiLM concept to the user — how ingest, wiki, chat, output generation, nested projects, and lint all work together."
+  },
+  "app/src/components/note-composer-modal.tsx": {
+    "title": "Note Composer Modal",
+    "layer": "ui",
+    "summary": "Modal form for composing a hand-written note with title, tags, markdown body, project selection, and a choice to save as pending or ingest immediately."
+  },
+  "app/src/components/nudges-section.tsx": {
+    "title": "Dashboard Nudges Panel",
+    "layer": "ui",
+    "summary": "Shows the dashboard's list of suggested actions (promote a page, research a gap, create a concept). Users can act on or dismiss each nudge."
+  },
+  "app/src/components/project-switcher.tsx": {
+    "title": "Project Tree Switcher",
+    "layer": "ui",
+    "summary": "Sidebar component that lets users browse the project tree, switch the active project, and add child projects or delete existing ones."
+  },
+  "app/src/components/running-jobs-panel.tsx": {
+    "title": "Running Jobs Panel",
+    "layer": "ui",
+    "summary": "Slide-up panel showing all active background jobs (ingests, research, output generation) with their status, model, and cancel buttons."
+  },
+  "app/src/components/sidebar.tsx": {
+    "title": "App Sidebar Navigation",
+    "layer": "ui",
+    "summary": "The main left-hand navigation bar containing links to every page (Wiki, Intake, Chat, Jobs, Settings), theme toggle, and active-job footer."
+  },
+  "app/src/components/theme-provider.tsx": {
+    "title": "Light/Dark Theme Provider",
+    "layer": "ui",
+    "summary": "Tracks the user's light/dark/system theme preference and applies it across the app, respecting the OS setting when system mode is chosen."
+  },
+  "app/src/components/toast-provider.tsx": {
+    "title": "Toast Notification System",
+    "layer": "ui",
+    "summary": "Provides the pop-up notification system used throughout the app to show success, error, info, and warning messages."
+  },
+  "app/src/content/help.test.ts": {
+    "title": "Help Content Tests",
+    "layer": "utils",
+    "summary": "Automated tests that verify the in-app help topics are well-formed: every topic has a unique slug, valid section, and non-empty content."
+  },
+  "app/src/content/help.ts": {
+    "title": "In-App Help Topics",
+    "layer": "data",
+    "summary": "The single source of truth for all user-facing help content — every topic, section, and explainer shown in the help page, help modal, and chat prompt digest."
+  },
+  "app/src/db/index.ts": {
+    "title": "SQLite Database Connection",
+    "layer": "external",
+    "summary": "Opens the local SQLite database file that stores all projects, sources, wiki page metadata, chat sessions, jobs, and settings."
+  },
+  "app/src/db/schema.ts": {
+    "title": "Database Table Definitions",
+    "layer": "data",
+    "summary": "Defines the shape of every database table: projects, sources, wiki pages, chat sessions, chat messages, settings, and lint findings."
+  },
+  "app/src/instrumentation.ts": {
+    "title": "Server Startup Hook",
+    "layer": "external",
+    "summary": "Runs once when the server boots to clean up any jobs left in a stuck 'running' state from a previous session."
+  },
+  "app/src/lib/__mocks__/claude-mock.ts": {
+    "title": "Claude CLI Mock Responses",
+    "layer": "data",
+    "summary": "Canned fake responses used when MOCK_MODE is on, so the app can be demoed without a real Claude CLI. Simulates ingest, query, lint, and research output."
+  },
+  "app/src/lib/claude-runner.ts": {
+    "title": "Job Runner & Provider Router",
+    "layer": "external",
+    "summary": "The central engine that runs background jobs. Dispatches each job to the right AI provider (Claude, Gemini, or Ollama), manages the queue, and limits concurrency."
+  },
+  "app/src/lib/error-codes.ts": {
+    "title": "Job Error Message Formatter",
+    "layer": "utils",
+    "summary": "Converts raw job failure codes (auth failed, rate limited, timeout) into friendly user-facing titles and descriptions."
+  },
+  "app/src/lib/export-docx.ts": {
+    "title": "Markdown to Word Exporter",
+    "layer": "utils",
+    "summary": "Converts markdown chat responses into downloadable Word (.docx) files, handling headings, bold/italic, lists, code blocks, tables, and links."
+  },
+  "app/src/lib/gemini-runner.ts": {
+    "title": "Google Gemini Job Runner",
+    "layer": "external",
+    "summary": "Runs background jobs using the Google Gemini CLI. Detects whether Gemini is installed, picks the right model, and streams its output back to the app."
+  },
+  "app/src/lib/lint.ts": {
+    "title": "Wiki Lint Engine",
+    "layer": "external",
+    "summary": "Orchestrates wiki health checks: looks for orphan pages, missing concepts, contradictions, and cross-references by spawning Claude to audit the wiki."
+  },
+  "app/src/lib/ollama-runner.ts": {
+    "title": "Local Ollama Job Runner",
+    "layer": "external",
+    "summary": "Runs background jobs against a locally-installed Ollama model. Detects available models, streams responses, and lets users cancel mid-run."
+  },
+  "app/src/lib/output-types.test.ts": {
+    "title": "Output Types Tests",
+    "layer": "utils",
+    "summary": "Automated tests for the output generation helpers, covering filename slug building, type lookup, and the enabled output type list."
+  },
+  "app/src/lib/output-types.ts": {
+    "title": "Output Generation Registry",
+    "layer": "data",
+    "summary": "Defines every kind of artifact WikiLM can generate (report, cheat sheet, summary, briefing deck, infographic) with its prompt template and file extensions."
+  },
+  "app/src/lib/projects.test.ts": {
+    "title": "Project Slug Tests",
+    "layer": "utils",
+    "summary": "Automated tests for the project slug helpers, verifying that project names get correctly converted into URL-safe slugs and composed with parent paths."
+  },
+  "app/src/lib/projects.ts": {
+    "title": "Project Tree Service",
+    "layer": "external",
+    "summary": "Core service for managing projects — resolving their filesystem paths, building the parent/child tree, creating wiki directories, and slugifying names."
+  },
+  "app/src/lib/utils.ts": {
+    "title": "CSS Class Name Merger",
+    "layer": "utils",
+    "summary": "A tiny helper that combines and deduplicates Tailwind CSS class names, used across every UI component."
+  },
+  "app/src/lib/wiki-utils.test.ts": {
+    "title": "Wiki Frontmatter Tests",
+    "layer": "utils",
+    "summary": "Automated tests for the wiki frontmatter parser, checking that page metadata (title, type, tags) is read correctly from markdown files."
+  },
+  "app/src/lib/wiki-utils.ts": {
+    "title": "Wiki File Reader",
+    "layer": "utils",
+    "summary": "Reads markdown files from the wiki folder and parses the YAML metadata block at the top of each page into structured data."
+  },
+  "app/vitest.config.ts": {
+    "title": "Test Runner Config",
+    "layer": "data",
+    "summary": "Configuration for Vitest, the automated test runner — tells it where the tests live, how to resolve imports, and which folders to skip."
+  },
+  "mcp/src/api.ts": {
+    "title": "WikiLM MCP HTTP Client",
+    "layer": "external",
+    "summary": "HTTP client used by the MCP server to talk to the WikiLM app's API. Handles auth headers, error formatting, and network failures in one place."
+  },
+  "mcp/src/config.ts": {
+    "title": "MCP Server Configuration",
+    "layer": "external",
+    "summary": "Loads the MCP server's settings: the WikiLM API URL, optional write token, and the map that translates a dev project's folder path into a WikiLM project slug."
+  },
+  "mcp/src/index.ts": {
+    "title": "WikiLM MCP Server Entrypoint",
+    "layer": "external",
+    "summary": "The main entry point for the WikiLM MCP server, which lets other Claude Code sessions read and write to this wiki. Registers the 8 available tools."
+  },
+  "mcp/src/tools/projects.ts": {
+    "title": "MCP Project Tools",
+    "layer": "external",
+    "summary": "Implements the MCP tools for listing projects, creating new projects, and reading a project's auto-generated overview page, proxied through the WikiLM API."
+  },
+  "mcp/src/tools/wiki.ts": {
+    "title": "Wiki MCP Tools",
+    "layer": "external",
+    "summary": "Exposes wiki search, read, and list operations to external AI assistants (via MCP protocol) so tools like Claude Code can query any project's wiki pages by slug, tag, or full-text search."
+  },
+  "scripts/capture-demo-gif.mjs": {
+    "title": "Demo GIF Recorder",
+    "layer": "external",
+    "summary": "Drives a headless Chrome browser through a scripted tour of the app (ledger, wiki, synthesis, chat, lint, dictation) and stitches the captured frames into the animated demo.gif shown in the README."
+  },
+  "scripts/capture-screenshots.mjs": {
+    "title": "README Screenshot Capture",
+    "layer": "external",
+    "summary": "Launches a headless browser to visit each major screen of the running app and save PNG screenshots into docs/screenshots/ for use in the README and release notes."
+  }
+}

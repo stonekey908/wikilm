@@ -1,0 +1,580 @@
+{
+  "appName": "WikiLM",
+  "summary": "WikiLM is a personal knowledge base that turns raw source material (articles, PDFs, notes, web pages) into a structured, interlinked wiki using LLMs. Researchers, writers, and curious learners drop content in and get back organized markdown pages with entities, concepts, syntheses, and a browsable graph — plus chat, lint, and output generation (reports, decks, infographics) on top.",
+  "stats": {
+    "screens": 11,
+    "cloudFunctions": 41,
+    "aiFeatures": 6,
+    "dataTypes": 2
+  },
+  "features": [
+    {
+      "icon": "📥",
+      "title": "Ingest Sources",
+      "description": "Upload files, paste URLs, or save notes and chat threads — WikiLM reads the source and spins up entity, concept, and summary pages automatically. Everything gets cross-linked into the wiki so knowledge compounds instead of scattering.",
+      "layer": "ui",
+      "componentPaths": [
+        "app/src/app/sources/page.tsx",
+        "app/src/components/note-composer-modal.tsx",
+        "app/src/app/api/sources/upload/route.ts",
+        "app/src/app/api/sources/ingest-web/route.ts"
+      ]
+    },
+    {
+      "icon": "🔍",
+      "title": "Research & Discover",
+      "description": "Ask a research question and an LLM with web grounding finds relevant sources, returns results, and lets you approve them directly into the wiki. Results persist so you can return later and pick what to ingest.",
+      "layer": "ui",
+      "componentPaths": [
+        "app/src/components/editorial/ledger/ledger-dispatch-research.tsx",
+        "app/src/app/api/sources/research/route.ts"
+      ]
+    },
+    {
+      "icon": "📖",
+      "title": "Browse the Wiki",
+      "description": "Every ingested source becomes a set of interlinked pages — entities (people, orgs), concepts, comparisons, and syntheses — rendered as browsable markdown with hover previews and wikilinks. A force-directed graph view shows how everything connects.",
+      "layer": "ui",
+      "componentPaths": [
+        "app/src/app/wiki/page.tsx",
+        "app/src/app/graph/page.tsx",
+        "app/src/components/editorial/wiki/markdown-renderer.tsx",
+        "app/src/components/editorial/wiki/wiki-preview.tsx"
+      ]
+    },
+    {
+      "icon": "💬",
+      "title": "Chat With Your Wiki",
+      "description": "Ask questions against your accumulated knowledge — the chat agent reads relevant wiki pages and answers with citations. Notable threads can be saved back as new wiki notes in one click.",
+      "layer": "ui",
+      "componentPaths": [
+        "app/src/app/chat/page.tsx",
+        "app/src/components/editorial/chat-sessions-sidebar.tsx",
+        "app/src/app/api/chat/save-as-note/route.ts"
+      ]
+    },
+    {
+      "icon": "📑",
+      "title": "Generate Outputs",
+      "description": "Turn a project's wiki into polished reports, executive summaries, cheat sheets, briefing decks (with slides), or infographics via a guided modal. Artifacts are versioned with timestamps and appear alongside your wiki.",
+      "layer": "ui",
+      "componentPaths": [
+        "app/src/components/generate-output-modal.tsx",
+        "app/src/app/api/projects/[id]/outputs/generate/route.ts",
+        "app/src/lib/output-types.ts"
+      ]
+    },
+    {
+      "icon": "🧹",
+      "title": "Lint & Nudges",
+      "description": "A health check scans for orphan pages, dangling wikilinks, missing concepts, and cross-source tensions, surfacing actionable findings you can fix one-click or in bulk. Dashboard nudges promote themes and gaps that span child projects.",
+      "layer": "ui",
+      "componentPaths": [
+        "app/src/app/lint/page.tsx",
+        "app/src/components/nudges-section.tsx",
+        "app/src/app/api/lint/run/route.ts",
+        "app/src/app/api/lint/fix/route.ts"
+      ]
+    },
+    {
+      "icon": "🗂️",
+      "title": "Nested Projects",
+      "description": "Organize knowledge into parent/child projects (e.g. AI → LLMs) with their own wikis, cross-project wikilinks, and parent-level synthesis that rolls up themes from children. Move, promote, and navigate the tree from the sidebar.",
+      "layer": "ui",
+      "componentPaths": [
+        "app/src/components/editorial/editorial-project-tree.tsx",
+        "app/src/components/project-switcher.tsx",
+        "app/src/app/api/projects/[id]/move/route.ts",
+        "app/src/app/api/projects/[id]/promote-page/route.ts"
+      ]
+    },
+    {
+      "icon": "⚙️",
+      "title": "Jobs & Settings",
+      "description": "A live job queue shows running LLM tasks (ingest, synthesis, output generation) with per-row cancel and model provenance. Settings control which model powers each task type (Claude, Gemini, Ollama) and manage local backups.",
+      "layer": "ui",
+      "componentPaths": [
+        "app/src/app/jobs/page.tsx",
+        "app/src/components/running-jobs-panel.tsx",
+        "app/src/app/settings/page.tsx",
+        "app/src/app/api/backup/run/route.ts"
+      ]
+    }
+  ],
+  "flows": [
+    {
+      "title": "Source → Wiki Pages Flow",
+      "description": "A raw source becomes a web of interlinked wiki pages via an LLM subprocess.",
+      "steps": [
+        {
+          "title": "User uploads or pastes source",
+          "description": "File upload, URL, or inline note is submitted from the Sources page.",
+          "layer": "ui",
+          "componentPaths": [
+            "app/src/app/sources/page.tsx",
+            "app/src/components/note-composer-modal.tsx"
+          ]
+        },
+        {
+          "title": "API saves raw file",
+          "description": "The upload endpoint writes the raw file into the project's raw/ folder and creates a pending source row.",
+          "layer": "api",
+          "componentPaths": [
+            "app/src/app/api/sources/upload/route.ts",
+            "app/src/app/api/sources/upload-md/route.ts"
+          ]
+        },
+        {
+          "title": "Job queued",
+          "description": "An ingest job enters the queue; the runner enforces concurrency and drains as slots free up.",
+          "layer": "utils",
+          "componentPaths": [
+            "app/src/lib/claude-runner.ts"
+          ]
+        },
+        {
+          "title": "LLM writes markdown",
+          "description": "A Claude/Gemini/Ollama subprocess reads the source, creates source/entity/concept pages, and adds wikilinks.",
+          "layer": "external",
+          "componentPaths": [
+            "app/src/lib/claude-runner.ts",
+            "app/src/lib/gemini-runner.ts",
+            "app/src/lib/ollama-runner.ts"
+          ]
+        },
+        {
+          "title": "Synthesis coalesces",
+          "description": "When the job queue goes idle, a single synthesis run rolls up cross-page themes into synthesis pages.",
+          "layer": "utils",
+          "componentPaths": [
+            "app/src/lib/claude-runner.ts"
+          ]
+        },
+        {
+          "title": "Wiki renders",
+          "description": "New pages appear in the index, graph, and hover previews — users can browse, edit, or chat against them.",
+          "layer": "ui",
+          "componentPaths": [
+            "app/src/app/wiki/page.tsx",
+            "app/src/app/graph/page.tsx"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Chat → Saved Note Flow",
+      "description": "A useful chat thread is preserved as a first-class wiki source.",
+      "steps": [
+        {
+          "title": "User asks a question",
+          "description": "The chat page sends the prompt plus recent history to the stream endpoint.",
+          "layer": "ui",
+          "componentPaths": [
+            "app/src/app/chat/page.tsx"
+          ]
+        },
+        {
+          "title": "Stream answers with citations",
+          "description": "The server streams an LLM response that reads relevant wiki pages before answering.",
+          "layer": "api",
+          "componentPaths": [
+            "app/src/app/api/claude/stream/route.ts"
+          ]
+        },
+        {
+          "title": "Save as note",
+          "description": "User clicks 'Save thread as note' — a summariser job condenses the thread into overview + key points + open questions.",
+          "layer": "api",
+          "componentPaths": [
+            "app/src/app/api/chat/save-as-note/route.ts"
+          ]
+        },
+        {
+          "title": "Note lands in Sources",
+          "description": "On job completion a pending source row is created with the summary markdown, ready to ingest like any other source.",
+          "layer": "data",
+          "componentPaths": [
+            "app/src/db/schema.ts"
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Output Generation Flow",
+      "description": "A project's wiki becomes a shareable artifact (report, deck, infographic).",
+      "steps": [
+        {
+          "title": "Pick output type",
+          "description": "User opens the Generate Output modal, picks report/summary/cheat sheet/deck/infographic and sets scope + focus.",
+          "layer": "ui",
+          "componentPaths": [
+            "app/src/components/generate-output-modal.tsx"
+          ]
+        },
+        {
+          "title": "Prompt built",
+          "description": "The output-types registry assembles a type-specific prompt with the relevant wiki context.",
+          "layer": "utils",
+          "componentPaths": [
+            "app/src/lib/output-types.ts"
+          ]
+        },
+        {
+          "title": "Job runs",
+          "description": "The generate endpoint spawns an LLM job; progress is visible in the live jobs panel.",
+          "layer": "api",
+          "componentPaths": [
+            "app/src/app/api/projects/[id]/outputs/generate/route.ts"
+          ]
+        },
+        {
+          "title": "Post-processing",
+          "description": "Docx export, Marp CLI for decks, or headless Chrome for infographic PNGs produces companion files.",
+          "layer": "utils",
+          "componentPaths": [
+            "app/src/lib/export-docx.ts"
+          ]
+        },
+        {
+          "title": "Artifact appears in Wiki",
+          "description": "A timestamped output page links the primary file and companions; users can download or delete.",
+          "layer": "api",
+          "componentPaths": [
+            "app/src/app/api/projects/[id]/outputs/download/route.ts",
+            "app/src/app/api/projects/[id]/outputs/delete/route.ts"
+          ]
+        }
+      ]
+    }
+  ],
+  "backend": [
+    {
+      "icon": "🤖",
+      "title": "Claude Runner",
+      "description": "Spawns Claude Code subprocesses for ingest, lint, synthesis, and chat streaming. Manages concurrency, queues overflow jobs, and coalesces synthesis runs until the queue is idle.",
+      "componentPaths": [
+        "app/src/lib/claude-runner.ts"
+      ]
+    },
+    {
+      "icon": "✨",
+      "title": "Gemini Runner",
+      "description": "Runs Gemini CLI jobs in headless mode with error classification (rate-limit, auth, model-not-found). Blocked for research today because the CLI fabricates URLs.",
+      "componentPaths": [
+        "app/src/lib/gemini-runner.ts"
+      ]
+    },
+    {
+      "icon": "🦙",
+      "title": "Ollama Runner",
+      "description": "Routes jobs to a local Ollama HTTP server for offline model execution. Parses 404s into friendly model-not-found errors.",
+      "componentPaths": [
+        "app/src/lib/ollama-runner.ts"
+      ]
+    },
+    {
+      "icon": "📦",
+      "title": "Projects Service",
+      "description": "Manages the nested project tree — materialized-path slugs, filesystem layout, move/rename, and per-project wiki directories. The authoritative source for where each project lives on disk.",
+      "componentPaths": [
+        "app/src/lib/projects.ts"
+      ]
+    },
+    {
+      "icon": "🗄️",
+      "title": "SQLite Database",
+      "description": "Stores projects, sources, chat sessions/messages, jobs, lint findings, and settings via Drizzle ORM. The wiki pages themselves live on the filesystem, not in the DB.",
+      "componentPaths": [
+        "app/src/db/index.ts",
+        "app/src/db/schema.ts"
+      ]
+    },
+    {
+      "icon": "🔌",
+      "title": "WikiLM MCP Server",
+      "description": "An MCP server that exposes WikiLM to other Claude Code sessions — list projects, search wiki, read pages, save learnings, check job status. Lets any tool contribute to the wiki.",
+      "componentPaths": [
+        "mcp/src/index.ts",
+        "mcp/src/tools/projects.ts",
+        "mcp/src/tools/wiki.ts"
+      ]
+    },
+    {
+      "icon": "📝",
+      "title": "Lint Engine",
+      "description": "Runs quality checks over the wiki — orphans, dangling wikilinks, missing concepts, contradictions — and persists findings that can be fixed one-click. Supports parent-level lint across nested projects.",
+      "componentPaths": [
+        "app/src/lib/lint.ts",
+        "app/src/app/api/lint/run/route.ts",
+        "app/src/app/api/lint/parent-run/[projectId]/route.ts"
+      ]
+    },
+    {
+      "icon": "💾",
+      "title": "Backup Service",
+      "description": "Creates timestamped tar.gz archives of the wiki/ and projects/ folders so knowledge survives disk failures. Settings shows the last successful run and any errors.",
+      "componentPaths": [
+        "app/src/app/api/backup/run/route.ts",
+        "app/src/app/api/backup/status/route.ts"
+      ]
+    }
+  ],
+  "dataTypes": [
+    {
+      "name": "Project",
+      "description": "A parent or child knowledge project with its own wiki, slug, and filesystem location."
+    },
+    {
+      "name": "Source",
+      "description": "A raw input (file, URL, note) with status (pending/ingested) and metadata linking it to a project."
+    },
+    {
+      "name": "Chat Session",
+      "description": "A scoped conversation with messages, tied to the active project."
+    },
+    {
+      "name": "Job",
+      "description": "A queued or running LLM task with model, status, error code, and output file reference."
+    },
+    {
+      "name": "Lint Finding",
+      "description": "A detected wiki-quality issue (orphan, missing link, recurring theme) with scope and fix status."
+    },
+    {
+      "name": "Setting",
+      "description": "Key/value app configuration — per-task model choices, backup timestamp, feature toggles."
+    }
+  ],
+  "capabilities": [
+    {
+      "icon": "🏠",
+      "title": "Editorial App Shell",
+      "description": "The shared layout — topbar, sidebar, project tree, palette, keyboard shortcuts, and toast bridge — that wraps every screen in the editorial UI. All pages render inside this shell.",
+      "componentPaths": [
+        "app/src/app/layout.tsx",
+        "app/src/app/page.tsx",
+        "app/src/components/editorial/editorial-shell.tsx",
+        "app/src/components/editorial/editorial-sidebar.tsx",
+        "app/src/components/editorial/editorial-topbar.tsx",
+        "app/src/components/editorial/editorial-project-tree.tsx",
+        "app/src/components/editorial/palette.tsx",
+        "app/src/components/editorial/keyboard-shortcuts.tsx",
+        "app/src/components/editorial/editorial-toast-bridge.tsx",
+        "app/src/components/editorial/phase-placeholder.tsx",
+        "app/src/components/editorial/folio-map.ts",
+        "app/src/components/editorial/portal-to-body.tsx",
+        "app/src/components/sidebar.tsx",
+        "app/src/components/breadcrumbs.tsx",
+        "app/src/components/editorial/wiki/breadcrumbs.tsx"
+      ]
+    },
+    {
+      "icon": "🎨",
+      "title": "Theme & Tweaks Providers",
+      "description": "React contexts that share theme and typographic/visual tweaks across the whole app so every component responds to user preferences without prop drilling.",
+      "componentPaths": [
+        "app/src/components/theme-provider.tsx",
+        "app/src/components/toast-provider.tsx",
+        "app/src/components/editorial/tweaks-provider.tsx",
+        "app/src/components/editorial/tweaks-panel.tsx",
+        "app/src/components/project-switcher.tsx",
+        "app/src/components/editorial/project-switcher-dropdown.tsx"
+      ]
+    },
+    {
+      "icon": "📥",
+      "title": "Source Ingestion",
+      "description": "Everything that turns raw material into wiki pages — file upload, URL ingest, inline notes, chat-to-note, and the API endpoints that queue the LLM jobs.",
+      "componentPaths": [
+        "app/src/app/sources/page.tsx",
+        "app/src/components/note-composer-modal.tsx",
+        "app/src/components/editorial/note-composer-modal.tsx",
+        "app/src/app/api/sources/route.ts",
+        "app/src/app/api/sources/[id]/route.ts",
+        "app/src/app/api/sources/upload/route.ts",
+        "app/src/app/api/sources/upload-md/route.ts",
+        "app/src/app/api/sources/ingest-web/route.ts",
+        "app/src/app/api/sources/research/route.ts",
+        "app/src/app/api/chat/save-as-note/route.ts",
+        "app/src/components/editorial/ledger/ledger-dispatch-research.tsx"
+      ]
+    },
+    {
+      "icon": "📖",
+      "title": "Wiki Rendering & Graph",
+      "description": "Reads markdown files from disk, renders them with wikilink resolution, shows hover previews, and lays out a force-directed graph of the knowledge network.",
+      "componentPaths": [
+        "app/src/app/wiki/page.tsx",
+        "app/src/app/graph/page.tsx",
+        "app/src/components/editorial/wiki/markdown-renderer.tsx",
+        "app/src/components/editorial/wiki/wiki-preview.tsx",
+        "app/src/components/editorial/map/force-layout.ts",
+        "app/src/app/api/wiki/route.ts",
+        "app/src/app/api/wiki/[slug]/route.ts",
+        "app/src/app/api/wiki/graph/route.ts",
+        "app/src/app/api/wiki/concept-scaffold/route.ts",
+        "app/src/lib/wiki-utils.ts",
+        "app/src/lib/wiki-utils.test.ts"
+      ]
+    },
+    {
+      "icon": "💬",
+      "title": "Chat",
+      "description": "Multi-turn chat against the wiki — streamed Claude responses, session history per project, and the ability to save threads back as notes.",
+      "componentPaths": [
+        "app/src/app/chat/page.tsx",
+        "app/src/components/editorial/chat-sessions-sidebar.tsx",
+        "app/src/app/api/chat/sessions/route.ts",
+        "app/src/app/api/chat/sessions/[id]/route.ts",
+        "app/src/app/api/chat/sessions/[id]/messages/route.ts",
+        "app/src/app/api/claude/stream/route.ts"
+      ]
+    },
+    {
+      "icon": "🧠",
+      "title": "LLM Job Orchestration",
+      "description": "The runner layer that spawns Claude/Gemini/Ollama subprocesses, manages the job queue, classifies errors, and surfaces job state to the UI with cancel support.",
+      "componentPaths": [
+        "app/src/app/jobs/page.tsx",
+        "app/src/components/running-jobs-panel.tsx",
+        "app/src/components/editorial/job-beacon.tsx",
+        "app/src/lib/claude-runner.ts",
+        "app/src/lib/gemini-runner.ts",
+        "app/src/lib/ollama-runner.ts",
+        "app/src/lib/error-codes.ts",
+        "app/src/lib/__mocks__/claude-mock.ts",
+        "app/src/app/api/claude/job/route.ts",
+        "app/src/app/api/claude/job/[id]/route.ts",
+        "app/src/app/api/gemini/models/route.ts",
+        "app/src/app/api/ollama/models/route.ts"
+      ]
+    },
+    {
+      "icon": "📑",
+      "title": "Output Generation",
+      "description": "Generates reports, decks, cheat sheets, summaries, and infographics from a project's wiki via typed prompt builders and post-processing (docx, Marp, headless Chrome).",
+      "componentPaths": [
+        "app/src/components/generate-output-modal.tsx",
+        "app/src/components/editorial/quick-generate.tsx",
+        "app/src/app/compose/page.tsx",
+        "app/src/app/api/projects/[id]/outputs/generate/route.ts",
+        "app/src/app/api/projects/[id]/outputs/download/route.ts",
+        "app/src/app/api/projects/[id]/outputs/delete/route.ts",
+        "app/src/lib/output-types.ts",
+        "app/src/lib/output-types.test.ts",
+        "app/src/lib/export-docx.ts"
+      ]
+    },
+    {
+      "icon": "🧹",
+      "title": "Lint & Nudges",
+      "description": "Scans wiki quality across single and parent projects, persists findings with fix status, and surfaces promotion/theme nudges on the dashboard.",
+      "componentPaths": [
+        "app/src/app/lint/page.tsx",
+        "app/src/components/nudges-section.tsx",
+        "app/src/components/editorial/ledger/ledger-nudges.tsx",
+        "app/src/app/api/lint/run/route.ts",
+        "app/src/app/api/lint/fix/route.ts",
+        "app/src/app/api/lint/findings/route.ts",
+        "app/src/app/api/lint/findings/[id]/route.ts",
+        "app/src/app/api/lint/findings/[id]/fix/route.ts",
+        "app/src/app/api/lint/parent-run/[projectId]/route.ts",
+        "app/src/app/api/dashboard/route.ts",
+        "app/src/app/api/dashboard/nudges/route.ts",
+        "app/src/lib/lint.ts"
+      ]
+    },
+    {
+      "icon": "🗂️",
+      "title": "Project Tree & Nesting",
+      "description": "Manages the parent/child project hierarchy — create, move, promote, synthesise at parent level, and navigate the tree across the UI.",
+      "componentPaths": [
+        "app/src/components/child-projects.tsx",
+        "app/src/app/api/projects/route.ts",
+        "app/src/app/api/projects/[id]/route.ts",
+        "app/src/app/api/projects/[id]/move/route.ts",
+        "app/src/app/api/projects/[id]/promote-page/route.ts",
+        "app/src/app/api/projects/[id]/synthesis/parent-run/route.ts",
+        "app/src/app/api/projects/tree/route.ts",
+        "app/src/app/api/projects/nudge-counts/route.ts",
+        "app/src/app/api/admin/backfill-claude-md/route.ts",
+        "app/src/lib/projects.ts",
+        "app/src/lib/projects.test.ts"
+      ]
+    },
+    {
+      "icon": "⚙️",
+      "title": "Settings & Backup",
+      "description": "Per-task model selection (Claude/Gemini/Ollama), feature toggles, and local tar.gz backups of the knowledge base.",
+      "componentPaths": [
+        "app/src/app/settings/page.tsx",
+        "app/src/app/api/settings/route.ts",
+        "app/src/app/api/backup/run/route.ts",
+        "app/src/app/api/backup/status/route.ts"
+      ]
+    },
+    {
+      "icon": "❓",
+      "title": "Help & Onboarding",
+      "description": "In-app help modal and help page that explain the product, keyboard shortcuts, and flows so new users can orient themselves without leaving the app.",
+      "componentPaths": [
+        "app/src/app/help/page.tsx",
+        "app/src/components/help-modal.tsx",
+        "app/src/components/editorial/help-modal.tsx",
+        "app/src/content/help.ts",
+        "app/src/content/help.test.ts"
+      ]
+    },
+    {
+      "icon": "🗄️",
+      "title": "Database & Schema",
+      "description": "SQLite + Drizzle ORM layer defining the tables (projects, sources, chat, jobs, findings, settings) and its config.",
+      "componentPaths": [
+        "app/src/db/index.ts",
+        "app/src/db/schema.ts",
+        "app/drizzle.config.ts",
+        "app/next-env.d.ts",
+        "app/src/instrumentation.ts"
+      ]
+    },
+    {
+      "icon": "🔌",
+      "title": "MCP Server",
+      "description": "Exposes WikiLM tools (list/search/read/save) to other Claude Code sessions over the Model Context Protocol so external agents can query and contribute.",
+      "componentPaths": [
+        "mcp/src/index.ts",
+        "mcp/src/api.ts",
+        "mcp/src/config.ts",
+        "mcp/src/tools/projects.ts",
+        "mcp/src/tools/wiki.ts"
+      ]
+    },
+    {
+      "icon": "🛠️",
+      "title": "Build & Tooling Config",
+      "description": "Project-level configuration — Next.js, ESLint, PostCSS, Vitest — plus shared utility helpers used across the app.",
+      "componentPaths": [
+        "app/next.config.ts",
+        "app/eslint.config.mjs",
+        "app/postcss.config.mjs",
+        "app/vitest.config.ts",
+        "app/src/lib/utils.ts"
+      ]
+    },
+    {
+      "icon": "📸",
+      "title": "Screenshot & Demo Scripts",
+      "description": "Headless-Chrome scripts that capture UI screenshots and demo GIFs for docs and the README so marketing stays in sync with the product.",
+      "componentPaths": [
+        "scripts/capture-screenshots.mjs",
+        "scripts/capture-demo-gif.mjs",
+        "app/scripts/screenshot-extras.mjs",
+        "app/scripts/screenshot-features.mjs",
+        "app/scripts/screenshot-help.mjs",
+        "app/scripts/screenshot-note-flows.mjs"
+      ]
+    }
+  ],
+  "generatedAt": "2026-04-23T14:43:30.719Z",
+  "componentCount": 123
+}

@@ -1,0 +1,2191 @@
+{
+  "graph": {
+    "nodes": [
+      {
+        "id": "app/drizzle.config.ts",
+        "label": "Drizzle.config",
+        "description": "Configuration and settings for the app — environment variables, feature flags, constants",
+        "filePath": "<user-home>/SecondBrain/app/drizzle.config.ts",
+        "relativePath": "app/drizzle.config.ts",
+        "layer": "utils",
+        "role": "config",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 1,
+          "connectionCount": 0,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "app/eslint.config.mjs",
+        "label": "Eslint.config",
+        "description": "Configuration and settings for the app — environment variables, feature flags, constants",
+        "filePath": "<user-home>/SecondBrain/app/eslint.config.mjs",
+        "relativePath": "app/eslint.config.mjs",
+        "layer": "utils",
+        "role": "config",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 3,
+          "connectionCount": 0,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "app/next-env.d.ts",
+        "label": "Next Env",
+        "description": "Database table definition for next env — columns, types, and relationships",
+        "filePath": "<user-home>/SecondBrain/app/next-env.d.ts",
+        "relativePath": "app/next-env.d.ts",
+        "layer": "data",
+        "role": "schema",
+        "metadata": {
+          "exportCount": 0,
+          "importCount": 1,
+          "connectionCount": 0,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "app/next.config.ts",
+        "label": "Next.config",
+        "description": "Configuration and settings for the app — environment variables, feature flags, constants",
+        "filePath": "<user-home>/SecondBrain/app/next.config.ts",
+        "relativePath": "app/next.config.ts",
+        "layer": "utils",
+        "role": "config",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 1,
+          "connectionCount": 0,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "app/postcss.config.mjs",
+        "label": "Postcss.config",
+        "description": "Configuration and settings for the app — environment variables, feature flags, constants",
+        "filePath": "<user-home>/SecondBrain/app/postcss.config.mjs",
+        "relativePath": "app/postcss.config.mjs",
+        "layer": "utils",
+        "role": "config",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 0,
+          "connectionCount": 0,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "app/scripts/screenshot-extras.mjs",
+        "label": "Screenshot Extras",
+        "description": "Part of the Scripts layer",
+        "filePath": "<user-home>/SecondBrain/app/scripts/screenshot-extras.mjs",
+        "relativePath": "app/scripts/screenshot-extras.mjs",
+        "layer": "ui",
+        "role": "unknown",
+        "metadata": {
+          "exportCount": 0,
+          "importCount": 2,
+          "connectionCount": 0
+        }
+      },
+      {
+        "id": "app/scripts/screenshot-features.mjs",
+        "label": "Screenshot Features",
+        "description": "Part of the Scripts layer",
+        "filePath": "<user-home>/SecondBrain/app/scripts/screenshot-features.mjs",
+        "relativePath": "app/scripts/screenshot-features.mjs",
+        "layer": "ui",
+        "role": "unknown",
+        "metadata": {
+          "exportCount": 0,
+          "importCount": 3,
+          "connectionCount": 0
+        }
+      },
+      {
+        "id": "app/scripts/screenshot-help.mjs",
+        "label": "Screenshot Help",
+        "description": "Part of the Scripts layer",
+        "filePath": "<user-home>/SecondBrain/app/scripts/screenshot-help.mjs",
+        "relativePath": "app/scripts/screenshot-help.mjs",
+        "layer": "ui",
+        "role": "unknown",
+        "metadata": {
+          "exportCount": 0,
+          "importCount": 2,
+          "connectionCount": 0
+        }
+      },
+      {
+        "id": "app/scripts/screenshot-note-flows.mjs",
+        "label": "Screenshot Note Flows",
+        "description": "Part of the Scripts layer",
+        "filePath": "<user-home>/SecondBrain/app/scripts/screenshot-note-flows.mjs",
+        "relativePath": "app/scripts/screenshot-note-flows.mjs",
+        "layer": "ui",
+        "role": "unknown",
+        "metadata": {
+          "exportCount": 0,
+          "importCount": 2,
+          "connectionCount": 0
+        }
+      },
+      {
+        "id": "app/src/app/api/admin/backfill-claude-md/route.ts",
+        "label": "Backfill Claude Md API",
+        "description": "POST endpoint for Backfill Claude Md — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/admin/backfill-claude-md/route.ts",
+        "relativePath": "app/src/app/api/admin/backfill-claude-md/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 1,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/backup/run/route.ts",
+        "label": "Run API",
+        "description": "POST endpoint for Run — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/backup/run/route.ts",
+        "relativePath": "app/src/app/api/backup/run/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 6,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/backup/status/route.ts",
+        "label": "Status API",
+        "description": "GET endpoint for Status — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/backup/status/route.ts",
+        "relativePath": "app/src/app/api/backup/status/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 4,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/chat/save-as-note/route.ts",
+        "label": "Save As Note API",
+        "description": "POST endpoint for Save As Note — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/chat/save-as-note/route.ts",
+        "relativePath": "app/src/app/api/chat/save-as-note/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 8,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/chat/sessions/[id]/messages/route.ts",
+        "label": "Messages API",
+        "description": "POST endpoint for Messages — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/chat/sessions/[id]/messages/route.ts",
+        "relativePath": "app/src/app/api/chat/sessions/[id]/messages/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 4,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/chat/sessions/[id]/route.ts",
+        "label": "Sessions API",
+        "description": "GET/DELETE endpoint for [id] — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/chat/sessions/[id]/route.ts",
+        "relativePath": "app/src/app/api/chat/sessions/[id]/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 2,
+          "importCount": 4,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/chat/sessions/route.ts",
+        "label": "Sessions API",
+        "description": "GET/POST endpoint for Sessions — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/chat/sessions/route.ts",
+        "relativePath": "app/src/app/api/chat/sessions/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 2,
+          "importCount": 4,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/claude/job/[id]/route.ts",
+        "label": "Job API",
+        "description": "GET/DELETE/PATCH endpoint for [id] — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/claude/job/[id]/route.ts",
+        "relativePath": "app/src/app/api/claude/job/[id]/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 3,
+          "importCount": 5,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/claude/job/route.ts",
+        "label": "Job API",
+        "description": "POST/GET endpoint for Job — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/claude/job/route.ts",
+        "relativePath": "app/src/app/api/claude/job/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 2,
+          "importCount": 6,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/claude/stream/route.ts",
+        "label": "Stream API",
+        "description": "POST endpoint for Stream — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/claude/stream/route.ts",
+        "relativePath": "app/src/app/api/claude/stream/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 3,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/dashboard/nudges/route.ts",
+        "label": "Nudges API",
+        "description": "GET endpoint for Nudges — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/dashboard/nudges/route.ts",
+        "relativePath": "app/src/app/api/dashboard/nudges/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 3,
+          "importCount": 4,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/dashboard/route.ts",
+        "label": "Dashboard API",
+        "description": "GET endpoint for Dashboard — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/dashboard/route.ts",
+        "relativePath": "app/src/app/api/dashboard/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 8,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/gemini/models/route.ts",
+        "label": "Models API",
+        "description": "GET endpoint for Gemini — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/gemini/models/route.ts",
+        "relativePath": "app/src/app/api/gemini/models/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 1,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/lint/findings/[id]/fix/route.ts",
+        "label": "Fix API",
+        "description": "POST endpoint for Fix — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/lint/findings/[id]/fix/route.ts",
+        "relativePath": "app/src/app/api/lint/findings/[id]/fix/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 6,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/lint/findings/[id]/route.ts",
+        "label": "Findings API",
+        "description": "PATCH endpoint for [id] — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/lint/findings/[id]/route.ts",
+        "relativePath": "app/src/app/api/lint/findings/[id]/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 4,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/lint/findings/route.ts",
+        "label": "Findings API",
+        "description": "GET endpoint for Findings — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/lint/findings/route.ts",
+        "relativePath": "app/src/app/api/lint/findings/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 4,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/lint/fix/route.ts",
+        "label": "Fix API",
+        "description": "POST endpoint for Fix — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/lint/fix/route.ts",
+        "relativePath": "app/src/app/api/lint/fix/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 6,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/lint/parent-run/[projectId]/route.ts",
+        "label": "Parent Run API",
+        "description": "POST endpoint for [project Id] — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/lint/parent-run/[projectId]/route.ts",
+        "relativePath": "app/src/app/api/lint/parent-run/[projectId]/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 6,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/lint/run/route.ts",
+        "label": "Run API",
+        "description": "POST endpoint for Run — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/lint/run/route.ts",
+        "relativePath": "app/src/app/api/lint/run/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 6,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/ollama/models/route.ts",
+        "label": "Models API",
+        "description": "GET endpoint for Ollama — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/ollama/models/route.ts",
+        "relativePath": "app/src/app/api/ollama/models/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 1,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/projects/[id]/move/route.ts",
+        "label": "Move API",
+        "description": "POST endpoint for Move — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/projects/[id]/move/route.ts",
+        "relativePath": "app/src/app/api/projects/[id]/move/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 2,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/projects/[id]/outputs/delete/route.ts",
+        "label": "Delete API",
+        "description": "DELETE endpoint for Delete — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/projects/[id]/outputs/delete/route.ts",
+        "relativePath": "app/src/app/api/projects/[id]/outputs/delete/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 4,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/projects/[id]/outputs/download/route.ts",
+        "label": "Download API",
+        "description": "GET endpoint for Download — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/projects/[id]/outputs/download/route.ts",
+        "relativePath": "app/src/app/api/projects/[id]/outputs/download/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 4,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/projects/[id]/outputs/generate/route.ts",
+        "label": "Generate API",
+        "description": "POST endpoint for Generate — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/projects/[id]/outputs/generate/route.ts",
+        "relativePath": "app/src/app/api/projects/[id]/outputs/generate/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 11,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/projects/[id]/promote-page/route.ts",
+        "label": "Promote Page API",
+        "description": "POST endpoint for Promote Page — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/projects/[id]/promote-page/route.ts",
+        "relativePath": "app/src/app/api/projects/[id]/promote-page/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 8,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/projects/[id]/route.ts",
+        "label": "Projects API",
+        "description": "GET/PATCH/DELETE endpoint for [id] — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/projects/[id]/route.ts",
+        "relativePath": "app/src/app/api/projects/[id]/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 3,
+          "importCount": 6,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/projects/[id]/synthesis/parent-run/route.ts",
+        "label": "Parent Run API",
+        "description": "POST endpoint for Parent Run — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/projects/[id]/synthesis/parent-run/route.ts",
+        "relativePath": "app/src/app/api/projects/[id]/synthesis/parent-run/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 3,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/projects/nudge-counts/route.ts",
+        "label": "Nudge Counts API",
+        "description": "GET endpoint for Nudge Counts — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/projects/nudge-counts/route.ts",
+        "relativePath": "app/src/app/api/projects/nudge-counts/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 3,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/projects/route.ts",
+        "label": "Projects API",
+        "description": "GET/POST endpoint for Projects — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/projects/route.ts",
+        "relativePath": "app/src/app/api/projects/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 2,
+          "importCount": 7,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/projects/tree/route.ts",
+        "label": "Tree API",
+        "description": "GET endpoint for Tree — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/projects/tree/route.ts",
+        "relativePath": "app/src/app/api/projects/tree/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 1,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/settings/route.ts",
+        "label": "Settings API",
+        "description": "GET/PUT endpoint for Settings — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/settings/route.ts",
+        "relativePath": "app/src/app/api/settings/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 2,
+          "importCount": 4,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/sources/[id]/route.ts",
+        "label": "Sources API",
+        "description": "DELETE/POST endpoint for [id] — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/sources/[id]/route.ts",
+        "relativePath": "app/src/app/api/sources/[id]/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 2,
+          "importCount": 8,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/sources/ingest-web/route.ts",
+        "label": "Ingest Web API",
+        "description": "POST endpoint for Ingest Web — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/sources/ingest-web/route.ts",
+        "relativePath": "app/src/app/api/sources/ingest-web/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 9,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/sources/research/route.ts",
+        "label": "Research API",
+        "description": "POST endpoint for Research — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/sources/research/route.ts",
+        "relativePath": "app/src/app/api/sources/research/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 3,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/sources/route.ts",
+        "label": "Sources API",
+        "description": "GET endpoint for Sources — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/sources/route.ts",
+        "relativePath": "app/src/app/api/sources/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 4,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/sources/upload/route.ts",
+        "label": "Upload API",
+        "description": "POST endpoint for Upload — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/sources/upload/route.ts",
+        "relativePath": "app/src/app/api/sources/upload/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 8,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/sources/upload-md/route.ts",
+        "label": "Upload Md API",
+        "description": "POST endpoint for Upload Md — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/sources/upload-md/route.ts",
+        "relativePath": "app/src/app/api/sources/upload-md/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 9,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/wiki/[slug]/route.ts",
+        "label": "Wiki API",
+        "description": "GET endpoint for [slug] — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/wiki/[slug]/route.ts",
+        "relativePath": "app/src/app/api/wiki/[slug]/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 7,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/wiki/concept-scaffold/route.ts",
+        "label": "Concept Scaffold API",
+        "description": "POST endpoint for Concept Scaffold — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/wiki/concept-scaffold/route.ts",
+        "relativePath": "app/src/app/api/wiki/concept-scaffold/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 8,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/wiki/graph/route.ts",
+        "label": "Graph API",
+        "description": "GET endpoint for Graph — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/wiki/graph/route.ts",
+        "relativePath": "app/src/app/api/wiki/graph/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 5,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/api/wiki/route.ts",
+        "label": "Wiki API",
+        "description": "GET endpoint for Wiki — handles requests from the frontend",
+        "filePath": "<user-home>/SecondBrain/app/src/app/api/wiki/route.ts",
+        "relativePath": "app/src/app/api/wiki/route.ts",
+        "layer": "api",
+        "role": "api-route",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 5,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/chat/page.tsx",
+        "label": "Chat Page",
+        "description": "The Chat Page screen in the Chat section — this is what users see when they navigate here",
+        "filePath": "<user-home>/SecondBrain/app/src/app/chat/page.tsx",
+        "relativePath": "app/src/app/chat/page.tsx",
+        "layer": "ui",
+        "role": "page",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 6,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/compose/page.tsx",
+        "label": "Compose Page",
+        "description": "The Compose Page screen in the Compose section — this is what users see when they navigate here",
+        "filePath": "<user-home>/SecondBrain/app/src/app/compose/page.tsx",
+        "relativePath": "app/src/app/compose/page.tsx",
+        "layer": "ui",
+        "role": "page",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 6,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/graph/page.tsx",
+        "label": "Graph Page",
+        "description": "The Graph Page screen in the Graph section — this is what users see when they navigate here",
+        "filePath": "<user-home>/SecondBrain/app/src/app/graph/page.tsx",
+        "relativePath": "app/src/app/graph/page.tsx",
+        "layer": "ui",
+        "role": "page",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 5,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/help/page.tsx",
+        "label": "Help Page",
+        "description": "The Help Page screen in the Help section — this is what users see when they navigate here",
+        "filePath": "<user-home>/SecondBrain/app/src/app/help/page.tsx",
+        "relativePath": "app/src/app/help/page.tsx",
+        "layer": "ui",
+        "role": "page",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 3,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/jobs/page.tsx",
+        "label": "Jobs Page",
+        "description": "The Jobs Page screen in the Jobs section — this is what users see when they navigate here",
+        "filePath": "<user-home>/SecondBrain/app/src/app/jobs/page.tsx",
+        "relativePath": "app/src/app/jobs/page.tsx",
+        "layer": "ui",
+        "role": "page",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 5,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/layout.tsx",
+        "label": "Layout",
+        "description": "Wraps pages with shared navigation, headers, and structure",
+        "filePath": "<user-home>/SecondBrain/app/src/app/layout.tsx",
+        "relativePath": "app/src/app/layout.tsx",
+        "layer": "ui",
+        "role": "layout",
+        "metadata": {
+          "exportCount": 2,
+          "importCount": 7,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/lint/page.tsx",
+        "label": "Lint Page",
+        "description": "The Lint Page screen in the Lint section — this is what users see when they navigate here",
+        "filePath": "<user-home>/SecondBrain/app/src/app/lint/page.tsx",
+        "relativePath": "app/src/app/lint/page.tsx",
+        "layer": "ui",
+        "role": "page",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 5,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/page.tsx",
+        "label": "Page",
+        "description": "The Page screen — this is what users see when they navigate here",
+        "filePath": "<user-home>/SecondBrain/app/src/app/page.tsx",
+        "relativePath": "app/src/app/page.tsx",
+        "layer": "ui",
+        "role": "page",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 5,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/settings/page.tsx",
+        "label": "Settings Page",
+        "description": "The Settings Page screen in the Settings section — this is what users see when they navigate here",
+        "filePath": "<user-home>/SecondBrain/app/src/app/settings/page.tsx",
+        "relativePath": "app/src/app/settings/page.tsx",
+        "layer": "ui",
+        "role": "page",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 4,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/sources/page.tsx",
+        "label": "Sources Page",
+        "description": "The Sources Page screen in the Sources section — this is what users see when they navigate here",
+        "filePath": "<user-home>/SecondBrain/app/src/app/sources/page.tsx",
+        "relativePath": "app/src/app/sources/page.tsx",
+        "layer": "ui",
+        "role": "page",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 7,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/app/wiki/page.tsx",
+        "label": "Wiki Page",
+        "description": "The Wiki Page screen in the Wiki section — this is what users see when they navigate here",
+        "filePath": "<user-home>/SecondBrain/app/src/app/wiki/page.tsx",
+        "relativePath": "app/src/app/wiki/page.tsx",
+        "layer": "ui",
+        "role": "page",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 7,
+          "connectionCount": 0,
+          "framework": "nextjs"
+        }
+      },
+      {
+        "id": "app/src/components/breadcrumbs.tsx",
+        "label": "Breadcrumbs",
+        "description": "A reusable UI element: Breadcrumbs",
+        "filePath": "<user-home>/SecondBrain/app/src/components/breadcrumbs.tsx",
+        "relativePath": "app/src/components/breadcrumbs.tsx",
+        "layer": "ui",
+        "role": "component",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 1,
+          "connectionCount": 0,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/child-projects.tsx",
+        "label": "Child Projects",
+        "description": "A reusable UI element: Child Projects",
+        "filePath": "<user-home>/SecondBrain/app/src/components/child-projects.tsx",
+        "relativePath": "app/src/components/child-projects.tsx",
+        "layer": "ui",
+        "role": "component",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 2,
+          "connectionCount": 0,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/editorial/chat-sessions-sidebar.tsx",
+        "label": "Chat Sessions Sidebar",
+        "description": "A reusable UI element: Chat Sessions Sidebar (used in Editorial)",
+        "filePath": "<user-home>/SecondBrain/app/src/components/editorial/chat-sessions-sidebar.tsx",
+        "relativePath": "app/src/components/editorial/chat-sessions-sidebar.tsx",
+        "layer": "ui",
+        "role": "component",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 3,
+          "connectionCount": 1,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/editorial/editorial-project-tree.tsx",
+        "label": "Editorial Project Tree",
+        "description": "A reusable UI element: Editorial Project Tree (used in Editorial)",
+        "filePath": "<user-home>/SecondBrain/app/src/components/editorial/editorial-project-tree.tsx",
+        "relativePath": "app/src/components/editorial/editorial-project-tree.tsx",
+        "layer": "ui",
+        "role": "component",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 4,
+          "connectionCount": 1,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/editorial/editorial-shell.tsx",
+        "label": "Editorial Shell",
+        "description": "A reusable UI element: Editorial Shell (used in Editorial)",
+        "filePath": "<user-home>/SecondBrain/app/src/components/editorial/editorial-shell.tsx",
+        "relativePath": "app/src/components/editorial/editorial-shell.tsx",
+        "layer": "ui",
+        "role": "component",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 8,
+          "connectionCount": 7,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/editorial/editorial-sidebar.tsx",
+        "label": "Editorial Sidebar",
+        "description": "A reusable UI element: Editorial Sidebar (used in Editorial)",
+        "filePath": "<user-home>/SecondBrain/app/src/components/editorial/editorial-sidebar.tsx",
+        "relativePath": "app/src/components/editorial/editorial-sidebar.tsx",
+        "layer": "ui",
+        "role": "component",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 5,
+          "connectionCount": 4,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/editorial/editorial-toast-bridge.tsx",
+        "label": "Editorial Toast Bridge",
+        "description": "A reusable UI element: Editorial Toast Bridge (used in Editorial)",
+        "filePath": "<user-home>/SecondBrain/app/src/components/editorial/editorial-toast-bridge.tsx",
+        "relativePath": "app/src/components/editorial/editorial-toast-bridge.tsx",
+        "layer": "ui",
+        "role": "component",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 2,
+          "connectionCount": 1,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/editorial/editorial-topbar.tsx",
+        "label": "Editorial Topbar",
+        "description": "A reusable UI element: Editorial Topbar (used in Editorial)",
+        "filePath": "<user-home>/SecondBrain/app/src/components/editorial/editorial-topbar.tsx",
+        "relativePath": "app/src/components/editorial/editorial-topbar.tsx",
+        "layer": "ui",
+        "role": "component",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 4,
+          "connectionCount": 4,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/editorial/folio-map.ts",
+        "label": "Folio Map",
+        "description": "Provides editorial view, folio entry, folio and more",
+        "filePath": "<user-home>/SecondBrain/app/src/components/editorial/folio-map.ts",
+        "relativePath": "app/src/components/editorial/folio-map.ts",
+        "layer": "utils",
+        "role": "utility",
+        "metadata": {
+          "exportCount": 5,
+          "importCount": 0,
+          "connectionCount": 5,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "app/src/components/editorial/help-modal.tsx",
+        "label": "Help Modal",
+        "description": "A reusable UI element: Help Modal (used in Editorial)",
+        "filePath": "<user-home>/SecondBrain/app/src/components/editorial/help-modal.tsx",
+        "relativePath": "app/src/components/editorial/help-modal.tsx",
+        "layer": "ui",
+        "role": "component",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 3,
+          "connectionCount": 1,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/editorial/job-beacon.tsx",
+        "label": "Job Beacon",
+        "description": "A reusable UI element: Job Beacon (used in Editorial)",
+        "filePath": "<user-home>/SecondBrain/app/src/components/editorial/job-beacon.tsx",
+        "relativePath": "app/src/components/editorial/job-beacon.tsx",
+        "layer": "ui",
+        "role": "component",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 3,
+          "connectionCount": 1,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/editorial/keyboard-shortcuts.tsx",
+        "label": "Keyboard Shortcuts",
+        "description": "A reusable UI element: Keyboard Shortcuts (used in Editorial)",
+        "filePath": "<user-home>/SecondBrain/app/src/components/editorial/keyboard-shortcuts.tsx",
+        "relativePath": "app/src/components/editorial/keyboard-shortcuts.tsx",
+        "layer": "ui",
+        "role": "component",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 3,
+          "connectionCount": 2,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/editorial/ledger/ledger-dispatch-research.tsx",
+        "label": "Ledger Dispatch Research",
+        "description": "A reusable UI element: Ledger Dispatch Research (used in Ledger)",
+        "filePath": "<user-home>/SecondBrain/app/src/components/editorial/ledger/ledger-dispatch-research.tsx",
+        "relativePath": "app/src/components/editorial/ledger/ledger-dispatch-research.tsx",
+        "layer": "ui",
+        "role": "component",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 4,
+          "connectionCount": 0,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/editorial/ledger/ledger-nudges.tsx",
+        "label": "Ledger Nudges",
+        "description": "A reusable UI element: Ledger Nudges (used in Ledger)",
+        "filePath": "<user-home>/SecondBrain/app/src/components/editorial/ledger/ledger-nudges.tsx",
+        "relativePath": "app/src/components/editorial/ledger/ledger-nudges.tsx",
+        "layer": "ui",
+        "role": "component",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 4,
+          "connectionCount": 0,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/editorial/map/force-layout.ts",
+        "label": "Force Layout",
+        "description": "Provides laid node, laid edge, force layout",
+        "filePath": "<user-home>/SecondBrain/app/src/components/editorial/map/force-layout.ts",
+        "relativePath": "app/src/components/editorial/map/force-layout.ts",
+        "layer": "utils",
+        "role": "utility",
+        "metadata": {
+          "exportCount": 3,
+          "importCount": 0,
+          "connectionCount": 0,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "app/src/components/editorial/note-composer-modal.tsx",
+        "label": "Note Composer Modal",
+        "description": "A reusable UI element: Note Composer Modal (used in Editorial)",
+        "filePath": "<user-home>/SecondBrain/app/src/components/editorial/note-composer-modal.tsx",
+        "relativePath": "app/src/components/editorial/note-composer-modal.tsx",
+        "layer": "ui",
+        "role": "component",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 4,
+          "connectionCount": 0,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/editorial/palette.tsx",
+        "label": "Palette",
+        "description": "A reusable UI element: Palette (used in Editorial)",
+        "filePath": "<user-home>/SecondBrain/app/src/components/editorial/palette.tsx",
+        "relativePath": "app/src/components/editorial/palette.tsx",
+        "layer": "ui",
+        "role": "component",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 6,
+          "connectionCount": 3,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/editorial/phase-placeholder.tsx",
+        "label": "Phase Placeholder",
+        "description": "A reusable UI element: Phase Placeholder (used in Editorial)",
+        "filePath": "<user-home>/SecondBrain/app/src/components/editorial/phase-placeholder.tsx",
+        "relativePath": "app/src/components/editorial/phase-placeholder.tsx",
+        "layer": "ui",
+        "role": "component",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 2,
+          "connectionCount": 1,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/editorial/portal-to-body.tsx",
+        "label": "Portal To Body",
+        "description": "Detects or manages portal to body state for components that need it",
+        "filePath": "<user-home>/SecondBrain/app/src/components/editorial/portal-to-body.tsx",
+        "relativePath": "app/src/components/editorial/portal-to-body.tsx",
+        "layer": "ui",
+        "role": "hook",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 2,
+          "connectionCount": 0,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/editorial/project-switcher-dropdown.tsx",
+        "label": "Project Switcher Dropdown",
+        "description": "A reusable UI element: Project Switcher Dropdown (used in Editorial)",
+        "filePath": "<user-home>/SecondBrain/app/src/components/editorial/project-switcher-dropdown.tsx",
+        "relativePath": "app/src/components/editorial/project-switcher-dropdown.tsx",
+        "layer": "ui",
+        "role": "component",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 3,
+          "connectionCount": 2,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/editorial/quick-generate.tsx",
+        "label": "Quick Generate",
+        "description": "A reusable UI element: Quick Generate (used in Editorial)",
+        "filePath": "<user-home>/SecondBrain/app/src/components/editorial/quick-generate.tsx",
+        "relativePath": "app/src/components/editorial/quick-generate.tsx",
+        "layer": "ui",
+        "role": "component",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 5,
+          "connectionCount": 0,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/editorial/tweaks-panel.tsx",
+        "label": "Tweaks Panel",
+        "description": "A reusable UI element: Tweaks Panel (used in Editorial)",
+        "filePath": "<user-home>/SecondBrain/app/src/components/editorial/tweaks-panel.tsx",
+        "relativePath": "app/src/components/editorial/tweaks-panel.tsx",
+        "layer": "ui",
+        "role": "component",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 1,
+          "connectionCount": 2,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/editorial/tweaks-provider.tsx",
+        "label": "Tweaks Provider",
+        "description": "Shares tweaks across the entire app without passing it through every component",
+        "filePath": "<user-home>/SecondBrain/app/src/components/editorial/tweaks-provider.tsx",
+        "relativePath": "app/src/components/editorial/tweaks-provider.tsx",
+        "layer": "ui",
+        "role": "context",
+        "metadata": {
+          "exportCount": 9,
+          "importCount": 1,
+          "connectionCount": 3,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/editorial/wiki/breadcrumbs.tsx",
+        "label": "Breadcrumbs",
+        "description": "A reusable UI element: Breadcrumbs (used in Wiki)",
+        "filePath": "<user-home>/SecondBrain/app/src/components/editorial/wiki/breadcrumbs.tsx",
+        "relativePath": "app/src/components/editorial/wiki/breadcrumbs.tsx",
+        "layer": "ui",
+        "role": "component",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 2,
+          "connectionCount": 0,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/editorial/wiki/markdown-renderer.tsx",
+        "label": "Markdown Renderer",
+        "description": "A reusable UI element: Markdown Renderer (used in Wiki)",
+        "filePath": "<user-home>/SecondBrain/app/src/components/editorial/wiki/markdown-renderer.tsx",
+        "relativePath": "app/src/components/editorial/wiki/markdown-renderer.tsx",
+        "layer": "ui",
+        "role": "component",
+        "metadata": {
+          "exportCount": 4,
+          "importCount": 1,
+          "connectionCount": 0,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/editorial/wiki/wiki-preview.tsx",
+        "label": "Wiki Preview",
+        "description": "A reusable UI element: Wiki Preview (used in Wiki)",
+        "filePath": "<user-home>/SecondBrain/app/src/components/editorial/wiki/wiki-preview.tsx",
+        "relativePath": "app/src/components/editorial/wiki/wiki-preview.tsx",
+        "layer": "ui",
+        "role": "component",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 2,
+          "connectionCount": 0,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/generate-output-modal.tsx",
+        "label": "Generate Output Modal",
+        "description": "A reusable UI element: Generate Output Modal",
+        "filePath": "<user-home>/SecondBrain/app/src/components/generate-output-modal.tsx",
+        "relativePath": "app/src/components/generate-output-modal.tsx",
+        "layer": "ui",
+        "role": "component",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 3,
+          "connectionCount": 0,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/help-modal.tsx",
+        "label": "Help Modal",
+        "description": "A reusable UI element: Help Modal",
+        "filePath": "<user-home>/SecondBrain/app/src/components/help-modal.tsx",
+        "relativePath": "app/src/components/help-modal.tsx",
+        "layer": "ui",
+        "role": "component",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 2,
+          "connectionCount": 0,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/note-composer-modal.tsx",
+        "label": "Note Composer Modal",
+        "description": "A reusable UI element: Note Composer Modal",
+        "filePath": "<user-home>/SecondBrain/app/src/components/note-composer-modal.tsx",
+        "relativePath": "app/src/components/note-composer-modal.tsx",
+        "layer": "ui",
+        "role": "component",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 4,
+          "connectionCount": 0,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/nudges-section.tsx",
+        "label": "Nudges Section",
+        "description": "A reusable UI element: Nudges Section",
+        "filePath": "<user-home>/SecondBrain/app/src/components/nudges-section.tsx",
+        "relativePath": "app/src/components/nudges-section.tsx",
+        "layer": "ui",
+        "role": "component",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 5,
+          "connectionCount": 0,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/project-switcher.tsx",
+        "label": "Project Switcher",
+        "description": "Shares project switcher across the entire app without passing it through every component",
+        "filePath": "<user-home>/SecondBrain/app/src/components/project-switcher.tsx",
+        "relativePath": "app/src/components/project-switcher.tsx",
+        "layer": "ui",
+        "role": "context",
+        "metadata": {
+          "exportCount": 3,
+          "importCount": 2,
+          "connectionCount": 0,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/running-jobs-panel.tsx",
+        "label": "Running Jobs Panel",
+        "description": "A reusable UI element: Running Jobs Panel",
+        "filePath": "<user-home>/SecondBrain/app/src/components/running-jobs-panel.tsx",
+        "relativePath": "app/src/components/running-jobs-panel.tsx",
+        "layer": "ui",
+        "role": "component",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 3,
+          "connectionCount": 0,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/sidebar.tsx",
+        "label": "Sidebar",
+        "description": "A reusable UI element: Sidebar",
+        "filePath": "<user-home>/SecondBrain/app/src/components/sidebar.tsx",
+        "relativePath": "app/src/components/sidebar.tsx",
+        "layer": "ui",
+        "role": "component",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 8,
+          "connectionCount": 0,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/theme-provider.tsx",
+        "label": "Theme Provider",
+        "description": "Shares theme across the entire app without passing it through every component",
+        "filePath": "<user-home>/SecondBrain/app/src/components/theme-provider.tsx",
+        "relativePath": "app/src/components/theme-provider.tsx",
+        "layer": "ui",
+        "role": "context",
+        "metadata": {
+          "exportCount": 2,
+          "importCount": 1,
+          "connectionCount": 0,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/components/toast-provider.tsx",
+        "label": "Toast Provider",
+        "description": "Shares toast across the entire app without passing it through every component",
+        "filePath": "<user-home>/SecondBrain/app/src/components/toast-provider.tsx",
+        "relativePath": "app/src/components/toast-provider.tsx",
+        "layer": "ui",
+        "role": "context",
+        "metadata": {
+          "exportCount": 2,
+          "importCount": 2,
+          "connectionCount": 0,
+          "framework": "react"
+        }
+      },
+      {
+        "id": "app/src/content/help.test.ts",
+        "label": "Help",
+        "description": "Part of the Content layer",
+        "filePath": "<user-home>/SecondBrain/app/src/content/help.test.ts",
+        "relativePath": "app/src/content/help.test.ts",
+        "layer": "ui",
+        "role": "unknown",
+        "metadata": {
+          "exportCount": 0,
+          "importCount": 2,
+          "connectionCount": 1
+        }
+      },
+      {
+        "id": "app/src/content/help.ts",
+        "label": "Help",
+        "description": "Provides help topic, help section, help sections and more",
+        "filePath": "<user-home>/SecondBrain/app/src/content/help.ts",
+        "relativePath": "app/src/content/help.ts",
+        "layer": "utils",
+        "role": "utility",
+        "metadata": {
+          "exportCount": 7,
+          "importCount": 0,
+          "connectionCount": 1,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "app/src/db/index.ts",
+        "label": "Db",
+        "description": "Provides sqlite db",
+        "filePath": "<user-home>/SecondBrain/app/src/db/index.ts",
+        "relativePath": "app/src/db/index.ts",
+        "layer": "utils",
+        "role": "utility",
+        "metadata": {
+          "exportCount": 2,
+          "importCount": 4,
+          "connectionCount": 1,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "app/src/db/schema.ts",
+        "label": "Schema",
+        "description": "Database table definition for schema — columns, types, and relationships",
+        "filePath": "<user-home>/SecondBrain/app/src/db/schema.ts",
+        "relativePath": "app/src/db/schema.ts",
+        "layer": "data",
+        "role": "schema",
+        "metadata": {
+          "exportCount": 8,
+          "importCount": 2,
+          "connectionCount": 1,
+          "framework": "drizzle"
+        }
+      },
+      {
+        "id": "app/src/instrumentation.ts",
+        "label": "Instrumentation",
+        "description": "Provides register",
+        "filePath": "<user-home>/SecondBrain/app/src/instrumentation.ts",
+        "relativePath": "app/src/instrumentation.ts",
+        "layer": "utils",
+        "role": "utility",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 1,
+          "connectionCount": 0,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "app/src/lib/__mocks__/claude-mock.ts",
+        "label": "Claude Mock",
+        "description": "Provides get mock response, create mock stream",
+        "filePath": "<user-home>/SecondBrain/app/src/lib/__mocks__/claude-mock.ts",
+        "relativePath": "app/src/lib/__mocks__/claude-mock.ts",
+        "layer": "utils",
+        "role": "utility",
+        "metadata": {
+          "exportCount": 2,
+          "importCount": 0,
+          "connectionCount": 0,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "app/src/lib/claude-runner.ts",
+        "label": "Claude Runner",
+        "description": "Provides is mock mode, get model, get running job count and more",
+        "filePath": "<user-home>/SecondBrain/app/src/lib/claude-runner.ts",
+        "relativePath": "app/src/lib/claude-runner.ts",
+        "layer": "utils",
+        "role": "utility",
+        "metadata": {
+          "exportCount": 9,
+          "importCount": 8,
+          "connectionCount": 0,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "app/src/lib/error-codes.ts",
+        "label": "Error Codes",
+        "description": "Provides job error code, job error message, format job error and more",
+        "filePath": "<user-home>/SecondBrain/app/src/lib/error-codes.ts",
+        "relativePath": "app/src/lib/error-codes.ts",
+        "layer": "utils",
+        "role": "utility",
+        "metadata": {
+          "exportCount": 5,
+          "importCount": 0,
+          "connectionCount": 0,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "app/src/lib/export-docx.ts",
+        "label": "Export Docx",
+        "description": "Provides markdown to document blob, markdown to docx buffer, filename from markdown",
+        "filePath": "<user-home>/SecondBrain/app/src/lib/export-docx.ts",
+        "relativePath": "app/src/lib/export-docx.ts",
+        "layer": "utils",
+        "role": "utility",
+        "metadata": {
+          "exportCount": 3,
+          "importCount": 1,
+          "connectionCount": 0,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "app/src/lib/gemini-runner.ts",
+        "label": "Gemini Runner",
+        "description": "Provides gemini model, detect gemini, is gemini available and more",
+        "filePath": "<user-home>/SecondBrain/app/src/lib/gemini-runner.ts",
+        "relativePath": "app/src/lib/gemini-runner.ts",
+        "layer": "utils",
+        "role": "utility",
+        "metadata": {
+          "exportCount": 8,
+          "importCount": 5,
+          "connectionCount": 0,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "app/src/lib/lint.ts",
+        "label": "Lint",
+        "description": "Provides fixable categories, get lint prompt, parse lint output and more",
+        "filePath": "<user-home>/SecondBrain/app/src/lib/lint.ts",
+        "relativePath": "app/src/lib/lint.ts",
+        "layer": "utils",
+        "role": "utility",
+        "metadata": {
+          "exportCount": 14,
+          "importCount": 4,
+          "connectionCount": 0,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "app/src/lib/ollama-runner.ts",
+        "label": "Ollama Runner",
+        "description": "Provides ollama model, detect ollama models, run ollama job and more",
+        "filePath": "<user-home>/SecondBrain/app/src/lib/ollama-runner.ts",
+        "relativePath": "app/src/lib/ollama-runner.ts",
+        "layer": "utils",
+        "role": "utility",
+        "metadata": {
+          "exportCount": 5,
+          "importCount": 3,
+          "connectionCount": 0,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "app/src/lib/output-types.test.ts",
+        "label": "Output Types",
+        "description": "Shared helper used across the app",
+        "filePath": "<user-home>/SecondBrain/app/src/lib/output-types.test.ts",
+        "relativePath": "app/src/lib/output-types.test.ts",
+        "layer": "utils",
+        "role": "utility",
+        "metadata": {
+          "exportCount": 0,
+          "importCount": 2,
+          "connectionCount": 1,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "app/src/lib/output-types.ts",
+        "label": "Output Types",
+        "description": "Provides output type id, output scope, build prompt context and more",
+        "filePath": "<user-home>/SecondBrain/app/src/lib/output-types.ts",
+        "relativePath": "app/src/lib/output-types.ts",
+        "layer": "utils",
+        "role": "utility",
+        "metadata": {
+          "exportCount": 11,
+          "importCount": 3,
+          "connectionCount": 1,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "app/src/lib/projects.test.ts",
+        "label": "Projects",
+        "description": "Shared helper used across the app",
+        "filePath": "<user-home>/SecondBrain/app/src/lib/projects.test.ts",
+        "relativePath": "app/src/lib/projects.test.ts",
+        "layer": "utils",
+        "role": "utility",
+        "metadata": {
+          "exportCount": 0,
+          "importCount": 2,
+          "connectionCount": 1,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "app/src/lib/projects.ts",
+        "label": "Projects",
+        "description": "Provides project, wiki dir, project root and more",
+        "filePath": "<user-home>/SecondBrain/app/src/lib/projects.ts",
+        "relativePath": "app/src/lib/projects.ts",
+        "layer": "utils",
+        "role": "utility",
+        "metadata": {
+          "exportCount": 18,
+          "importCount": 6,
+          "connectionCount": 1,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "app/src/lib/utils.ts",
+        "label": "Utils",
+        "description": "Shared helper used across the app",
+        "filePath": "<user-home>/SecondBrain/app/src/lib/utils.ts",
+        "relativePath": "app/src/lib/utils.ts",
+        "layer": "utils",
+        "role": "utility",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 2,
+          "connectionCount": 0,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "app/src/lib/wiki-utils.test.ts",
+        "label": "Wiki Utils",
+        "description": "Shared helper used across the app",
+        "filePath": "<user-home>/SecondBrain/app/src/lib/wiki-utils.test.ts",
+        "relativePath": "app/src/lib/wiki-utils.test.ts",
+        "layer": "utils",
+        "role": "utility",
+        "metadata": {
+          "exportCount": 0,
+          "importCount": 2,
+          "connectionCount": 1,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "app/src/lib/wiki-utils.ts",
+        "label": "Wiki Utils",
+        "description": "Provides get all md files, parse frontmatter",
+        "filePath": "<user-home>/SecondBrain/app/src/lib/wiki-utils.ts",
+        "relativePath": "app/src/lib/wiki-utils.ts",
+        "layer": "utils",
+        "role": "utility",
+        "metadata": {
+          "exportCount": 2,
+          "importCount": 2,
+          "connectionCount": 1,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "app/vitest.config.ts",
+        "label": "Vitest.config",
+        "description": "Configuration and settings for the app — environment variables, feature flags, constants",
+        "filePath": "<user-home>/SecondBrain/app/vitest.config.ts",
+        "relativePath": "app/vitest.config.ts",
+        "layer": "utils",
+        "role": "config",
+        "metadata": {
+          "exportCount": 1,
+          "importCount": 2,
+          "connectionCount": 0,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "mcp/src/api.ts",
+        "label": "Api",
+        "description": "Provides wiki lmapi error, api, project node and more",
+        "filePath": "<user-home>/SecondBrain/mcp/src/api.ts",
+        "relativePath": "mcp/src/api.ts",
+        "layer": "utils",
+        "role": "utility",
+        "metadata": {
+          "exportCount": 8,
+          "importCount": 1,
+          "connectionCount": 0,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "mcp/src/config.ts",
+        "label": "Config",
+        "description": "Configuration and settings for Mcp — environment variables, feature flags, constants",
+        "filePath": "<user-home>/SecondBrain/mcp/src/config.ts",
+        "relativePath": "mcp/src/config.ts",
+        "layer": "utils",
+        "role": "config",
+        "metadata": {
+          "exportCount": 5,
+          "importCount": 3,
+          "connectionCount": 0,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "mcp/src/index.ts",
+        "label": "Mcp",
+        "description": "Part of the Mcp layer",
+        "filePath": "<user-home>/SecondBrain/mcp/src/index.ts",
+        "relativePath": "mcp/src/index.ts",
+        "layer": "utils",
+        "role": "unknown",
+        "metadata": {
+          "exportCount": 0,
+          "importCount": 6,
+          "connectionCount": 0
+        }
+      },
+      {
+        "id": "mcp/src/tools/projects.ts",
+        "label": "Projects",
+        "description": "Provides list projects schema, list projects, create project schema and more",
+        "filePath": "<user-home>/SecondBrain/mcp/src/tools/projects.ts",
+        "relativePath": "mcp/src/tools/projects.ts",
+        "layer": "utils",
+        "role": "utility",
+        "metadata": {
+          "exportCount": 6,
+          "importCount": 2,
+          "connectionCount": 0,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "mcp/src/tools/wiki.ts",
+        "label": "Wiki",
+        "description": "Provides search wiki schema, search wiki, read wiki page schema and more",
+        "filePath": "<user-home>/SecondBrain/mcp/src/tools/wiki.ts",
+        "relativePath": "mcp/src/tools/wiki.ts",
+        "layer": "utils",
+        "role": "utility",
+        "metadata": {
+          "exportCount": 12,
+          "importCount": 2,
+          "connectionCount": 0,
+          "framework": "unknown"
+        }
+      },
+      {
+        "id": "scripts/capture-demo-gif.mjs",
+        "label": "Capture Demo Gif",
+        "description": "Part of the Scripts layer",
+        "filePath": "<user-home>/SecondBrain/scripts/capture-demo-gif.mjs",
+        "relativePath": "scripts/capture-demo-gif.mjs",
+        "layer": "utils",
+        "role": "unknown",
+        "metadata": {
+          "exportCount": 0,
+          "importCount": 4,
+          "connectionCount": 0
+        }
+      },
+      {
+        "id": "scripts/capture-screenshots.mjs",
+        "label": "Capture Screenshots",
+        "description": "Part of the Scripts layer",
+        "filePath": "<user-home>/SecondBrain/scripts/capture-screenshots.mjs",
+        "relativePath": "scripts/capture-screenshots.mjs",
+        "layer": "utils",
+        "role": "unknown",
+        "metadata": {
+          "exportCount": 0,
+          "importCount": 3,
+          "connectionCount": 0
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "app/src/components/editorial/editorial-shell.tsx->app/src/components/editorial/editorial-sidebar.tsx",
+        "source": "app/src/components/editorial/editorial-shell.tsx",
+        "target": "app/src/components/editorial/editorial-sidebar.tsx",
+        "type": "import"
+      },
+      {
+        "id": "app/src/components/editorial/editorial-shell.tsx->app/src/components/editorial/editorial-topbar.tsx",
+        "source": "app/src/components/editorial/editorial-shell.tsx",
+        "target": "app/src/components/editorial/editorial-topbar.tsx",
+        "type": "import"
+      },
+      {
+        "id": "app/src/components/editorial/editorial-shell.tsx->app/src/components/editorial/tweaks-panel.tsx",
+        "source": "app/src/components/editorial/editorial-shell.tsx",
+        "target": "app/src/components/editorial/tweaks-panel.tsx",
+        "type": "import"
+      },
+      {
+        "id": "app/src/components/editorial/editorial-shell.tsx->app/src/components/editorial/keyboard-shortcuts.tsx",
+        "source": "app/src/components/editorial/editorial-shell.tsx",
+        "target": "app/src/components/editorial/keyboard-shortcuts.tsx",
+        "type": "import"
+      },
+      {
+        "id": "app/src/components/editorial/editorial-shell.tsx->app/src/components/editorial/palette.tsx",
+        "source": "app/src/components/editorial/editorial-shell.tsx",
+        "target": "app/src/components/editorial/palette.tsx",
+        "type": "import"
+      },
+      {
+        "id": "app/src/components/editorial/editorial-shell.tsx->app/src/components/editorial/editorial-toast-bridge.tsx",
+        "source": "app/src/components/editorial/editorial-shell.tsx",
+        "target": "app/src/components/editorial/editorial-toast-bridge.tsx",
+        "type": "import"
+      },
+      {
+        "id": "app/src/components/editorial/editorial-shell.tsx->app/src/components/editorial/help-modal.tsx",
+        "source": "app/src/components/editorial/editorial-shell.tsx",
+        "target": "app/src/components/editorial/help-modal.tsx",
+        "type": "import"
+      },
+      {
+        "id": "app/src/components/editorial/editorial-sidebar.tsx->app/src/components/editorial/folio-map.ts",
+        "source": "app/src/components/editorial/editorial-sidebar.tsx",
+        "target": "app/src/components/editorial/folio-map.ts",
+        "type": "import"
+      },
+      {
+        "id": "app/src/components/editorial/editorial-sidebar.tsx->app/src/components/editorial/project-switcher-dropdown.tsx",
+        "source": "app/src/components/editorial/editorial-sidebar.tsx",
+        "target": "app/src/components/editorial/project-switcher-dropdown.tsx",
+        "type": "import"
+      },
+      {
+        "id": "app/src/components/editorial/editorial-sidebar.tsx->app/src/components/editorial/chat-sessions-sidebar.tsx",
+        "source": "app/src/components/editorial/editorial-sidebar.tsx",
+        "target": "app/src/components/editorial/chat-sessions-sidebar.tsx",
+        "type": "import"
+      },
+      {
+        "id": "app/src/components/editorial/editorial-topbar.tsx->app/src/components/editorial/tweaks-provider.tsx",
+        "source": "app/src/components/editorial/editorial-topbar.tsx",
+        "target": "app/src/components/editorial/tweaks-provider.tsx",
+        "type": "import"
+      },
+      {
+        "id": "app/src/components/editorial/editorial-topbar.tsx->app/src/components/editorial/folio-map.ts",
+        "source": "app/src/components/editorial/editorial-topbar.tsx",
+        "target": "app/src/components/editorial/folio-map.ts",
+        "type": "import"
+      },
+      {
+        "id": "app/src/components/editorial/editorial-topbar.tsx->app/src/components/editorial/job-beacon.tsx",
+        "source": "app/src/components/editorial/editorial-topbar.tsx",
+        "target": "app/src/components/editorial/job-beacon.tsx",
+        "type": "import"
+      },
+      {
+        "id": "app/src/components/editorial/keyboard-shortcuts.tsx->app/src/components/editorial/folio-map.ts",
+        "source": "app/src/components/editorial/keyboard-shortcuts.tsx",
+        "target": "app/src/components/editorial/folio-map.ts",
+        "type": "import"
+      },
+      {
+        "id": "app/src/components/editorial/palette.tsx->app/src/components/editorial/tweaks-provider.tsx",
+        "source": "app/src/components/editorial/palette.tsx",
+        "target": "app/src/components/editorial/tweaks-provider.tsx",
+        "type": "import"
+      },
+      {
+        "id": "app/src/components/editorial/palette.tsx->app/src/components/editorial/folio-map.ts",
+        "source": "app/src/components/editorial/palette.tsx",
+        "target": "app/src/components/editorial/folio-map.ts",
+        "type": "import"
+      },
+      {
+        "id": "app/src/components/editorial/phase-placeholder.tsx->app/src/components/editorial/folio-map.ts",
+        "source": "app/src/components/editorial/phase-placeholder.tsx",
+        "target": "app/src/components/editorial/folio-map.ts",
+        "type": "import"
+      },
+      {
+        "id": "app/src/components/editorial/project-switcher-dropdown.tsx->app/src/components/editorial/editorial-project-tree.tsx",
+        "source": "app/src/components/editorial/project-switcher-dropdown.tsx",
+        "target": "app/src/components/editorial/editorial-project-tree.tsx",
+        "type": "import"
+      },
+      {
+        "id": "app/src/components/editorial/tweaks-panel.tsx->app/src/components/editorial/tweaks-provider.tsx",
+        "source": "app/src/components/editorial/tweaks-panel.tsx",
+        "target": "app/src/components/editorial/tweaks-provider.tsx",
+        "type": "import"
+      },
+      {
+        "id": "app/src/content/help.test.ts->app/src/content/help.ts",
+        "source": "app/src/content/help.test.ts",
+        "target": "app/src/content/help.ts",
+        "type": "import"
+      },
+      {
+        "id": "app/src/db/index.ts->app/src/db/schema.ts",
+        "source": "app/src/db/index.ts",
+        "target": "app/src/db/schema.ts",
+        "type": "import"
+      },
+      {
+        "id": "app/src/lib/output-types.test.ts->app/src/lib/output-types.ts",
+        "source": "app/src/lib/output-types.test.ts",
+        "target": "app/src/lib/output-types.ts",
+        "type": "import"
+      },
+      {
+        "id": "app/src/lib/projects.test.ts->app/src/lib/projects.ts",
+        "source": "app/src/lib/projects.test.ts",
+        "target": "app/src/lib/projects.ts",
+        "type": "import"
+      },
+      {
+        "id": "app/src/lib/wiki-utils.test.ts->app/src/lib/wiki-utils.ts",
+        "source": "app/src/lib/wiki-utils.test.ts",
+        "target": "app/src/lib/wiki-utils.ts",
+        "type": "import"
+      }
+    ],
+    "clusters": [
+      {
+        "id": "cluster-utils",
+        "label": "Utilities",
+        "description": "Shared helper tools used across the app",
+        "layer": "utils",
+        "nodeIds": [
+          "app/drizzle.config.ts",
+          "app/eslint.config.mjs",
+          "app/next.config.ts",
+          "app/postcss.config.mjs",
+          "app/src/components/editorial/folio-map.ts",
+          "app/src/components/editorial/map/force-layout.ts",
+          "app/src/content/help.ts",
+          "app/src/db/index.ts",
+          "app/src/instrumentation.ts",
+          "app/src/lib/__mocks__/claude-mock.ts",
+          "app/src/lib/claude-runner.ts",
+          "app/src/lib/error-codes.ts",
+          "app/src/lib/export-docx.ts",
+          "app/src/lib/gemini-runner.ts",
+          "app/src/lib/lint.ts",
+          "app/src/lib/ollama-runner.ts",
+          "app/src/lib/output-types.test.ts",
+          "app/src/lib/output-types.ts",
+          "app/src/lib/projects.test.ts",
+          "app/src/lib/projects.ts",
+          "app/src/lib/utils.ts",
+          "app/src/lib/wiki-utils.test.ts",
+          "app/src/lib/wiki-utils.ts",
+          "app/vitest.config.ts",
+          "mcp/src/api.ts",
+          "mcp/src/config.ts",
+          "mcp/src/index.ts",
+          "mcp/src/tools/projects.ts",
+          "mcp/src/tools/wiki.ts",
+          "scripts/capture-demo-gif.mjs",
+          "scripts/capture-screenshots.mjs"
+        ],
+        "metadata": {
+          "componentCount": 31,
+          "connectionCount": 10
+        }
+      },
+      {
+        "id": "cluster-data",
+        "label": "Data Layer",
+        "description": "Database structure — what information is stored and how",
+        "layer": "data",
+        "nodeIds": [
+          "app/next-env.d.ts",
+          "app/src/db/schema.ts"
+        ],
+        "metadata": {
+          "componentCount": 2,
+          "connectionCount": 1
+        }
+      },
+      {
+        "id": "cluster-ui",
+        "label": "UI Components",
+        "description": "What users see and interact with — screens, buttons, and forms",
+        "layer": "ui",
+        "nodeIds": [
+          "app/scripts/screenshot-extras.mjs",
+          "app/scripts/screenshot-features.mjs",
+          "app/scripts/screenshot-help.mjs",
+          "app/scripts/screenshot-note-flows.mjs",
+          "app/src/app/chat/page.tsx",
+          "app/src/app/compose/page.tsx",
+          "app/src/app/graph/page.tsx",
+          "app/src/app/help/page.tsx",
+          "app/src/app/jobs/page.tsx",
+          "app/src/app/layout.tsx",
+          "app/src/app/lint/page.tsx",
+          "app/src/app/page.tsx",
+          "app/src/app/settings/page.tsx",
+          "app/src/app/sources/page.tsx",
+          "app/src/app/wiki/page.tsx",
+          "app/src/components/breadcrumbs.tsx",
+          "app/src/components/child-projects.tsx",
+          "app/src/components/editorial/chat-sessions-sidebar.tsx",
+          "app/src/components/editorial/editorial-project-tree.tsx",
+          "app/src/components/editorial/editorial-shell.tsx",
+          "app/src/components/editorial/editorial-sidebar.tsx",
+          "app/src/components/editorial/editorial-toast-bridge.tsx",
+          "app/src/components/editorial/editorial-topbar.tsx",
+          "app/src/components/editorial/help-modal.tsx",
+          "app/src/components/editorial/job-beacon.tsx",
+          "app/src/components/editorial/keyboard-shortcuts.tsx",
+          "app/src/components/editorial/ledger/ledger-dispatch-research.tsx",
+          "app/src/components/editorial/ledger/ledger-nudges.tsx",
+          "app/src/components/editorial/note-composer-modal.tsx",
+          "app/src/components/editorial/palette.tsx",
+          "app/src/components/editorial/phase-placeholder.tsx",
+          "app/src/components/editorial/portal-to-body.tsx",
+          "app/src/components/editorial/project-switcher-dropdown.tsx",
+          "app/src/components/editorial/quick-generate.tsx",
+          "app/src/components/editorial/tweaks-panel.tsx",
+          "app/src/components/editorial/tweaks-provider.tsx",
+          "app/src/components/editorial/wiki/breadcrumbs.tsx",
+          "app/src/components/editorial/wiki/markdown-renderer.tsx",
+          "app/src/components/editorial/wiki/wiki-preview.tsx",
+          "app/src/components/generate-output-modal.tsx",
+          "app/src/components/help-modal.tsx",
+          "app/src/components/note-composer-modal.tsx",
+          "app/src/components/nudges-section.tsx",
+          "app/src/components/project-switcher.tsx",
+          "app/src/components/running-jobs-panel.tsx",
+          "app/src/components/sidebar.tsx",
+          "app/src/components/theme-provider.tsx",
+          "app/src/components/toast-provider.tsx",
+          "app/src/content/help.test.ts"
+        ],
+        "metadata": {
+          "componentCount": 49,
+          "connectionCount": 20
+        }
+      },
+      {
+        "id": "cluster-api",
+        "label": "API Routes",
+        "description": "Behind-the-scenes handlers that process requests",
+        "layer": "api",
+        "nodeIds": [
+          "app/src/app/api/admin/backfill-claude-md/route.ts",
+          "app/src/app/api/backup/run/route.ts",
+          "app/src/app/api/backup/status/route.ts",
+          "app/src/app/api/chat/save-as-note/route.ts",
+          "app/src/app/api/chat/sessions/[id]/messages/route.ts",
+          "app/src/app/api/chat/sessions/[id]/route.ts",
+          "app/src/app/api/chat/sessions/route.ts",
+          "app/src/app/api/claude/job/[id]/route.ts",
+          "app/src/app/api/claude/job/route.ts",
+          "app/src/app/api/claude/stream/route.ts",
+          "app/src/app/api/dashboard/nudges/route.ts",
+          "app/src/app/api/dashboard/route.ts",
+          "app/src/app/api/gemini/models/route.ts",
+          "app/src/app/api/lint/findings/[id]/fix/route.ts",
+          "app/src/app/api/lint/findings/[id]/route.ts",
+          "app/src/app/api/lint/findings/route.ts",
+          "app/src/app/api/lint/fix/route.ts",
+          "app/src/app/api/lint/parent-run/[projectId]/route.ts",
+          "app/src/app/api/lint/run/route.ts",
+          "app/src/app/api/ollama/models/route.ts",
+          "app/src/app/api/projects/[id]/move/route.ts",
+          "app/src/app/api/projects/[id]/outputs/delete/route.ts",
+          "app/src/app/api/projects/[id]/outputs/download/route.ts",
+          "app/src/app/api/projects/[id]/outputs/generate/route.ts",
+          "app/src/app/api/projects/[id]/promote-page/route.ts",
+          "app/src/app/api/projects/[id]/route.ts",
+          "app/src/app/api/projects/[id]/synthesis/parent-run/route.ts",
+          "app/src/app/api/projects/nudge-counts/route.ts",
+          "app/src/app/api/projects/route.ts",
+          "app/src/app/api/projects/tree/route.ts",
+          "app/src/app/api/settings/route.ts",
+          "app/src/app/api/sources/[id]/route.ts",
+          "app/src/app/api/sources/ingest-web/route.ts",
+          "app/src/app/api/sources/research/route.ts",
+          "app/src/app/api/sources/route.ts",
+          "app/src/app/api/sources/upload/route.ts",
+          "app/src/app/api/sources/upload-md/route.ts",
+          "app/src/app/api/wiki/[slug]/route.ts",
+          "app/src/app/api/wiki/concept-scaffold/route.ts",
+          "app/src/app/api/wiki/graph/route.ts",
+          "app/src/app/api/wiki/route.ts"
+        ],
+        "metadata": {
+          "componentCount": 41,
+          "connectionCount": 0
+        }
+      }
+    ]
+  },
+  "layout": {
+    "nodes": {},
+    "groups": {
+      "cluster-utils": {
+        "x": 60,
+        "y": 60,
+        "width": 340,
+        "height": 1980
+      },
+      "cluster-ui": {
+        "x": 460,
+        "y": 60,
+        "width": 340,
+        "height": 3060
+      },
+      "cluster-api": {
+        "x": 860,
+        "y": 60,
+        "width": 340,
+        "height": 2580
+      },
+      "cluster-data": {
+        "x": 60,
+        "y": 3180,
+        "width": 340,
+        "height": 240
+      }
+    }
+  }
+}

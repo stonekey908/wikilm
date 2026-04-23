@@ -206,12 +206,12 @@ export default function HelpPage() {
         </article>
       </div>
 
-      <HelpStyles totalTopics={helpTopics.length} />
+      <HelpStyles />
     </div>
   );
 }
 
-function HelpStyles({ totalTopics: _totalTopics }: { totalTopics: number }) {
+function HelpStyles() {
   return (
     <style jsx global>{`
       .help-page {

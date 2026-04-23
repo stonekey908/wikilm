@@ -147,7 +147,7 @@ function findBridges(nodes: LaidNode[], adj: Map<string, Set<string>>): Set<stri
  */
 function extractExcerpt(body: string): string {
   const lines = body.split("\n");
-  let buf: string[] = [];
+  const buf: string[] = [];
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed) {
