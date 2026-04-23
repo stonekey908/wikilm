@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useProject } from "@/components/project-switcher";
 import { useToast } from "@/components/toast-provider";
 
@@ -99,6 +99,7 @@ export function EditorialProjectTree() {
   const [moveTarget, setMoveTarget] = useState<TreeNode | null>(null);
   const [moveNewParentId, setMoveNewParentId] = useState<number | null>(null);
   const [moveBusy, setMoveBusy] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -133,13 +134,26 @@ export function EditorialProjectTree() {
   }, [activeProject?.id, tree]);
 
   useEffect(() => {
-    function onDoc() {
+    if (menuFor === null) return;
+    // Close only when the click/mousedown lands outside the open menu. The
+    // earlier version relied on stopPropagation in the menu's onMouseDown to
+    // block this listener, which was fragile — any missed stop (e.g. a
+    // button's mousedown path through a portal or zoomed ancestor) would
+    // reset menuFor before the button's click handler could run, so Move /
+    // Delete appeared inert.
+    let cancelled = false;
+    function onDoc(e: MouseEvent) {
+      if (menuRef.current?.contains(e.target as Node)) return;
       setMenuFor(null);
     }
-    if (menuFor !== null) {
-      window.setTimeout(() => document.addEventListener("mousedown", onDoc), 0);
-    }
-    return () => document.removeEventListener("mousedown", onDoc);
+    const timer = window.setTimeout(() => {
+      if (!cancelled) document.addEventListener("mousedown", onDoc);
+    }, 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      document.removeEventListener("mousedown", onDoc);
+    };
   }, [menuFor]);
 
   function toggleCollapsed(id: number) {

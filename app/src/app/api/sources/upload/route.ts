@@ -7,8 +7,6 @@ import path from "path";
 import { writeFile, mkdir } from "fs/promises";
 import { getProject, projectRoot } from "@/lib/projects";
 
-const RAW_DIR = path.join(process.cwd(), "..", "raw");
-
 function inferType(filename: string): string {
   const ext = path.extname(filename).toLowerCase();
   if (ext === ".pdf") return "pdf";
@@ -50,8 +48,13 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "No project found" }, { status: 404 });
   }
   const projectCwd = projectRoot(project);
+  // Per-project raw dir so the ingest subprocess (spawned with cwd=projectCwd)
+  // can resolve `raw/<filename>` against the project directory. The previous
+  // `process.cwd()/../raw` path wrote to the top-level repo raw/ regardless of
+  // project, so ingest for any nested project silently failed.
+  const rawDir = path.join(projectCwd, "raw");
 
-  await mkdir(RAW_DIR, { recursive: true });
+  await mkdir(rawDir, { recursive: true });
 
   const created: Array<{ id: number; title: string; jobId: number }> = [];
 
@@ -60,7 +63,7 @@ export async function POST(request: NextRequest) {
 
     const buffer = Buffer.from(await entry.arrayBuffer());
     const filename = entry.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const filePath = path.join(RAW_DIR, filename);
+    const filePath = path.join(rawDir, filename);
 
     await writeFile(filePath, buffer);
 

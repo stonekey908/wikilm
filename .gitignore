@@ -15,3 +15,16 @@ app/.env.local
 
 # Backups — local-only by default. Opt in manually if you want offsite copies.
 backups/
+
+# ─────────────────────────────────────────────────────────────────────
+# User content — ignored by default so the shared repo is a clean install.
+# The empty .gitkeep scaffolding stays in source control so every clone
+# boots with the right directory shape.
+/wiki/**/*
+!/wiki/**/.gitkeep
+
+/raw/*
+!/raw/.gitkeep
+
+/projects/**/*
+!/projects/**/.gitkeep

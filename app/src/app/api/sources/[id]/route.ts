@@ -62,7 +62,7 @@ export async function POST(
     db.update(sources).set({ status: "ingesting" }).where(eq(sources.id, sourceId)).run();
 
     // Start ingest job
-    const { startJob } = await import("@/lib/claude-runner");
+    const { startJob, triggerSynthesisUpdate } = await import("@/lib/claude-runner");
     const projectCwd = projectRoot(project);
     const prompt = `Ingest ${source.filePath}`;
 
@@ -77,6 +77,16 @@ export async function POST(
           .set({ status: status === "completed" ? "ingested" : "failed" })
           .where(eq(sources.id, sourceId))
           .run();
+        // Approve (from pending) + Retry (from failed) both route here. The
+        // upload / upload-md / ingest-web paths trigger synthesis on their own
+        // onComplete — this path didn't, so approved-pending notes never
+        // refreshed the overview. Trigger is coalesced, so batching N approvals
+        // still produces one synthesis at the end.
+        if (status === "completed") {
+          triggerSynthesisUpdate(projectCwd, project.id).catch((err) => {
+            console.error("[synthesis] failed to trigger from approve/retry:", err);
+          });
+        }
       },
     });
 

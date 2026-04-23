@@ -74,9 +74,10 @@ function extractFor(s: Source): string {
   const m = parseMeta(s.meta);
   const summary = (m.summary as string | undefined) ?? (m.description as string | undefined);
   if (summary) return summary;
-  if (s.type === "web") return "Web source · awaiting ingestion.";
-  if (s.type === "note") return "Captured note · awaiting ingestion.";
-  return "Pending source · awaiting ingestion.";
+  const ingested = s.status === "ingested";
+  if (s.type === "web") return ingested ? "Web source · ingested." : "Web source · awaiting ingestion.";
+  if (s.type === "note") return ingested ? "Captured note · ingested." : "Captured note · awaiting ingestion.";
+  return ingested ? "Source · ingested." : "Pending source · awaiting ingestion.";
 }
 
 function externalUrlFor(s: Source): string | null {
@@ -255,6 +256,24 @@ function IntakePageInner() {
     }
   }
 
+  async function retry(s: Source) {
+    if (s.status !== "failed") return;
+    setSources((p) => p.map((x) => (x.id === s.id ? { ...x, status: "ingesting" } : x)));
+    try {
+      const res = await fetch(`/api/sources/${s.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "ingest" }),
+      });
+      if (!res.ok) throw new Error();
+      addToast({ type: "success", title: "Retrying ingest", description: s.title });
+      fetchSources();
+    } catch {
+      setSources((p) => p.map((x) => (x.id === s.id ? { ...x, status: "failed" } : x)));
+      addToast({ type: "error", title: "Couldn't retry" });
+    }
+  }
+
   async function remove(s: Source) {
     if (!confirm(`Delete "${s.title}"? This removes the raw file + DB row.`)) return;
     try {
@@ -271,9 +290,8 @@ function IntakePageInner() {
     if (!files || files.length === 0 || !projectId) return;
     for (const file of Array.from(files)) {
       const fd = new FormData();
-      fd.append("file", file);
+      fd.append("files", file);
       fd.append("projectId", String(projectId));
-      fd.append("ingest", "false");
       try {
         const res = await fetch("/api/sources/upload", { method: "POST", body: fd });
         if (!res.ok) throw new Error();
@@ -799,6 +817,11 @@ function IntakePageInner() {
                         {isPending && !isApproved && (
                           <button className="btn primary" onClick={() => approve(s)}>
                             Approve
+                          </button>
+                        )}
+                        {s.status === "failed" && (
+                          <button className="btn primary" onClick={() => retry(s)}>
+                            Retry
                           </button>
                         )}
                         <button className="btn red" onClick={() => remove(s)} disabled={isApproved}>

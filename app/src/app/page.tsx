@@ -175,6 +175,95 @@ export default function LedgerPage() {
         </div>
       </div>
 
+      {data !== null && stats.sources === 0 && (
+        <div className="ledger-intake-cta">
+          <div className="ledger-intake-cta-inner">
+            <div className="ledger-intake-cta-eyebrow">Empty wiki</div>
+            <h2 className="ledger-intake-cta-title">
+              Want to explore <em>something new?</em>
+            </h2>
+            <p className="ledger-intake-cta-sub">
+              Drop a PDF, paste a URL, or jot a note — WikiLM reads it, writes a source summary,
+              extracts the entities + concepts into their own pages, and links everything together.
+              A single source typically produces 5–15 wiki pages.
+            </p>
+            <div className="ledger-intake-cta-actions">
+              <button
+                type="button"
+                className="btn primary"
+                onClick={() => router.push("/sources")}
+              >
+                Open Intake →
+              </button>
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => router.push("/help")}
+              >
+                Read the guide
+              </button>
+            </div>
+          </div>
+          <style jsx>{`
+            .ledger-intake-cta {
+              margin: 28px 0 36px;
+              border: 1.5px solid var(--ink);
+              background: var(--paper);
+              box-shadow: 6px 6px 0 var(--ink);
+              padding: 28px 32px;
+              position: relative;
+            }
+            .ledger-intake-cta::before {
+              content: "";
+              position: absolute;
+              inset: 6px;
+              border: 1px dashed var(--rule-faint);
+              pointer-events: none;
+            }
+            .ledger-intake-cta-inner {
+              position: relative;
+              max-width: 64ch;
+            }
+            .ledger-intake-cta-eyebrow {
+              font-family: var(--font-mono);
+              font-size: 10px;
+              font-weight: 700;
+              letter-spacing: 0.18em;
+              text-transform: uppercase;
+              color: var(--accent);
+              margin-bottom: 10px;
+            }
+            .ledger-intake-cta-title {
+              font-family: var(--font-serif);
+              font-size: 34px;
+              font-weight: 700;
+              line-height: 1.05;
+              color: var(--ink);
+              margin: 0 0 12px;
+            }
+            .ledger-intake-cta-title em {
+              font-family: var(--font-inst);
+              font-style: italic;
+              color: var(--accent);
+              font-weight: 400;
+            }
+            .ledger-intake-cta-sub {
+              font-family: var(--font-serif);
+              font-size: 15px;
+              line-height: 1.6;
+              color: var(--ink-2);
+              margin: 0 0 20px;
+              max-width: 60ch;
+            }
+            .ledger-intake-cta-actions {
+              display: flex;
+              gap: 10px;
+              flex-wrap: wrap;
+            }
+          `}</style>
+        </div>
+      )}
+
       <div className="ledger-body">
         <div className="col">
           <div className="col-head">

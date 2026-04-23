@@ -1,6 +1,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+
+// Keep this list short — the modal is a glance card, not the full manual.
+// /help is the full knowledge bank; the modal just points at it.
+const QUICK_ITEMS: Array<[string, string]> = [
+  ["Intake", "Drop files, paste URLs, type notes, commission research. Approve pending sources. ⌘3"],
+  ["Wiki", "Article reader with hover-previewed wikilinks + backlinks. ⌘2"],
+  ["Salon", "Chat over the wiki — ask it how to do anything. Save a thread as a note. ⌘4"],
+  ["The Edit", "Lint — orphan, dangling-wikilink, contradiction findings. Fix queues a repair. ⌘5"],
+  ["Dispatch", "Every running job — ingest, research, lint, output. Live progress + cancel. ⌘6"],
+  ["Map", "Force-directed graph of the wiki. ⌘7"],
+  ["Dictation", "Generate report / summary / cheat sheet / deck / infographic. ⌘8"],
+  ["Press", "Model routing per job type, provider availability, UI tokens. ⌘9"],
+];
+
+const SHORTCUTS: Array<[string, string]> = [
+  ["⌘K", "Command palette — navigate, search, generate, ask."],
+  ["?", "Open this help."],
+  ["⌘1–⌘9", "Jump to any top-level page."],
+  ["Esc", "Close any modal."],
+];
 
 export function HelpModal() {
   const [open, setOpen] = useState(false);
@@ -31,7 +52,7 @@ export function HelpModal() {
     <div className="note-modal-bg" onClick={() => setOpen(false)}>
       <div
         className="note-modal"
-        style={{ width: 680 }}
+        style={{ width: 640 }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="note-modal-head">
@@ -47,32 +68,23 @@ export function HelpModal() {
             style={{
               fontFamily: "var(--font-inst)",
               fontStyle: "italic",
-              fontSize: 17,
+              fontSize: 16,
               color: "var(--ink-2)",
-              marginBottom: 22,
-              maxWidth: "62ch",
+              marginBottom: 18,
+              maxWidth: "60ch",
             }}
           >
-            Drop sources in the <em>Intake</em>. WikiLM reads them, synthesises entity + concept pages, links them with
-            <em> [[wikilinks]]</em>, and keeps a running project overview. Ask it questions in the <em>Salon</em>, run
-            health checks in <em>Lint</em>, generate decks or reports in <em>Dictation</em>.
+            Drop sources in <em>Intake</em>. WikiLM reads them, writes source + entity + concept pages,
+            links them with <em>[[wikilinks]]</em>, and keeps a running project overview. Ask questions
+            in the <em>Salon</em>, lint the graph in <em>The Edit</em>, generate polished outputs in{" "}
+            <em>Dictation</em>.
           </p>
 
-          <div style={{ display: "grid", gap: 14 }}>
-            {[
-              ["01 · Ledger", "Dashboard — stat run, recent pages, nudges, dispatch snapshot, commission research. ⌘1"],
-              ["02 · Wiki", "Article reader with hover previews on wikilinks, picker with collapsible type groups. ⌘2"],
-              ["03 · Intake", "Drop files / paste URLs / type notes / commission research. Approve pending sources. ⌘3"],
-              ["04 · Salon (Chat)", "Ask WikiLM about the project. Multi-turn context. Save a thread as a pending note. ⌘4"],
-              ["05 · Lint (The Edit)", "Health-check the wiki. Findings grouped by category — Fix queues a repair, Dismiss hides. ⌘5"],
-              ["06 · Dispatch", "Every job running on WikiLM — ingest, research, lint, output generation. Live progress + cancel. ⌘6"],
-              ["07 · Map", "Force-directed graph of the wiki. Click a legend category to isolate, wheel to zoom, drag to pan. ⌘7"],
-              ["08 · Dictation", "Generate a cheat sheet, report, deck, or infographic. Focus field steers the output. ⌘8"],
-              ["09 · Press (Settings)", "Model routing per job type, Ollama/Gemini availability, backup, UI tokens. ⌘9"],
-            ].map(([title, desc]) => (
+          <div style={{ display: "grid", gap: 10, marginBottom: 20 }}>
+            {QUICK_ITEMS.map(([title, desc]) => (
               <div
-                key={title as string}
-                style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: 14, alignItems: "baseline" }}
+                key={title}
+                style={{ display: "grid", gridTemplateColumns: "120px 1fr", gap: 14, alignItems: "baseline" }}
               >
                 <div
                   style={{
@@ -86,7 +98,7 @@ export function HelpModal() {
                 >
                   {title}
                 </div>
-                <div style={{ fontFamily: "var(--font-serif)", fontSize: 14, lineHeight: 1.5, color: "var(--ink-2)" }}>
+                <div style={{ fontFamily: "var(--font-serif)", fontSize: 13.5, lineHeight: 1.5, color: "var(--ink-2)" }}>
                   {desc}
                 </div>
               </div>
@@ -95,35 +107,64 @@ export function HelpModal() {
 
           <div
             style={{
-              marginTop: 26,
-              paddingTop: 16,
+              paddingTop: 14,
               borderTop: "1px dashed var(--rule-faint)",
               display: "grid",
-              gridTemplateColumns: "160px 1fr",
-              rowGap: 10,
+              gridTemplateColumns: "120px 1fr",
+              rowGap: 6,
               columnGap: 14,
+              marginBottom: 18,
             }}
           >
-            <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--ink-3)" }}>
-              ⌘K
-            </div>
-            <div style={{ fontFamily: "var(--font-serif)", fontSize: 14, color: "var(--ink-2)" }}>
-              Command palette — search pages, run lint, commission research, ask WikiLM, navigate.
-            </div>
+            {SHORTCUTS.map(([key, desc]) => (
+              <div key={key} style={{ display: "contents" }}>
+                <div
+                  style={{
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: "0.14em",
+                    textTransform: "uppercase",
+                    color: "var(--ink-3)",
+                  }}
+                >
+                  {key}
+                </div>
+                <div style={{ fontFamily: "var(--font-serif)", fontSize: 13.5, color: "var(--ink-2)" }}>
+                  {desc}
+                </div>
+              </div>
+            ))}
+          </div>
 
-            <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--ink-3)" }}>
-              ?
+          <div
+            style={{
+              paddingTop: 14,
+              borderTop: "1.5px solid var(--ink)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 14,
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "var(--font-inst)",
+                fontStyle: "italic",
+                fontSize: 14,
+                color: "var(--ink-3)",
+              }}
+            >
+              Need more? The full knowledge bank covers workflows, providers, MCP, troubleshooting.
             </div>
-            <div style={{ fontFamily: "var(--font-serif)", fontSize: 14, color: "var(--ink-2)" }}>
-              Open this help.
-            </div>
-
-            <div style={{ fontFamily: "var(--font-mono)", fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--ink-3)" }}>
-              Set type
-            </div>
-            <div style={{ fontFamily: "var(--font-serif)", fontSize: 14, color: "var(--ink-2)" }}>
-              Top-right dotted-sliders icon — swap paper theme, accent, font face, size, leading, grain.
-            </div>
+            <Link
+              href="/help"
+              onClick={() => setOpen(false)}
+              className="btn primary"
+              style={{ textDecoration: "none", whiteSpace: "nowrap" }}
+            >
+              Open full help →
+            </Link>
           </div>
         </div>
       </div>

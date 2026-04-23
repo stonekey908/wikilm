@@ -5,6 +5,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useProject } from "@/components/project-switcher";
 import { useToast } from "@/components/toast-provider";
 import { EditorialBreadcrumbs } from "@/components/editorial/wiki/breadcrumbs";
+import { buildHelpDigest } from "@/content/help";
+
+// Condensed WikiLM help content — computed once at module load and included
+// in every chat turn's system preamble so the model can answer how-to
+// questions without the user leaving chat.
+const HELP_DIGEST = buildHelpDigest();
 
 interface Message {
   id?: number;
@@ -304,15 +310,19 @@ function SalonInner() {
 
     // Build a multi-turn prompt from the conversation so WikiLM has the
     // prior context. First turn gets a system-like framing; follow-ups
-    // are simple Human/Assistant alternation.
+    // are simple Human/Assistant alternation. We also prepend a condensed
+    // help digest so the model can answer "how do I use WikiLM?" questions
+    // inline with pointers into the /help knowledge bank.
     const CONTEXT_LIMIT = 12; // last N turns to keep the prompt under control
     const kept = history.slice(-CONTEXT_LIMIT);
     const transcript = kept
       .map((m) => (m.role === "user" ? `Human: ${m.content}` : `Assistant: ${m.content}`))
       .join("\n\n");
-    const wrappedPrompt = kept.length === 1
-      ? text
-      : `You are continuing an ongoing conversation. The full prior transcript is below — treat every Human turn as what the user said and every Assistant turn as what you (the assistant) previously said. Continue the conversation naturally, grounded in the active wiki project.\n\n${transcript}\n\nAssistant:`;
+    const helpPreamble = HELP_DIGEST;
+    const wrappedPrompt =
+      kept.length === 1
+        ? `${helpPreamble}\n\n---\n\n${text}`
+        : `${helpPreamble}\n\n---\n\nYou are continuing an ongoing conversation. The full prior transcript is below — treat every Human turn as what the user said and every Assistant turn as what you (the assistant) previously said. Continue the conversation naturally, grounded in the active wiki project.\n\n${transcript}\n\nAssistant:`;
 
     const controller = new AbortController();
     abortRef.current = controller;
