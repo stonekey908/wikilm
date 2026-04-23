@@ -197,7 +197,17 @@ export function EditorialProjectTree() {
     if (!confirm(`Delete project "${name}" and all its wiki + sources? This cannot be undone.`)) return;
     try {
       const res = await fetch(`/api/projects/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        // Surface the server's actual error — parent projects with children
+        // return 409 with a descriptive message that the user needs to see.
+        let detail = "Couldn't delete project";
+        try {
+          const body = (await res.json()) as { error?: string };
+          if (body.error) detail = body.error;
+        } catch {}
+        addToast({ type: "error", title: detail });
+        return;
+      }
       addToast({ type: "success", title: `Deleted · ${name}` });
       refreshProjects();
     } catch {
@@ -281,6 +291,7 @@ export function EditorialProjectTree() {
 
         {menuOpen && (
           <div
+            ref={menuRef}
             className="proj-menu"
             style={{ top: 28, right: 6 }}
             onClick={(e) => e.stopPropagation()}

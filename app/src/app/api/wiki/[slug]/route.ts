@@ -139,6 +139,8 @@ export async function GET(
   }
 
   const content = fs.readFileSync(filePath, "utf-8");
+  const stat = fs.statSync(filePath);
+  const updatedAt = stat.mtime.toISOString();
   const { meta, body } = parseFrontmatter(content);
 
   const title = (meta.title as string) || (() => {
@@ -165,5 +167,6 @@ export async function GET(
     meta,
     body,
     backlinks,
+    updatedAt,
   });
 }

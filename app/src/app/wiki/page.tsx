@@ -28,6 +28,7 @@ interface WikiPage {
   meta: Record<string, unknown>;
   body: string;
   backlinks: Backlink[];
+  updatedAt?: string;
 }
 
 interface WikiIndexEntry {
@@ -425,7 +426,23 @@ function WikiPageInner() {
   }
 
   const { lead, tail } = splitTitleOnLastWord(page.title);
-  const revLabel = formatRev((page.meta.updatedAt as string | undefined) ?? (page.meta.date as string | undefined));
+  // Prefer the filesystem mtime when available — synthesis pages are written
+  // entirely by the synthesis job and don't reliably update a meta.updatedAt,
+  // so the mtime is the source of truth for "last refreshed".
+  const revSource =
+    page.updatedAt ??
+    (page.meta.updatedAt as string | undefined) ??
+    (page.meta.date as string | undefined);
+  const revLabel = formatRev(revSource);
+  const isSynthesis = page.type === "synthesis";
+  const synthesisAbsolute = page.updatedAt
+    ? new Date(page.updatedAt).toLocaleString(undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    : null;
   const tagRow = (page.tags ?? []).slice(0, 2).join(" · ").toUpperCase();
   const deck = (page.meta.deck as string | undefined) ?? (page.meta.description as string | undefined) ?? null;
   const deckFallback =
@@ -458,7 +475,14 @@ function WikiPageInner() {
               <span>{tagRow}</span>
             </>
           )}
-          {revLabel && <span className="rev">Rev · {revLabel}</span>}
+          {revLabel && (
+            <span
+              className="rev"
+              title={synthesisAbsolute ?? undefined}
+            >
+              {isSynthesis ? "Updated" : "Rev"} · {revLabel}
+            </span>
+          )}
         </div>
         <h1>
           {lead}

@@ -129,6 +129,14 @@ function IntakePageInner() {
   const abortRef = useRef<AbortController | null>(null);
   const nextResultId = useRef<number>(0);
 
+  // Gate persistence until after the load effect has populated state for the
+  // current project. Without this gate, on mount the persist effect fires
+  // with `results === []` (initial state) BEFORE the load effect's setResults
+  // re-render — which writes `[]` to localStorage, wiping the persisted data.
+  // Symptom: results vanish after navigating away and back. The ref also
+  // protects against the same race on project switches.
+  const loadedForProjectRef = useRef<number | null>(null);
+
   // ── Load project-scoped research state when project changes ─────
   useEffect(() => {
     if (projectId === null) return;
@@ -145,11 +153,13 @@ function IntakePageInner() {
         .reduce((a, b) => Math.max(a, b), -1);
       nextResultId.current = maxId + 1;
     } catch {}
+    loadedForProjectRef.current = projectId;
   }, [projectId]);
 
   // ── Persist on change (scoped to current project) ───────────────
   useEffect(() => {
     if (projectId === null) return;
+    if (loadedForProjectRef.current !== projectId) return;
     try {
       localStorage.setItem(researchResultsKey(projectId), JSON.stringify(results));
     } catch {}
@@ -157,6 +167,7 @@ function IntakePageInner() {
 
   useEffect(() => {
     if (projectId === null) return;
+    if (loadedForProjectRef.current !== projectId) return;
     try {
       localStorage.setItem(researchQueryKey(projectId), researchQuery);
     } catch {}
@@ -348,6 +359,11 @@ function IntakePageInner() {
   // when they hit Commission without changing the topic (or use Load more),
   // we preserve the existing list and just append.
   const [resultsTopic, setResultsTopic] = useState<string>("");
+  const [clearWarning, setClearWarning] = useState<{
+    topic: string;
+    existingTopic: string;
+    existingCount: number;
+  } | null>(null);
   useEffect(() => {
     // On project switch, sync resultsTopic from persisted query if we have results
     if (results.length > 0 && !resultsTopic) setResultsTopic(researchQuery);
@@ -355,7 +371,7 @@ function IntakePageInner() {
   }, [projectId]);
 
   const runResearch = useCallback(
-    async (topicOverride: string | undefined, append: boolean) => {
+    async (topicOverride: string | undefined, append: boolean, skipConfirm = false) => {
       const topic = (topicOverride ?? researchQuery).trim();
       if (!topic || isSearching || !projectId) return;
 
@@ -364,11 +380,9 @@ function IntakePageInner() {
       const topicChanged = resultsTopic && resultsTopic !== topic && results.length > 0;
       const effectiveAppend = append || (!topicChanged && results.length > 0);
 
-      if (topicChanged && !append) {
-        const ok = window.confirm(
-          `Replace ${results.length} result${results.length === 1 ? "" : "s"} for "${resultsTopic}" with a fresh search for "${topic}"?`
-        );
-        if (!ok) return;
+      if (topicChanged && !append && !skipConfirm) {
+        setClearWarning({ topic, existingTopic: resultsTopic, existingCount: results.length });
+        return;
       }
 
       const seenUrls = new Set<string>(
@@ -1042,6 +1056,84 @@ function IntakePageInner() {
         onClose={() => setNoteOpen(false)}
         onSaved={() => fetchSources()}
       />
+
+      {clearWarning && (
+        <div className="note-modal-bg" onClick={() => setClearWarning(null)}>
+          <div
+            className="note-modal"
+            style={{ width: 480 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="note-modal-head">
+              <h3>
+                Clear existing <em>results?</em>
+              </h3>
+              <button
+                className="x"
+                onClick={() => setClearWarning(null)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <div className="note-modal-body">
+              <p
+                style={{
+                  fontFamily: "var(--font-serif)",
+                  fontSize: 15,
+                  lineHeight: 1.6,
+                  color: "var(--ink-2)",
+                  margin: "0 0 14px",
+                }}
+              >
+                Running research for{" "}
+                <strong style={{ color: "var(--ink)" }}>
+                  &ldquo;{clearWarning.topic}&rdquo;
+                </strong>{" "}
+                will clear the {clearWarning.existingCount} result
+                {clearWarning.existingCount === 1 ? "" : "s"} below for{" "}
+                <em>&ldquo;{clearWarning.existingTopic}&rdquo;</em>.
+              </p>
+              <p
+                style={{
+                  fontFamily: "var(--font-inst)",
+                  fontStyle: "italic",
+                  fontSize: 14,
+                  color: "var(--ink-3)",
+                  margin: "0 0 20px",
+                }}
+              >
+                Pending sources already approved into your wiki aren&rsquo;t
+                affected — only the unapproved research list below is cleared.
+              </p>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 10,
+                  justifyContent: "flex-end",
+                }}
+              >
+                <button
+                  className="btn ghost"
+                  onClick={() => setClearWarning(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn primary"
+                  onClick={() => {
+                    const t = clearWarning.topic;
+                    setClearWarning(null);
+                    runResearch(t, false, true);
+                  }}
+                >
+                  Clear &amp; search
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
