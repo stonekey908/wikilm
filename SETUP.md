@@ -50,7 +50,15 @@ Behaviour notes:
 
 - If the dev server is already running, the launcher just opens the browser tab.
 - Server logs go to `backups/.wikilm-dev.log` — check that if something looks wrong.
-- To stop the server: `lsof -ti :3000 | xargs kill` in any terminal, or just close your laptop overnight.
+- **Closing the browser or PWA window does NOT stop the server** — it's detached on purpose so your next launch is instant. Stop it when you want to free the port or memory.
+
+### Stopping the server
+
+Three options, easiest first:
+
+1. **Double-click `scripts/stop-wikilm.command`** — kills whatever's listening on :3000, reports status, exits. Drag it to the Dock next to the launcher so stop is a one-click sibling of start.
+2. **`lsof -ti :3000 | xargs kill`** — one-liner in any terminal.
+3. Leave it running. The server idles at ~200 MB and costs nothing until the next ingest.
 
 ### Option B · Install as a web app
 
