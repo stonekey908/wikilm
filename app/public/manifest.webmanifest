@@ -1,0 +1,14 @@
+{
+  "name": "WikiLM",
+  "short_name": "WikiLM",
+  "description": "Personal wiki grown by an LLM.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f3efe7",
+  "theme_color": "#1a1816",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

@@ -64,6 +64,17 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "WikiLM — Editorial",
   description: "Personal wiki grown by an LLM",
+  manifest: "/manifest.webmanifest",
+  applicationName: "WikiLM",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "WikiLM",
+  },
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/icon.svg", type: "image/svg+xml" }],
+  },
 };
 
 export default function RootLayout({

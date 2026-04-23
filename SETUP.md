@@ -35,6 +35,34 @@ To use real AI features instead of mock data:
 3. Run `npm run db:push` — in case schema changed
 4. Run `npm run dev`
 
+## Running WikiLM Without Opening a Terminal (macOS)
+
+After one-time setup above, there are two ways to start WikiLM without a terminal:
+
+### Option A · Double-click launcher
+
+1. In Finder, open `SecondBrain/scripts/` and find `launch-wikilm.command`.
+2. First run only: right-click it → **Open** → confirm macOS's security prompt. After that, double-click always works.
+3. A short Terminal window flashes while the server boots. The app opens at `http://localhost:3000` automatically.
+4. Drag `launch-wikilm.command` onto the Dock or the Desktop for one-click access. The server keeps running after the Terminal window closes.
+
+Behaviour notes:
+
+- If the dev server is already running, the launcher just opens the browser tab.
+- Server logs go to `backups/.wikilm-dev.log` — check that if something looks wrong.
+- To stop the server: `lsof -ti :3000 | xargs kill` in any terminal, or just close your laptop overnight.
+
+### Option B · Install as a web app
+
+Once `http://localhost:3000` is open:
+
+- **Chrome / Edge / Arc**: address bar → **⋯ menu** → *Install app* (or **Install WikiLM**). Get a standalone window with no address bar, a Dock icon, and its own App Switcher entry.
+- **Safari**: **File** → *Add to Dock…*. Works identically — native-feeling app window, native icon.
+
+The manifest lives at `/manifest.webmanifest`; the app icon is a small SVG at `/icon.svg`. No extension or extra install needed.
+
+Combine both: double-click launcher to boot the server, then the installed web-app shortcut on the Dock takes you straight into the app window. Closest you can get to a native app without bundling Electron.
+
 ## Project Structure
 
 ```

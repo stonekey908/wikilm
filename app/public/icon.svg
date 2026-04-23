@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="WikiLM">
+  <rect width="512" height="512" rx="96" fill="#f3efe7"/>
+  <rect x="16" y="16" width="480" height="480" rx="80" fill="none" stroke="#1a1816" stroke-width="4"/>
+  <g fill="#1a1816" font-family="Georgia, 'Times New Roman', serif">
+    <text x="256" y="248" text-anchor="middle" font-size="180" font-weight="700" letter-spacing="-6">W</text>
+    <text x="256" y="382" text-anchor="middle" font-size="92" font-style="italic" font-weight="500" fill="#c0341c">LM</text>
+  </g>
+  <line x1="96" y1="420" x2="416" y2="420" stroke="#1a1816" stroke-width="3"/>
+  <line x1="96" y1="438" x2="416" y2="438" stroke="#1a1816" stroke-width="1"/>
+</svg>

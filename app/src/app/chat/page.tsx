@@ -221,6 +221,18 @@ function SalonInner() {
   const [streaming, setStreaming] = useState(false);
   const [streamText, setStreamText] = useState("");
   const abortRef = useRef<AbortController | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Auto-resize the chat textarea as the user types. The salon-input textarea
+  // has max-height:200px in CSS; reset-to-auto-then-scrollHeight is the
+  // standard browser-safe pattern. Runs on every `input` change (including
+  // programmatic setInput, e.g. after a send which clears the field).
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+  }, [input]);
   const autoFiredRef = useRef(false);
   const threadRef = useRef<HTMLDivElement | null>(null);
 
@@ -482,6 +494,7 @@ function SalonInner() {
         <div className="salon-input">
           <span className="sig">§</span>
           <textarea
+            ref={inputRef}
             placeholder="Ask WikiLM about this project…"
             value={input}
             onChange={(e) => setInput(e.target.value)}
