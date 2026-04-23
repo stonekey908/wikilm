@@ -45,11 +45,33 @@ done
 
 open_app() {
   if [ -n "$PWA_APP" ]; then
+    # Pre-warm the homepage before opening the PWA. Next.js dev compiles
+    # per-route on first request, so the PWA's very first load could hit
+    # a mid-compile response and render stale/empty. Hitting `/` via curl
+    # forces the compile to finish before the PWA window loads.
+    curl -s -o /dev/null -m 10 "$URL" || true
+
+    # Force a fresh PWA window each launch. `open -a` on a running Chrome
+    # App just reactivates the last window — if the previous session ended
+    # on a "can't connect" error page (server was down), that error stays
+    # cached and the user has to hit Cmd+R to retry. Quit the app first so
+    # the next `open -a` boots a clean window against the now-warm server.
+    local pwa_name
+    pwa_name=$(basename "$PWA_APP" .app)
+    if pgrep -f "$pwa_name" > /dev/null 2>&1; then
+      echo "Refreshing existing PWA window…"
+      osascript -e "tell application \"$pwa_name\" to quit" > /dev/null 2>&1 || true
+      for i in 1 2 3 4 5 6 7 8; do
+        sleep 0.25
+        pgrep -f "$pwa_name" > /dev/null 2>&1 || break
+      done
+    fi
     echo "Opening PWA window: $PWA_APP"
     open -a "$PWA_APP"
   else
     echo "No PWA install found — opening in default browser."
     echo "(Install as an app from Chrome → ⋯ → Install WikiLM for a standalone window.)"
+    curl -s -o /dev/null -m 10 "$URL" || true
     open "$URL"
   fi
 }
