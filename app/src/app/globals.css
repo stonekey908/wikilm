@@ -1718,6 +1718,16 @@ body[data-grain="false"]::after { display: none !important; }
 .map-seg-btn:last-child { border-right: none; }
 .map-seg-btn:hover { color: var(--ink); background: var(--paper-2); }
 .map-seg-btn.active { background: var(--ink); color: var(--paper); }
+.map-rail-reset {
+  margin-left: auto;
+  appearance: none; cursor: pointer;
+  font-family: var(--font-mono); font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--accent); background: none; border: 1px solid var(--accent);
+  padding: 6px 12px; border-radius: 2px;
+  transition: color 120ms, background 120ms;
+}
+.map-rail-reset:hover { color: var(--paper); background: var(--accent); }
 
 .mapwrap {
   border: 1.5px solid var(--rule);
@@ -1896,6 +1906,11 @@ body[data-grain="false"]::after { display: none !important; }
 }
 .trail-crumbs {
   display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+}
+.trail-row { display: inline-flex; align-items: center; gap: 6px; }
+.trail-arrow {
+  font-family: var(--font-mono); font-size: 14px; color: var(--ink-4);
+  padding: 0 2px;
 }
 .trail-step {
   display: inline-flex; align-items: center; gap: 8px;

@@ -278,12 +278,18 @@ export default function MapPage() {
   type MapView = "constellation" | "full";
   const [view, setView] = useState<MapView>("constellation");
   const [weight, setWeight] = useState<boolean>(true);
+  const [bloomOn, setBloomOn] = useState<boolean>(true);
+  const [trailOn, setTrailOn] = useState<boolean>(true);
   useEffect(() => {
     if (projectId === null) return;
     const v = window.localStorage.getItem(`wikilm.map.view.${projectId}`);
     if (v === "constellation" || v === "full") setView(v);
     const w = window.localStorage.getItem(`wikilm.map.weight.${projectId}`);
     if (w === "on" || w === "off") setWeight(w === "on");
+    const b = window.localStorage.getItem(`wikilm.map.bloom.${projectId}`);
+    if (b === "on" || b === "off") setBloomOn(b === "on");
+    const t = window.localStorage.getItem(`wikilm.map.trail.${projectId}`);
+    if (t === "on" || t === "off") setTrailOn(t === "on");
   }, [projectId]);
   const setViewPersist = useCallback(
     (v: MapView) => {
@@ -297,6 +303,22 @@ export default function MapPage() {
       setWeight(w);
       if (projectId !== null)
         window.localStorage.setItem(`wikilm.map.weight.${projectId}`, w ? "on" : "off");
+    },
+    [projectId],
+  );
+  const setBloomPersist = useCallback(
+    (b: boolean) => {
+      setBloomOn(b);
+      if (projectId !== null)
+        window.localStorage.setItem(`wikilm.map.bloom.${projectId}`, b ? "on" : "off");
+    },
+    [projectId],
+  );
+  const setTrailPersist = useCallback(
+    (t: boolean) => {
+      setTrailOn(t);
+      if (projectId !== null)
+        window.localStorage.setItem(`wikilm.map.trail.${projectId}`, t ? "on" : "off");
     },
     [projectId],
   );
@@ -352,6 +374,8 @@ export default function MapPage() {
     title: string;
     type: string;
     excerpt: string;
+    outgoing: { slug: string; title: string }[];
+    incoming: { slug: string; title: string }[];
   }
   const [selectedDetail, setSelectedDetail] = useState<NodeDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -467,12 +491,14 @@ export default function MapPage() {
   }, [adjacency, nodes]);
 
   // 1-hop neighborhood of the selected node (includes the node itself).
+  // Bloom toggle gates the dim/highlight side-effect — when off, selection
+  // still happens (preview card opens) but the rest of the graph stays bright.
   const neighborhood = useMemo(() => {
-    if (!selectedId) return null;
+    if (!selectedId || !bloomOn) return null;
     const set = new Set<string>([selectedId]);
     for (const n of adjacency.get(selectedId) ?? []) set.add(n);
     return set;
-  }, [selectedId, adjacency]);
+  }, [selectedId, adjacency, bloomOn]);
 
   const tooltipNode = hoverId ? nodes.find((n) => n.id === hoverId) : null;
 
@@ -485,24 +511,26 @@ export default function MapPage() {
     return m;
   }, [trail]);
 
-  // Click → bloom (selection). Double-click → open the wiki page.
-  // Bloom side-effect: append to trail unless we're collapsing or this stop
-  // is the same as the most recent one already recorded.
+  // Click → select (opens preview card; blooms if Bloom toggle is on).
+  // Double-click → open the wiki page directly.
+  // Trail toggle gates whether the click is recorded as a journey stop.
   const onNodeClick = useCallback(
     (n: LaidNode) => {
       setSelectedId((prev) => {
         if (prev === n.id) return null; // collapse
-        const last = trail[trail.length - 1];
-        if (!last || last.id !== n.id) {
-          persistTrail([
-            ...trail,
-            { id: n.id, slug: n.slug, title: n.title, type: n.type, ts: Date.now() },
-          ]);
+        if (trailOn) {
+          const last = trail[trail.length - 1];
+          if (!last || last.id !== n.id) {
+            persistTrail([
+              ...trail,
+              { id: n.id, slug: n.slug, title: n.title, type: n.type, ts: Date.now() },
+            ]);
+          }
         }
         return n.id;
       });
     },
-    [trail, persistTrail],
+    [trail, persistTrail, trailOn],
   );
   const onNodeDoubleClick = useCallback(
     (n: LaidNode) => {
@@ -563,14 +591,26 @@ export default function MapPage() {
       .then((r) => (r.ok ? r.json() : null))
       .then((d: { title?: string; type?: string; body?: string } | null) => {
         if (cancelled || !d) return;
-        // First non-empty, non-heading paragraph. Strip wikilink pipes for the
-        // one-liner so `[[x|y]]` renders as `y`.
         const body = d.body ?? "";
+        const incomingEdges = edges.filter((e) => e.to === selectedId);
+        const outgoingEdges = edges.filter((e) => e.from === selectedId);
+        const titleFor = (id: string) => {
+          const n = nodes.find((x) => x.id === id);
+          return n ? { slug: n.slug, title: n.title } : null;
+        };
+        const outgoing = outgoingEdges
+          .map((e) => titleFor(e.to))
+          .filter((x): x is { slug: string; title: string } => x !== null);
+        const incoming = incomingEdges
+          .map((e) => titleFor(e.from))
+          .filter((x): x is { slug: string; title: string } => x !== null);
         setSelectedDetail({
           slug: node.slug,
           title: d.title ?? node.title,
           type: d.type ?? node.type,
           excerpt: extractExcerpt(body),
+          outgoing,
+          incoming,
         });
       })
       .catch(() => {})
@@ -580,7 +620,7 @@ export default function MapPage() {
     return () => {
       cancelled = true;
     };
-  }, [selectedId, nodes, projectId]);
+  }, [selectedId, nodes, edges, projectId]);
 
   function edgeVisible(e: LaidEdge): boolean {
     if (!activeType) return true;
@@ -708,6 +748,54 @@ export default function MapPage() {
             </button>
           </div>
         </div>
+        <div className="map-rail-group">
+          <span className="map-rail-lab">Bloom</span>
+          <div className="map-seg">
+            <button
+              type="button"
+              className={`map-seg-btn${bloomOn ? " active" : ""}`}
+              onClick={() => setBloomPersist(true)}
+            >
+              On
+            </button>
+            <button
+              type="button"
+              className={`map-seg-btn${!bloomOn ? " active" : ""}`}
+              onClick={() => setBloomPersist(false)}
+            >
+              Off
+            </button>
+          </div>
+        </div>
+        <div className="map-rail-group">
+          <span className="map-rail-lab">Trail</span>
+          <div className="map-seg">
+            <button
+              type="button"
+              className={`map-seg-btn${trailOn ? " active" : ""}`}
+              onClick={() => setTrailPersist(true)}
+            >
+              On
+            </button>
+            <button
+              type="button"
+              className={`map-seg-btn${!trailOn ? " active" : ""}`}
+              onClick={() => setTrailPersist(false)}
+            >
+              Off
+            </button>
+          </div>
+        </div>
+        {trail.length > 0 && (
+          <button
+            type="button"
+            className="map-rail-reset"
+            onClick={clearTrail}
+            title="Clear the recorded journey"
+          >
+            Reset journey
+          </button>
+        )}
       </div>
 
       <div className="mapwrap">
@@ -790,24 +878,51 @@ export default function MapPage() {
                     stops that have a positioned counterpart in `nodes`
                     are joined; stops from a different view (filtered
                     out by Constellation) skip a segment. */}
-              {trail.length >= 2 && (() => {
-                const points = trail
-                  .map((s) => nodes.find((n) => n.id === s.id))
-                  .filter((n): n is LaidNode => Boolean(n));
-                if (points.length < 2) return null;
-                const d = points
-                  .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`)
-                  .join(" ");
+              {trailOn && trail.length >= 2 && (() => {
+                // Walk the trail in order; render each consecutive pair as
+                // its own arrow-headed segment so direction is unambiguous.
+                // Stops not currently positioned (e.g. filtered out by the
+                // Constellation view) are skipped — the next visible pair
+                // continues the journey.
+                const segments: { from: LaidNode; to: LaidNode; idx: number }[] = [];
+                let prev: LaidNode | undefined;
+                trail.forEach((s, i) => {
+                  const here = nodes.find((n) => n.id === s.id);
+                  if (!here) return;
+                  if (prev) segments.push({ from: prev, to: here, idx: i });
+                  prev = here;
+                });
+                if (segments.length === 0) return null;
                 return (
-                  <path
-                    d={d}
-                    fill="none"
-                    stroke="var(--accent)"
-                    strokeWidth={2}
-                    strokeDasharray="6 4"
-                    opacity={0.75}
-                    pointerEvents="none"
-                  />
+                  <g pointerEvents="none">
+                    <defs>
+                      <marker
+                        id="trail-arrow"
+                        viewBox="0 0 10 10"
+                        refX="9"
+                        refY="5"
+                        markerWidth="7"
+                        markerHeight="7"
+                        orient="auto-start-reverse"
+                      >
+                        <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)" />
+                      </marker>
+                    </defs>
+                    {segments.map((seg) => (
+                      <line
+                        key={`trail-${seg.idx}`}
+                        x1={seg.from.x}
+                        y1={seg.from.y}
+                        x2={seg.to.x}
+                        y2={seg.to.y}
+                        stroke="var(--accent)"
+                        strokeWidth={2}
+                        strokeDasharray="6 4"
+                        opacity={0.8}
+                        markerEnd="url(#trail-arrow)"
+                      />
+                    ))}
+                  </g>
                 );
               })()}
 
@@ -930,7 +1045,7 @@ export default function MapPage() {
                         {n.title.length > 28 ? n.title.slice(0, 26) + "…" : n.title}
                       </text>
                     )}
-                    {trailIndexById.has(n.id) && (
+                    {trailOn && trailIndexById.has(n.id) && (
                       <g pointerEvents="none">
                         <circle
                           cx={n.x + baseR * scale + 4}
@@ -1021,62 +1136,124 @@ export default function MapPage() {
             )}
 
             {selectedId && (
-              <div className="map-peek">
-                <div className="map-peek-type">
-                  {selectedDetail?.type?.toUpperCase() ?? (detailLoading ? "…" : "—")}
-                </div>
-                <div className="map-peek-body">
-                  <div className="map-peek-title">
-                    {selectedDetail?.title ?? (detailLoading ? "Loading…" : "—")}
-                  </div>
-                  {selectedDetail?.excerpt && (
-                    <div className="map-peek-excerpt">{selectedDetail.excerpt}</div>
-                  )}
-                </div>
-                <div className="map-peek-actions">
-                  {selectedDetail && (
-                    <>
+              <aside className="map-focus">
+                {selectedDetail ? (
+                  <>
+                    <div className="map-focus-head">
+                      <div className="map-focus-type">{selectedDetail.type.toUpperCase()}</div>
                       <button
                         type="button"
-                        className="map-peek-btn"
+                        className="map-focus-x"
+                        onClick={() => setSelectedId(null)}
+                        aria-label="Close"
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <h3>{selectedDetail.title}</h3>
+                    {selectedDetail.excerpt ? (
+                      <p className="map-focus-excerpt">{selectedDetail.excerpt}</p>
+                    ) : (
+                      <p className="map-focus-excerpt map-focus-excerpt-missing">
+                        No opening paragraph.
+                      </p>
+                    )}
+
+                    <div className="map-focus-section">
+                      <div className="map-focus-section-h">
+                        Outgoing · {selectedDetail.outgoing.length}
+                      </div>
+                      {selectedDetail.outgoing.length === 0 ? (
+                        <div className="map-focus-empty">— no outbound links</div>
+                      ) : (
+                        <ul className="map-focus-list">
+                          {selectedDetail.outgoing.slice(0, 12).map((o) => (
+                            <li key={`out-${o.slug}`}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const target = nodes.find((n) => n.slug === o.slug);
+                                  if (target) onNodeClick(target);
+                                }}
+                              >
+                                {o.title}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
+                    <div className="map-focus-section">
+                      <div className="map-focus-section-h">
+                        Incoming · {selectedDetail.incoming.length}
+                      </div>
+                      {selectedDetail.incoming.length === 0 ? (
+                        <div className="map-focus-empty">— nothing links here yet</div>
+                      ) : (
+                        <ul className="map-focus-list">
+                          {selectedDetail.incoming.slice(0, 12).map((o) => (
+                            <li key={`in-${o.slug}`}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const target = nodes.find((n) => n.slug === o.slug);
+                                  if (target) onNodeClick(target);
+                                }}
+                              >
+                                {o.title}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
+                    <div className="map-focus-actions">
+                      <button
+                        type="button"
+                        className="btn sm"
                         onClick={() =>
                           router.push(`/wiki?slug=${encodeURIComponent(selectedDetail.slug)}`)
                         }
                       >
-                        Open page →
+                        Open in Wiki →
                       </button>
                       <button
                         type="button"
-                        className="map-peek-btn primary"
+                        className="btn sm primary"
                         onClick={() => {
-                          const q = `Tell me about "${selectedDetail.title}" using the wiki.`;
+                          const neighborTitles = [
+                            selectedDetail.title,
+                            ...selectedDetail.outgoing.slice(0, 6).map((o) => o.title),
+                            ...selectedDetail.incoming.slice(0, 6).map((o) => o.title),
+                          ];
+                          const q = `Focus on these pages and answer only from them: ${neighborTitles
+                            .map((t) => `"${t}"`)
+                            .join(", ")}.\n\nWhat does this subgraph tell us about ${selectedDetail.title}?`;
                           router.push(`/chat?q=${encodeURIComponent(q)}`);
                         }}
                       >
                         Ask about this →
                       </button>
-                    </>
-                  )}
-                  <button
-                    type="button"
-                    className="map-peek-x"
-                    onClick={() => setSelectedId(null)}
-                    aria-label="Close"
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
+                    </div>
+                  </>
+                ) : detailLoading ? (
+                  <div className="map-focus-loading">Loading…</div>
+                ) : (
+                  <div className="map-focus-loading">—</div>
+                )}
+              </aside>
             )}
           </>
         )}
       </div>
 
-      {trail.length > 0 && (
+      {trailOn && trail.length > 0 && (
         <div className="trail-rail">
           <div className="trail-head">
             <h3>
-              The trail you&rsquo;ve <em>wandered.</em>
+              The journey you&rsquo;ve <em>wandered.</em>
             </h3>
             <div className="trail-actions">
               <button
@@ -1085,7 +1262,7 @@ export default function MapPage() {
                 onClick={clearTrail}
                 disabled={savingTrail}
               >
-                Clear trail
+                Reset journey
               </button>
               <button
                 type="button"
@@ -1100,10 +1277,13 @@ export default function MapPage() {
           </div>
           <div className="trail-crumbs">
             {trail.map((s, i) => (
-              <span key={`${s.id}-${i}`} className="trail-step">
-                <span className="trail-num">{i + 1}</span>
-                <span className="trail-kind">{s.type}</span>
-                <span className="trail-title">{s.title}</span>
+              <span key={`${s.id}-${i}`} className="trail-row">
+                {i > 0 && <span className="trail-arrow">→</span>}
+                <span className="trail-step">
+                  <span className="trail-num">{i + 1}</span>
+                  <span className="trail-kind">{s.type}</span>
+                  <span className="trail-title">{s.title}</span>
+                </span>
               </span>
             ))}
           </div>
@@ -1111,104 +1291,123 @@ export default function MapPage() {
       )}
 
       <style jsx>{`
-        .map-peek {
+        .map-focus {
           position: absolute;
-          left: 14px;
+          top: 14px;
           right: 14px;
           bottom: 14px;
+          width: 340px;
           background: var(--paper);
           border: 1.5px solid var(--ink);
           box-shadow: 4px 4px 0 var(--ink);
-          padding: 12px 16px;
-          display: flex;
-          align-items: center;
-          gap: 16px;
-          z-index: 20;
-          animation: peekIn 220ms ease;
-        }
-        @keyframes peekIn {
-          from { transform: translateY(8px); opacity: 0; }
-          to   { transform: translateY(0);   opacity: 1; }
-        }
-        .map-peek-type {
-          font-family: var(--font-mono);
-          font-size: 10px;
-          font-weight: 700;
-          letter-spacing: 0.14em;
-          color: var(--accent);
-          flex-shrink: 0;
-          width: 80px;
-        }
-        .map-peek-body {
-          flex: 1;
-          min-width: 0;
+          padding: 16px 18px;
+          overflow-y: auto;
           display: flex;
           flex-direction: column;
-          gap: 2px;
+          gap: 14px;
+          z-index: 20;
+          animation: focusIn 220ms ease;
         }
-        .map-peek-title {
-          font-family: var(--font-serif);
-          font-size: 16px;
-          font-weight: 600;
-          line-height: 1.2;
-          color: var(--ink);
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
+        @keyframes focusIn {
+          from { transform: translateX(12px); opacity: 0; }
+          to   { transform: translateX(0);    opacity: 1; }
         }
-        .map-peek-excerpt {
-          font-family: var(--font-serif);
-          font-size: 12.5px;
-          line-height: 1.4;
-          color: var(--ink-3);
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-        .map-peek-actions {
+        .map-focus-head {
           display: flex;
+          justify-content: space-between;
           align-items: center;
-          gap: 8px;
-          flex-shrink: 0;
         }
-        .map-peek-btn {
+        .map-focus-type {
           font-family: var(--font-mono);
-          font-size: 10.5px;
-          font-weight: 600;
-          letter-spacing: 0.08em;
-          text-transform: uppercase;
-          color: var(--ink-2);
-          background: none;
-          border: 1px solid var(--rule);
-          padding: 7px 11px;
-          border-radius: 2px;
-          cursor: pointer;
-          transition: color 120ms, border-color 120ms, background 120ms;
+          font-size: 9.5px;
+          font-weight: 700;
+          letter-spacing: 0.16em;
+          color: var(--accent);
         }
-        .map-peek-btn:hover {
-          color: var(--ink);
-          border-color: var(--ink);
-        }
-        .map-peek-btn.primary {
-          color: var(--paper);
-          background: var(--ink);
-          border-color: var(--ink);
-        }
-        .map-peek-btn.primary:hover {
-          background: var(--accent);
-          border-color: var(--accent);
-        }
-        .map-peek-x {
+        .map-focus-x {
           background: none;
           border: none;
           font-size: 22px;
           cursor: pointer;
-          color: var(--ink-4);
+          color: var(--ink-3);
           line-height: 1;
-          padding: 0 6px;
+          padding: 0 4px;
         }
-        .map-peek-x:hover {
+        .map-focus-x:hover { color: var(--ink); }
+        .map-focus h3 {
+          font-family: var(--font-serif);
+          font-size: 22px;
+          font-weight: 600;
+          letter-spacing: -0.01em;
+          line-height: 1.15;
           color: var(--ink);
+          margin: -2px 0 0;
+        }
+        .map-focus-excerpt {
+          font-family: var(--font-serif);
+          font-size: 13.5px;
+          line-height: 1.5;
+          color: var(--ink-2);
+          margin: 0;
+        }
+        .map-focus-excerpt-missing {
+          font-family: var(--font-inst);
+          font-style: italic;
+          color: var(--ink-4);
+        }
+        .map-focus-section {
+          border-top: 1px dashed var(--rule);
+          padding-top: 10px;
+        }
+        .map-focus-section-h {
+          font-family: var(--font-mono);
+          font-size: 9px;
+          font-weight: 700;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          color: var(--ink-3);
+          margin-bottom: 6px;
+        }
+        .map-focus-list {
+          list-style: none;
+          margin: 0;
+          padding: 0;
+          display: grid;
+          gap: 4px;
+        }
+        .map-focus-list button {
+          background: none;
+          border: none;
+          padding: 2px 0;
+          text-align: left;
+          font-family: var(--font-serif);
+          font-size: 13px;
+          color: var(--ink-2);
+          cursor: pointer;
+          text-decoration: underline;
+          text-decoration-color: var(--rule);
+          text-underline-offset: 3px;
+        }
+        .map-focus-list button:hover { color: var(--accent); }
+        .map-focus-empty {
+          font-family: var(--font-inst);
+          font-style: italic;
+          font-size: 12.5px;
+          color: var(--ink-4);
+        }
+        .map-focus-actions {
+          margin-top: auto;
+          display: flex;
+          gap: 8px;
+          flex-wrap: wrap;
+          padding-top: 10px;
+          border-top: 1.5px solid var(--ink);
+        }
+        .map-focus-loading {
+          font-family: var(--font-inst);
+          font-style: italic;
+          color: var(--ink-3);
+          font-size: 14px;
         }
       `}</style>
     </div>
