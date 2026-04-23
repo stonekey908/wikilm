@@ -330,11 +330,21 @@ function SalonInner() {
     const transcript = kept
       .map((m) => (m.role === "user" ? `Human: ${m.content}` : `Assistant: ${m.content}`))
       .join("\n\n");
+    // Style directive sits just above the user turn — kept separate from the
+    // help digest so it can evolve independently. The model reliably narrates
+    // its reading plan ("I will start by reading the wiki's index…") without
+    // this instruction; the directive squashes that habit.
+    const STYLE_DIRECTIVE = `Response style:
+- Start with the substantive answer. Do NOT narrate your process.
+- Never write phrases like "I will start by reading…", "I will now read…", "Let me first check…", "I will identify and read…", or any preamble about which pages you will consult.
+- If you need information from the wiki, read silently and answer directly.
+- No meta-commentary about the task. Just the answer, grounded in the wiki.`;
+
     const helpPreamble = HELP_DIGEST;
     const wrappedPrompt =
       kept.length === 1
-        ? `${helpPreamble}\n\n---\n\n${text}`
-        : `${helpPreamble}\n\n---\n\nYou are continuing an ongoing conversation. The full prior transcript is below — treat every Human turn as what the user said and every Assistant turn as what you (the assistant) previously said. Continue the conversation naturally, grounded in the active wiki project.\n\n${transcript}\n\nAssistant:`;
+        ? `${helpPreamble}\n\n---\n\n${STYLE_DIRECTIVE}\n\n---\n\n${text}`
+        : `${helpPreamble}\n\n---\n\n${STYLE_DIRECTIVE}\n\n---\n\nYou are continuing an ongoing conversation. The full prior transcript is below — treat every Human turn as what the user said and every Assistant turn as what you (the assistant) previously said. Continue the conversation naturally, grounded in the active wiki project.\n\n${transcript}\n\nAssistant:`;
 
     const controller = new AbortController();
     abortRef.current = controller;

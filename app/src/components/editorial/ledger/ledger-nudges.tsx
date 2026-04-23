@@ -25,9 +25,18 @@ interface NudgesResponse {
   promotion: DashboardNudge[];
   theme: DashboardNudge[];
   gap: DashboardNudge[];
+  suggestedQuestion: DashboardNudge[];
+  missingCrossRef: DashboardNudge[];
+  missingConcept: DashboardNudge[];
+  projectGroupTotals: {
+    suggestedQuestion: number;
+    missingCrossRef: number;
+    missingConcept: number;
+  };
 }
 
 type Group = "promotion" | "theme" | "gap";
+type ProjectGroup = "suggestedQuestion" | "missingCrossRef" | "missingConcept";
 
 const GROUP_LABEL: Record<Group, string> = {
   promotion: "Promote",
@@ -41,6 +50,15 @@ const GROUP_CLASS: Record<Group, string> = {
   gap: "red",
 };
 
+const PROJECT_GROUP_META: Record<
+  ProjectGroup,
+  { label: string; countKey: keyof NudgesResponse["projectGroupTotals"]; pillClass: string }
+> = {
+  suggestedQuestion: { label: "Suggested questions", countKey: "suggestedQuestion", pillClass: "" },
+  missingCrossRef: { label: "Missing cross-refs", countKey: "missingCrossRef", pillClass: "blue" },
+  missingConcept: { label: "Missing concepts", countKey: "missingConcept", pillClass: "red" },
+};
+
 export function LedgerMarginalia() {
   const router = useRouter();
   const { addToast } = useToast();
@@ -51,6 +69,8 @@ export function LedgerMarginalia() {
   const [hidden, setHidden] = useState<Set<number>>(new Set());
   const [conceptModal, setConceptModal] = useState<{ nudge: DashboardNudge; title: string } | null>(null);
   const [conceptBusy, setConceptBusy] = useState(false);
+  // Collapsed by default so lint findings don't flood the ledger.
+  const [expandedGroups, setExpandedGroups] = useState<Set<ProjectGroup>>(new Set());
 
   const fetchNudges = useCallback(async () => {
     if (activeProjectId === null) return;
@@ -167,13 +187,35 @@ export function LedgerMarginalia() {
     }
   }
 
-  if (visible.length === 0) {
+  const projectGroupTotals = data?.projectGroupTotals ?? {
+    suggestedQuestion: 0,
+    missingCrossRef: 0,
+    missingConcept: 0,
+  };
+  const hasAnyProjectGroup =
+    projectGroupTotals.suggestedQuestion +
+      projectGroupTotals.missingCrossRef +
+      projectGroupTotals.missingConcept >
+    0;
+
+  function toggleGroup(g: ProjectGroup) {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(g)) next.delete(g);
+      else next.add(g);
+      return next;
+    });
+  }
+
+  if (visible.length === 0 && !hasAnyProjectGroup) {
     return (
       <div style={{ fontFamily: "var(--font-inst)", fontStyle: "italic", fontSize: 13, color: "var(--ink-3)", padding: "8px 0" }}>
-        No nudges. Run a lint pass to surface promotions, themes, and gaps.
+        No nudges. Run a lint pass to surface suggestions, missing concepts, and cross-refs.
       </div>
     );
   }
+
+  const projectGroups: ProjectGroup[] = ["suggestedQuestion", "missingCrossRef", "missingConcept"];
 
   return (
     <>
@@ -214,6 +256,134 @@ export function LedgerMarginalia() {
           </div>
         );
       })}
+
+      {/* Project-scope lint highlights — collapsed by default so the ledger
+          stays scannable. Clicking the header reveals the first few items;
+          "View more" jumps to the full Lint page. */}
+      {projectGroups.map((g) => {
+        const meta = PROJECT_GROUP_META[g];
+        const items = (data?.[g] ?? []) as DashboardNudge[];
+        const total = projectGroupTotals[meta.countKey];
+        if (total === 0) return null;
+        const expanded = expandedGroups.has(g);
+        const hidden = Math.max(0, total - items.length);
+        return (
+          <div key={g} className={`mark-group${meta.pillClass ? ` ${meta.pillClass}` : ""}`}>
+            <button
+              type="button"
+              className="mark-group-head"
+              onClick={() => toggleGroup(g)}
+              aria-expanded={expanded}
+            >
+              <span
+                className="mark-group-chev"
+                style={{ transform: expanded ? "rotate(0deg)" : "rotate(-90deg)" }}
+              >
+                ▾
+              </span>
+              <span className="mark-group-label">{meta.label}</span>
+              <span className="mark-group-count">{total}</span>
+            </button>
+            {expanded && (
+              <div className="mark-group-body">
+                {items.map((n) => (
+                  <div key={n.id} className="mark-group-row">
+                    <p>
+                      <b>{n.title}</b>
+                      {n.description ? ` · ${n.description}` : null}
+                    </p>
+                    {n.targetPage && (
+                      <div className="mark-group-target">
+                        <code>{n.targetPage}</code>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                <div className="mark-group-foot">
+                  <button
+                    type="button"
+                    className="btn sm primary"
+                    onClick={() => router.push("/lint")}
+                  >
+                    {hidden > 0 ? `View ${hidden} more in Lint →` : "Open in Lint →"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      <style jsx>{`
+        .mark-group {
+          margin: 10px 0;
+          padding: 0;
+          border-left: 2px solid var(--rule);
+        }
+        .mark-group.blue { border-left-color: var(--blue, #3b82f6); }
+        .mark-group.red { border-left-color: var(--red, #c0341c); }
+        .mark-group-head {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          width: 100%;
+          background: none;
+          border: none;
+          padding: 6px 10px 6px 12px;
+          cursor: pointer;
+          text-align: left;
+          font-family: inherit;
+          transition: background 140ms;
+        }
+        .mark-group-head:hover { background: var(--paper-2); }
+        .mark-group-chev {
+          display: inline-block;
+          font-family: var(--font-mono);
+          font-size: 10px;
+          color: var(--ink-4);
+          transition: transform 140ms;
+        }
+        .mark-group-label {
+          flex: 1;
+          font-family: var(--font-mono);
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          color: var(--ink-2);
+        }
+        .mark-group-count {
+          font-family: var(--font-mono);
+          font-size: 10px;
+          color: var(--ink-4);
+          font-variant-numeric: tabular-nums;
+        }
+        .mark-group-body {
+          padding: 6px 12px 10px;
+          display: grid;
+          gap: 8px;
+        }
+        .mark-group-row {
+          font-family: var(--font-serif);
+          font-size: 13px;
+          line-height: 1.45;
+          color: var(--ink-2);
+        }
+        .mark-group-row p {
+          margin: 0;
+        }
+        .mark-group-target {
+          margin-top: 2px;
+          font-family: var(--font-mono);
+          font-size: 10px;
+          color: var(--ink-4);
+        }
+        .mark-group-foot {
+          margin-top: 4px;
+          display: flex;
+          justify-content: flex-end;
+        }
+      `}</style>
 
       {conceptModal && (
         <div

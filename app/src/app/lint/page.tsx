@@ -155,6 +155,18 @@ function EditInner() {
   async function runLint() {
     if (!projectId || running) return;
     setRunning(true);
+    // Optimistically mark a job as running so the button disables + the
+    // poll-while-running useEffect activates immediately. Without this,
+    // fetchFindings() can return the prior "completed" job before the new
+    // job has been persisted server-side, so the polling loop never starts
+    // and the user has to navigate away + back to see the new findings.
+    setLatestJob({
+      id: 0,
+      type: "lint",
+      status: "running",
+      startedAt: new Date().toISOString(),
+      completedAt: null,
+    });
     try {
       const res = await fetch("/api/lint/run", {
         method: "POST",
@@ -162,10 +174,12 @@ function EditInner() {
         body: JSON.stringify({ projectId }),
       });
       if (!res.ok) throw new Error();
-      addToast({ type: "success", title: "Lint pass started — findings will land below" });
+      addToast({ type: "success", title: "Running lint — findings will appear as they're written" });
       fetchFindings();
     } catch {
       addToast({ type: "error", title: "Couldn't start lint" });
+      // Roll back the optimistic stub on failure so the button re-enables.
+      setLatestJob((prev) => (prev && prev.id === 0 ? null : prev));
     } finally {
       setRunning(false);
     }

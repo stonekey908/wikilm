@@ -6,6 +6,10 @@ A local-first personal knowledge base where an LLM does the maintenance work. Dr
 
 Built around the pattern Andrej Karpathy described in his [LLM wiki gist](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) — raw sources go in, compiled knowledge comes out — extended with a full editorial-brutalist web UI, nested projects, a job queue, NotebookLM-style output generation, multi-provider model routing, and an MCP server so you can talk to the wiki from any Claude Code session.
 
+![WikiLM tour — product-ownership project](docs/demo.gif)
+
+> 15-second tour through a real `product-ownership` wiki: Ledger → Wiki picker → concept article → force-directed Map → Dictation outputs list → Salon. Re-record any time with `node scripts/capture-demo-gif.mjs` (dev server on :3000).
+
 ## What's new in v1.5-beta
 
 - **Editorial-brutalist frontend.** Fraunces + Instrument Serif + JetBrains Mono type stack. Four paper themes (Paper · Stone · Celadon · Night), five ink accents, three densities, four serif faces, three global sizes — all live-switchable via the ⌘T Tweaks panel. Every page redesigned: Ledger (dashboard), Wiki (article reader with margin cards + hover preview), Intake (sources), Dispatch (jobs), Map (force-directed graph), Dictation (compose), Chat, Lint, Settings.
@@ -21,6 +25,25 @@ Built around the pattern Andrej Karpathy described in his [LLM wiki gist](https:
 - **Hover preview cards.** Wikilinks show a portal-rendered preview card that tracks the cursor via rAF-batched transforms. No flicker, no lag, no layout thrash.
 - **⌘K palette.** NL-intent router (`go to …`, `find …`, `generate …`, `switch project …`). Keyboard-first navigation.
 - **Quality-of-life:** editorial toast singleton, responsive breakpoints, breadcrumbs everywhere, job beacon in the topbar, sticky margin cards, in-app `?` help, keyboard shortcuts.
+
+## Public-release updates (post v1.5-beta)
+
+Follow-up work layered on after the stabilisation cut. Everything below is on `main`.
+
+- **Knowledge-bank help.** New `/help` page with left-rail TOC and 27 topics across Concepts, Workflows, Providers, MCP, Navigation, and Troubleshooting. The `?` modal is a glance card with an "Open full help →" button in its header. The same help digest is prepended to every chat prompt so the Salon can answer "how do I…" questions inline with pointers into the knowledge bank.
+- **Ledger empty-state CTA.** Fresh-install projects show a prominent *Want to explore something new?* card with buttons to Intake and /help. Disappears automatically once the project has any source.
+- **Dictation outputs list.** `/compose` now surfaces every filed output below the generator: format pill, relative timestamp, Open / download / delete actions. Delete removes the row optimistically, sweeps every companion file, and broadcasts a `wikilm:outputs-changed` custom event — the wiki index listens and re-renders. Cross-page sync in both directions without reloads.
+- **Install as web app.** PWA manifest + SVG icon at `app/public/`. Chrome / Edge / Arc → ⋯ menu → *Install app*, Safari → File → *Add to Dock…* gets you a standalone window with a real Dock icon. A `scripts/launch-wikilm.command` double-click launcher boots the dev server in the background and opens `localhost:3000` in the default browser — no terminal once set up.
+- **Modal portals.** Every modal (Generate Output, Note composer, Help, Quick-generate, Move project, research-clear warning) now renders via `createPortal` into `document.body` so `position: fixed` escapes the `zoom: var(--fs-scale)` ancestor on `.content`. No more off-screen modals when triggered from a mid-scroll page.
+- **Research persistence race fix.** Results survive tab/page/project navigation. The persist effect was writing `[]` to localStorage before the load effect's setResults re-rendered — a `loadedForProjectRef` gate prevents that. New inline modal (not `window.confirm`) warns before a research topic change clears the existing list.
+- **Synthesis timestamp.** Wiki reader masthead shows `Updated · 2h` for synthesis pages, sourced from file mtime so it's honest even when the synthesis job doesn't update frontmatter.
+- **Retry failed sources.** Intake rows in `failed` status show a **Retry** button that re-runs the ingest job and now triggers synthesis on completion (approve + retry previously skipped this).
+- **Chat UX.** Textarea auto-resizes as you type (capped at 200px). The prompt wrapper explicitly forbids process narration ("I will start by reading the wiki's index…") so chat answers start with the substantive reply.
+- **Lint UX.** Run-lint button optimistically flips to "Linting…" immediately and starts polling — findings appear on the page when the job completes instead of requiring a navigate-away-and-back.
+- **Marginalia lint highlights.** Ledger Marginalia now also surfaces project-scope lint findings (suggested questions, missing cross-refs, missing concepts) as collapsible groups with a *View N more in Lint →* link. Collapsed by default so the Ledger stays scannable.
+- **Project tree ⋯ menu.** Move / Delete finally fire (ref attached to menu div; doc listener uses contains-check). Delete failures surface the real server error in the toast (e.g. "Cannot delete a project that has children").
+- **Source upload fixes.** Field-name mismatch (`file` vs `files`) + per-project raw dir (was writing to top-level `raw/` regardless of project). Uploads now land in the correct project and ingestion finds them.
+- **Cleaner source cards.** Extract line reads *"Note · ingested."* (or type-appropriate label) once the row is done — no more false "awaiting ingestion" on already-ingested rows.
 
 ## What it does
 

@@ -57,10 +57,18 @@ export function HelpModal() {
         style={{ width: 640 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="note-modal-head">
+        <div className="note-modal-head" style={{ gap: 10 }}>
           <h3>
             Help · <em>WikiLM</em>
           </h3>
+          <Link
+            href="/help"
+            onClick={() => setOpen(false)}
+            className="btn sm primary"
+            style={{ textDecoration: "none", whiteSpace: "nowrap", marginLeft: "auto" }}
+          >
+            Open full help →
+          </Link>
           <button className="x" onClick={() => setOpen(false)} aria-label="Close">
             ×
           </button>
@@ -143,30 +151,14 @@ export function HelpModal() {
             style={{
               paddingTop: 14,
               borderTop: "1.5px solid var(--ink)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 14,
+              fontFamily: "var(--font-inst)",
+              fontStyle: "italic",
+              fontSize: 14,
+              color: "var(--ink-3)",
+              textAlign: "center",
             }}
           >
-            <div
-              style={{
-                fontFamily: "var(--font-inst)",
-                fontStyle: "italic",
-                fontSize: 14,
-                color: "var(--ink-3)",
-              }}
-            >
-              Need more? The full knowledge bank covers workflows, providers, MCP, troubleshooting.
-            </div>
-            <Link
-              href="/help"
-              onClick={() => setOpen(false)}
-              className="btn primary"
-              style={{ textDecoration: "none", whiteSpace: "nowrap" }}
-            >
-              Open full help →
-            </Link>
+            Full knowledge bank → top-right button
           </div>
         </div>
       </div>
