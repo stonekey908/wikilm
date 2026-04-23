@@ -1804,12 +1804,12 @@ body[data-grain="false"]::after { display: none !important; }
 .map-tooltip .sub { display: block; color: var(--ink-4); font-weight: 400; font-size: 9.5px; margin-top: 2px; }
 
 .map-node {
-  cursor: pointer; transition: stroke-width 140ms, opacity 140ms;
+  cursor: pointer; transition: stroke-width 140ms, opacity 220ms ease;
 }
 .map-node:hover { stroke-width: 2; }
-.map-node.dim { opacity: 0.15; }
-.map-edge { transition: opacity 140ms; }
-.map-edge.dim { opacity: 0.06; }
+.map-node.dim { opacity: 0.18; }
+.map-edge { transition: opacity 220ms ease; }
+.map-edge.dim { opacity: 0.08; }
 
 .map-empty {
   position: absolute; inset: 0;

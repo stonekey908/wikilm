@@ -304,8 +304,6 @@ export default function MapPage() {
     title: string;
     type: string;
     excerpt: string;
-    outgoing: { slug: string; title: string }[];
-    incoming: { slug: string; title: string }[];
   }
   const [selectedDetail, setSelectedDetail] = useState<NodeDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -454,28 +452,11 @@ export default function MapPage() {
         // First non-empty, non-heading paragraph. Strip wikilink pipes for the
         // one-liner so `[[x|y]]` renders as `y`.
         const body = d.body ?? "";
-        const excerpt = extractExcerpt(body);
-        const neighborIds = Array.from(adjacency.get(selectedId) ?? []);
-        const incomingEdges = edges.filter((e) => e.to === selectedId);
-        const outgoingEdges = edges.filter((e) => e.from === selectedId);
-        const titleFor = (id: string) => {
-          const n = nodes.find((x) => x.id === id);
-          return n ? { slug: n.slug, title: n.title } : null;
-        };
-        const outgoing = outgoingEdges
-          .map((e) => titleFor(e.to))
-          .filter((x): x is { slug: string; title: string } => x !== null);
-        const incoming = incomingEdges
-          .map((e) => titleFor(e.from))
-          .filter((x): x is { slug: string; title: string } => x !== null);
-        void neighborIds; // (used later if we add a unified list)
         setSelectedDetail({
           slug: node.slug,
           title: d.title ?? node.title,
           type: d.type ?? node.type,
-          excerpt,
-          outgoing,
-          incoming,
+          excerpt: extractExcerpt(body),
         });
       })
       .catch(() => {})
@@ -485,7 +466,7 @@ export default function MapPage() {
     return () => {
       cancelled = true;
     };
-  }, [selectedId, nodes, edges, adjacency, projectId]);
+  }, [selectedId, nodes, projectId]);
 
   function edgeVisible(e: LaidEdge): boolean {
     if (!activeType) return true;
@@ -857,234 +838,156 @@ export default function MapPage() {
             )}
 
             {selectedId && (
-              <aside className="map-focus">
-                {selectedDetail ? (
-                  <>
-                    <div className="map-focus-head">
-                      <div className="map-focus-type">{selectedDetail.type.toUpperCase()}</div>
+              <div className="map-peek">
+                <div className="map-peek-type">
+                  {selectedDetail?.type?.toUpperCase() ?? (detailLoading ? "…" : "—")}
+                </div>
+                <div className="map-peek-body">
+                  <div className="map-peek-title">
+                    {selectedDetail?.title ?? (detailLoading ? "Loading…" : "—")}
+                  </div>
+                  {selectedDetail?.excerpt && (
+                    <div className="map-peek-excerpt">{selectedDetail.excerpt}</div>
+                  )}
+                </div>
+                <div className="map-peek-actions">
+                  {selectedDetail && (
+                    <>
                       <button
                         type="button"
-                        className="map-focus-x"
-                        onClick={() => setSelectedId(null)}
-                        aria-label="Close"
-                      >
-                        ×
-                      </button>
-                    </div>
-                    <h3>{selectedDetail.title}</h3>
-                    {selectedDetail.excerpt ? (
-                      <p className="map-focus-excerpt">{selectedDetail.excerpt}</p>
-                    ) : (
-                      <p className="map-focus-excerpt map-focus-excerpt-missing">
-                        No opening paragraph.
-                      </p>
-                    )}
-
-                    <div className="map-focus-section">
-                      <div className="map-focus-section-h">
-                        Outgoing · {selectedDetail.outgoing.length}
-                      </div>
-                      {selectedDetail.outgoing.length === 0 ? (
-                        <div className="map-focus-empty">— no outbound links</div>
-                      ) : (
-                        <ul className="map-focus-list">
-                          {selectedDetail.outgoing.slice(0, 12).map((o) => (
-                            <li key={`out-${o.slug}`}>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const target = nodes.find((n) => n.slug === o.slug);
-                                  if (target) setSelectedId(target.id);
-                                }}
-                              >
-                                {o.title}
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-
-                    <div className="map-focus-section">
-                      <div className="map-focus-section-h">
-                        Incoming · {selectedDetail.incoming.length}
-                      </div>
-                      {selectedDetail.incoming.length === 0 ? (
-                        <div className="map-focus-empty">— nothing links here yet</div>
-                      ) : (
-                        <ul className="map-focus-list">
-                          {selectedDetail.incoming.slice(0, 12).map((o) => (
-                            <li key={`in-${o.slug}`}>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const target = nodes.find((n) => n.slug === o.slug);
-                                  if (target) setSelectedId(target.id);
-                                }}
-                              >
-                                {o.title}
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-
-                    <div className="map-focus-actions">
-                      <button
-                        type="button"
-                        className="btn sm"
+                        className="map-peek-btn"
                         onClick={() =>
                           router.push(`/wiki?slug=${encodeURIComponent(selectedDetail.slug)}`)
                         }
                       >
-                        Open in Wiki →
+                        Open page →
                       </button>
                       <button
                         type="button"
-                        className="btn sm primary"
+                        className="map-peek-btn primary"
                         onClick={() => {
-                          const neighborTitles = [
-                            selectedDetail.title,
-                            ...selectedDetail.outgoing.slice(0, 6).map((o) => o.title),
-                            ...selectedDetail.incoming.slice(0, 6).map((o) => o.title),
-                          ];
-                          const q = `Focus on these pages and answer only from them: ${neighborTitles
-                            .map((t) => `"${t}"`)
-                            .join(", ")}.\n\nWhat does this subgraph tell us about ${selectedDetail.title}?`;
+                          const q = `Tell me about "${selectedDetail.title}" using the wiki.`;
                           router.push(`/chat?q=${encodeURIComponent(q)}`);
                         }}
                       >
                         Ask about this →
                       </button>
-                    </div>
-                  </>
-                ) : detailLoading ? (
-                  <div className="map-focus-loading">Loading…</div>
-                ) : (
-                  <div className="map-focus-loading">—</div>
-                )}
-              </aside>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    className="map-peek-x"
+                    onClick={() => setSelectedId(null)}
+                    aria-label="Close"
+                  >
+                    ×
+                  </button>
+                </div>
+              </div>
             )}
           </>
         )}
       </div>
 
       <style jsx>{`
-        .map-focus {
+        .map-peek {
           position: absolute;
-          top: 14px;
+          left: 14px;
           right: 14px;
           bottom: 14px;
-          width: 320px;
           background: var(--paper);
           border: 1.5px solid var(--ink);
           box-shadow: 4px 4px 0 var(--ink);
-          padding: 16px 18px;
-          overflow-y: auto;
+          padding: 12px 16px;
           display: flex;
-          flex-direction: column;
-          gap: 14px;
-          z-index: 20;
-        }
-        .map-focus-head {
-          display: flex;
-          justify-content: space-between;
           align-items: center;
+          gap: 16px;
+          z-index: 20;
+          animation: peekIn 220ms ease;
         }
-        .map-focus-type {
+        @keyframes peekIn {
+          from { transform: translateY(8px); opacity: 0; }
+          to   { transform: translateY(0);   opacity: 1; }
+        }
+        .map-peek-type {
           font-family: var(--font-mono);
-          font-size: 9px;
-          font-weight: 700;
-          letter-spacing: 0.16em;
-          color: var(--accent);
-        }
-        .map-focus-x {
-          background: none;
-          border: none;
-          font-size: 20px;
-          cursor: pointer;
-          color: var(--ink-3);
-          line-height: 1;
-          padding: 0 4px;
-        }
-        .map-focus-x:hover {
-          color: var(--ink);
-        }
-        .map-focus h3 {
-          font-family: var(--font-serif);
-          font-size: 20px;
-          font-weight: 700;
-          line-height: 1.2;
-          color: var(--ink);
-          margin: -2px 0 0;
-        }
-        .map-focus-excerpt {
-          font-family: var(--font-serif);
-          font-size: 13.5px;
-          line-height: 1.5;
-          color: var(--ink-2);
-          margin: 0;
-        }
-        .map-focus-excerpt-missing {
-          font-style: italic;
-          color: var(--ink-4);
-        }
-        .map-focus-section {
-          border-top: 1px dashed var(--rule-faint);
-          padding-top: 10px;
-        }
-        .map-focus-section-h {
-          font-family: var(--font-mono);
-          font-size: 9px;
+          font-size: 10px;
           font-weight: 700;
           letter-spacing: 0.14em;
-          text-transform: uppercase;
+          color: var(--accent);
+          flex-shrink: 0;
+          width: 80px;
+        }
+        .map-peek-body {
+          flex: 1;
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+        .map-peek-title {
+          font-family: var(--font-serif);
+          font-size: 16px;
+          font-weight: 600;
+          line-height: 1.2;
+          color: var(--ink);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .map-peek-excerpt {
+          font-family: var(--font-serif);
+          font-size: 12.5px;
+          line-height: 1.4;
           color: var(--ink-3);
-          margin-bottom: 6px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
-        .map-focus-list {
-          list-style: none;
-          margin: 0;
-          padding: 0;
-          display: grid;
-          gap: 4px;
+        .map-peek-actions {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          flex-shrink: 0;
         }
-        .map-focus-list button {
+        .map-peek-btn {
+          font-family: var(--font-mono);
+          font-size: 10.5px;
+          font-weight: 600;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: var(--ink-2);
+          background: none;
+          border: 1px solid var(--rule);
+          padding: 7px 11px;
+          border-radius: 2px;
+          cursor: pointer;
+          transition: color 120ms, border-color 120ms, background 120ms;
+        }
+        .map-peek-btn:hover {
+          color: var(--ink);
+          border-color: var(--ink);
+        }
+        .map-peek-btn.primary {
+          color: var(--paper);
+          background: var(--ink);
+          border-color: var(--ink);
+        }
+        .map-peek-btn.primary:hover {
+          background: var(--accent);
+          border-color: var(--accent);
+        }
+        .map-peek-x {
           background: none;
           border: none;
-          padding: 2px 0;
-          text-align: left;
-          font-family: var(--font-serif);
-          font-size: 13px;
-          color: var(--ink-2);
+          font-size: 22px;
           cursor: pointer;
-          text-decoration: underline;
-          text-decoration-color: var(--rule);
-          text-underline-offset: 3px;
-        }
-        .map-focus-list button:hover {
-          color: var(--accent);
-        }
-        .map-focus-empty {
-          font-family: var(--font-inst);
-          font-style: italic;
-          font-size: 12.5px;
           color: var(--ink-4);
+          line-height: 1;
+          padding: 0 6px;
         }
-        .map-focus-actions {
-          margin-top: auto;
-          display: flex;
-          gap: 8px;
-          flex-wrap: wrap;
-          padding-top: 10px;
-          border-top: 1.5px solid var(--ink);
-        }
-        .map-focus-loading {
-          font-family: var(--font-inst);
-          font-style: italic;
-          color: var(--ink-3);
-          font-size: 14px;
+        .map-peek-x:hover {
+          color: var(--ink);
         }
       `}</style>
     </div>
