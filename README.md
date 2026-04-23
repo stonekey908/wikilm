@@ -221,7 +221,6 @@ SecondBrain/
     src/components/editorial/  # Editorial-brutalist component library
   mcp/                     # MCP server (stdio, @modelcontextprotocol/sdk)
   docs/                    # Screenshots + design notes
-  design_handoff_wikilm_editorial/  # v1.5-beta design source + mock
 ```
 
 ## Versions
