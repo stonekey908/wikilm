@@ -4,7 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useProject } from "@/components/project-switcher";
 import { EditorialBreadcrumbs } from "@/components/editorial/wiki/breadcrumbs";
-import { forceLayout, type LaidEdge, type LaidNode } from "@/components/editorial/map/force-layout";
+import {
+  forceLayout,
+  radiusFor,
+  type LaidEdge,
+  type LaidNode,
+} from "@/components/editorial/map/force-layout";
 
 interface GraphNode {
   id: string;
@@ -13,6 +18,7 @@ interface GraphNode {
   type: string;
   projectId: number;
   projectSlug: string;
+  mtime: number;
 }
 interface GraphEdge {
   from: string;
@@ -334,6 +340,14 @@ export default function MapPage() {
     () => rawNodes.filter((n) => n.type === "synthesis").length,
     [rawNodes],
   );
+  // mtime lookup for the recency border encoding (slice 4). The forceLayout
+  // pipeline drops mtime to keep its node interface lean — read from rawNodes
+  // by id at render time instead.
+  const mtimeById = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const n of rawNodes) m.set(n.id, n.mtime);
+    return m;
+  }, [rawNodes]);
   const { layoutNodes, layoutEdges } = useMemo(() => {
     if (view === "full") return { layoutNodes: rawNodes, layoutEdges: rawEdges };
     const synthIds = new Set(rawNodes.filter((n) => n.type === "synthesis").map((n) => n.id));
@@ -709,13 +723,31 @@ export default function MapPage() {
                 const isSynthesis = n.type === "synthesis";
                 const fill = isBigHub ? "var(--accent)" : TYPE_COLOR_VAR[n.type] ?? "var(--ink)";
                 const op = selectionDim(n.id);
-                // Constellation view: syntheses get extra heft so they read as
-                // anchors at a glance; concept/entity orbits stay nominal.
+                // Weight encoding (slice 4):
+                //   ON  → radius scales with degree (built into n.r by the
+                //         layout) + hub gets a 1.3× boost; border thickness
+                //         encodes recency (≤14d bold, fading to thin >60d).
+                //   OFF → fixed type-based radius, no hub boost, uniform 1.5px
+                //         border. Useful when you want to read structure
+                //         without the visual heatmap.
+                const baseR = weight ? n.r : radiusFor(n.type);
+                const hubBoost = weight && isHub ? 1.3 : 1;
                 const constellationBoost = view === "constellation" && isSynthesis ? 1.6 : 1;
-                const scale = (isHub ? 1.3 : 1) * constellationBoost;
+                const scale = hubBoost * constellationBoost;
+                // Recency border: ≤14d → 2.5px, 14–60d → linear 2.5→0.8,
+                // >60d → 0.8px. Orphans keep their dashed thin ring.
+                const recencyStroke = (() => {
+                  if (!weight) return 1.5;
+                  const mt = mtimeById.get(n.id);
+                  if (!mt) return 1.5;
+                  const ageDays = (Date.now() - mt) / 86_400_000;
+                  if (ageDays <= 14) return 2.5;
+                  if (ageDays >= 60) return 0.8;
+                  return 2.5 - ((ageDays - 14) / 46) * 1.7;
+                })();
                 // In constellation view, syntheses always show their label
                 // regardless of radius; orbiters keep the existing rule.
-                const showLabel = (view === "constellation" && isSynthesis) || n.r >= 8;
+                const showLabel = (view === "constellation" && isSynthesis) || baseR >= 8;
                 const labelSize = view === "constellation" && isSynthesis ? 13 : 10.5;
                 const labelFill = view === "constellation" && isSynthesis ? "var(--ink)" : "var(--ink-2)";
                 return (
@@ -724,7 +756,7 @@ export default function MapPage() {
                       <circle
                         cx={n.x}
                         cy={n.y}
-                        r={n.r * scale + 3}
+                        r={baseR * scale + 3}
                         fill="none"
                         stroke="var(--accent)"
                         strokeWidth={1.2}
@@ -735,7 +767,7 @@ export default function MapPage() {
                       <circle
                         cx={n.x}
                         cy={n.y}
-                        r={n.r * scale + 6}
+                        r={baseR * scale + 6}
                         fill="none"
                         stroke="var(--green, #2f7d3b)"
                         strokeWidth={2}
@@ -745,10 +777,10 @@ export default function MapPage() {
                     <circle
                       cx={n.x}
                       cy={n.y}
-                      r={n.r * scale}
+                      r={baseR * scale}
                       fill={isOrphan ? "var(--paper)" : fill}
                       stroke={isOrphan ? "var(--ink-3)" : "var(--paper)"}
-                      strokeWidth={isOrphan ? 1.2 : 1.5}
+                      strokeWidth={isOrphan ? 1.2 : recencyStroke}
                       strokeDasharray={isOrphan ? "3 2" : undefined}
                       className="map-node"
                       onMouseEnter={() => setHoverId(n.id)}
@@ -760,7 +792,7 @@ export default function MapPage() {
                     {showLabel && (
                       <text
                         x={n.x}
-                        y={n.y + n.r * scale + 12}
+                        y={n.y + baseR * scale + 12}
                         textAnchor="middle"
                         fontFamily="var(--font-serif)"
                         fontSize={labelSize}

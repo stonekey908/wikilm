@@ -164,7 +164,7 @@ export function forceLayout({
   return { nodes: laid, edges: resolvedEdges };
 }
 
-function radiusFor(type: string): number {
+export function radiusFor(type: string): number {
   switch (type) {
     case "synthesis": return 14;
     case "concept": return 8;
