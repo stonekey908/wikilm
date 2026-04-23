@@ -191,6 +191,64 @@ function clusteringCoef(nodes: LaidNode[], edges: LaidEdge[]): number {
   return counted === 0 ? 0 : sum / counted;
 }
 
+/**
+ * Shown when constellation view is on but the project has no synthesis
+ * pages to anchor the view. Surfaces the gap (no silent fallback to full
+ * graph) and offers a one-click trigger for the synthesis job.
+ */
+function ConstellationEmpty({
+  projectId,
+  onSwitchToFull,
+}: {
+  projectId: number | null;
+  onSwitchToFull: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [queued, setQueued] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fire = useCallback(async () => {
+    if (projectId === null || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await fetch(`/api/projects/${projectId}/synthesis/run`, { method: "POST" });
+      if (!r.ok) {
+        const body = (await r.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? `HTTP ${r.status}`);
+      }
+      setQueued(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }, [projectId, busy]);
+  return (
+    <div className="map-empty constellation-empty">
+      <div className="ce-eyebrow">Constellation view</div>
+      <h3>No synthesis page yet.</h3>
+      <p>
+        The constellation view anchors itself to synthesis pages — the wiki's
+        deliberate overviews. This project doesn&rsquo;t have one yet.
+      </p>
+      <div className="ce-actions">
+        <button
+          type="button"
+          className="ce-primary"
+          onClick={fire}
+          disabled={busy || queued || projectId === null}
+        >
+          {queued ? "Synthesis queued — check Jobs" : busy ? "Queuing…" : "Generate a synthesis →"}
+        </button>
+        <button type="button" className="ce-secondary" onClick={onSwitchToFull}>
+          Or switch to Full graph
+        </button>
+      </div>
+      {error && <div className="ce-error">Couldn&rsquo;t queue: {error}</div>}
+    </div>
+  );
+}
+
 export default function MapPage() {
   const router = useRouter();
   const { activeProject } = useProject();
@@ -269,25 +327,51 @@ export default function MapPage() {
     };
   }, [projectId]);
 
+  // ── Constellation filter ─────────────────────────────────────────
+  // In "constellation" view, the layout sees only synthesis pages + their
+  // 1-hop concept/entity neighbors. Sources, queries, outputs are dropped
+  // from the layout entirely so the spread reflects the visible set.
+  // In "full" view, everything goes in.
+  const synthesisCount = useMemo(
+    () => rawNodes.filter((n) => n.type === "synthesis").length,
+    [rawNodes],
+  );
+  const { layoutNodes, layoutEdges } = useMemo(() => {
+    if (view === "full") return { layoutNodes: rawNodes, layoutEdges: rawEdges };
+    const synthIds = new Set(rawNodes.filter((n) => n.type === "synthesis").map((n) => n.id));
+    if (synthIds.size === 0) return { layoutNodes: [], layoutEdges: [] };
+    const keep = new Set(synthIds);
+    for (const e of rawEdges) {
+      if (synthIds.has(e.from)) keep.add(e.to);
+      if (synthIds.has(e.to)) keep.add(e.from);
+    }
+    const filteredNodes = rawNodes.filter(
+      (n) => keep.has(n.id) && (n.type === "synthesis" || n.type === "concept" || n.type === "entity"),
+    );
+    const visibleIds = new Set(filteredNodes.map((n) => n.id));
+    const filteredEdges = rawEdges.filter((e) => visibleIds.has(e.from) && visibleIds.has(e.to));
+    return { layoutNodes: filteredNodes, layoutEdges: filteredEdges };
+  }, [rawNodes, rawEdges, view]);
+
   const { nodes, edges, bounds } = useMemo(() => {
-    if (rawNodes.length === 0)
+    if (layoutNodes.length === 0)
       return {
         nodes: [] as LaidNode[],
         edges: [] as LaidEdge[],
         bounds: { width: BASE_WIDTH, height: BASE_HEIGHT },
       };
-    const layoutScale = Math.max(1, Math.sqrt(rawNodes.length / 40));
+    const layoutScale = Math.max(1, Math.sqrt(layoutNodes.length / 40));
     const width = BASE_WIDTH * layoutScale;
     const height = BASE_HEIGHT * layoutScale;
     const result = forceLayout({
-      nodes: rawNodes.map((n) => ({ id: n.id, type: n.type, title: n.title, slug: n.slug })),
-      edges: rawEdges,
+      nodes: layoutNodes.map((n) => ({ id: n.id, type: n.type, title: n.title, slug: n.slug })),
+      edges: layoutEdges,
       width: BASE_WIDTH,
       height: BASE_HEIGHT,
       iterations: 260,
     });
     return { ...result, bounds: { width, height } };
-  }, [rawNodes, rawEdges]);
+  }, [layoutNodes, layoutEdges]);
 
   const WIDTH = bounds.width;
   const HEIGHT = bounds.height;
@@ -534,6 +618,11 @@ export default function MapPage() {
       <div className="mapwrap">
         {rawNodes.length === 0 ? (
           <div className="map-empty">No pages yet — the map will populate as you ingest.</div>
+        ) : view === "constellation" && synthesisCount === 0 ? (
+          <ConstellationEmpty
+            projectId={projectId}
+            onSwitchToFull={() => setViewPersist("full")}
+          />
         ) : (
           <>
             <svg
@@ -636,9 +725,18 @@ export default function MapPage() {
                 const isBridge = bridges.has(n.id);
                 const isOrphan = orphans.has(n.id);
                 const isSelected = selectedId === n.id;
+                const isSynthesis = n.type === "synthesis";
                 const fill = isBigHub ? "var(--accent)" : TYPE_COLOR_VAR[n.type] ?? "var(--ink)";
                 const op = selectionDim(n.id);
-                const scale = isHub ? 1.3 : 1;
+                // Constellation view: syntheses get extra heft so they read as
+                // anchors at a glance; concept/entity orbits stay nominal.
+                const constellationBoost = view === "constellation" && isSynthesis ? 1.6 : 1;
+                const scale = (isHub ? 1.3 : 1) * constellationBoost;
+                // In constellation view, syntheses always show their label
+                // regardless of radius; orbiters keep the existing rule.
+                const showLabel = (view === "constellation" && isSynthesis) || n.r >= 8;
+                const labelSize = view === "constellation" && isSynthesis ? 13 : 10.5;
+                const labelFill = view === "constellation" && isSynthesis ? "var(--ink)" : "var(--ink-2)";
                 return (
                   <g key={n.id} opacity={op}>
                     {isBridge && !isOrphan && (
@@ -678,14 +776,14 @@ export default function MapPage() {
                       onDoubleClick={() => onNodeDoubleClick(n)}
                       style={{ cursor: "pointer" }}
                     />
-                    {n.r >= 8 && (
+                    {showLabel && (
                       <text
                         x={n.x}
                         y={n.y + n.r * scale + 12}
                         textAnchor="middle"
                         fontFamily="var(--font-serif)"
-                        fontSize={10.5}
-                        fill="var(--ink-2)"
+                        fontSize={labelSize}
+                        fill={labelFill}
                         pointerEvents="none"
                       >
                         {n.title.length > 28 ? n.title.slice(0, 26) + "…" : n.title}

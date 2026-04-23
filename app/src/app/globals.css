@@ -1818,6 +1818,48 @@ body[data-grain="false"]::after { display: none !important; }
   color: var(--ink-3);
   z-index: 3;
 }
+.constellation-empty {
+  font-style: normal; font-family: var(--font-serif);
+  text-align: center; padding: 32px;
+  max-width: 520px; margin: 0 auto;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+}
+.constellation-empty .ce-eyebrow {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 600;
+  color: var(--accent); letter-spacing: 0.14em; text-transform: uppercase;
+}
+.constellation-empty h3 {
+  font-family: var(--font-serif); font-weight: 400;
+  font-size: 32px; letter-spacing: -0.02em; color: var(--ink); margin: 0;
+}
+.constellation-empty p {
+  font-size: 14.5px; color: var(--ink-3); line-height: 1.5;
+  max-width: 440px; margin: 0;
+}
+.constellation-empty .ce-actions {
+  display: flex; gap: 12px; align-items: center; margin-top: 6px;
+  flex-wrap: wrap; justify-content: center;
+}
+.constellation-empty .ce-primary {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--paper); background: var(--ink); border: 1px solid var(--ink);
+  padding: 10px 16px; border-radius: 2px; cursor: pointer;
+  transition: opacity 120ms;
+}
+.constellation-empty .ce-primary:hover { background: var(--accent); border-color: var(--accent); }
+.constellation-empty .ce-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.constellation-empty .ce-secondary {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--ink-3); background: none; border: 1px solid var(--rule);
+  padding: 10px 14px; border-radius: 2px; cursor: pointer;
+}
+.constellation-empty .ce-secondary:hover { color: var(--ink); border-color: var(--ink); }
+.constellation-empty .ce-error {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--red); margin-top: 10px;
+}
 
 /* ══════════════════════════════════════════════════════════════════
    06 · DICTATION (compose)
