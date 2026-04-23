@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useProject } from "@/components/project-switcher";
 import { useToast } from "@/components/toast-provider";
+import { PortalToBody } from "@/components/editorial/portal-to-body";
 
 interface TreeNode {
   id: number;
@@ -426,6 +427,7 @@ export function EditorialProjectTree() {
       )}
 
       {moveTarget && (
+        <PortalToBody>
         <div className="proj-move-modal" onClick={() => !moveBusy && setMoveTarget(null)}>
           <div className="proj-move-card" onClick={(e) => e.stopPropagation()}>
             <h3>
@@ -457,6 +459,7 @@ export function EditorialProjectTree() {
             </div>
           </div>
         </div>
+        </PortalToBody>
       )}
     </div>
   );

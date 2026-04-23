@@ -144,16 +144,28 @@ function WikiPageInner() {
   useEffect(() => {
     if (slug || projectId === null) return;
     let cancelled = false;
-    fetch(`/api/wiki?projectId=${projectId}`)
-      .then((r) => r.json())
-      .then((d: { pages: WikiIndexEntry[] }) => {
-        if (!cancelled) {
-          setAllPages((d.pages ?? []).filter((p) => !["index", "log"].includes(p.slug)));
-        }
-      })
-      .catch(() => {});
+    const load = () => {
+      fetch(`/api/wiki?projectId=${projectId}`)
+        .then((r) => r.json())
+        .then((d: { pages: WikiIndexEntry[] }) => {
+          if (!cancelled) {
+            setAllPages((d.pages ?? []).filter((p) => !["index", "log"].includes(p.slug)));
+          }
+        })
+        .catch(() => {});
+    };
+    load();
+    // Keep the list in sync with output generation + deletion happening on
+    // other pages (notably /compose). Any page can broadcast this event to
+    // force a refresh.
+    const onOutputs = (e: Event) => {
+      const detail = (e as CustomEvent<{ projectId?: number }>).detail;
+      if (!detail?.projectId || detail.projectId === projectId) load();
+    };
+    window.addEventListener("wikilm:outputs-changed", onOutputs);
     return () => {
       cancelled = true;
+      window.removeEventListener("wikilm:outputs-changed", onOutputs);
     };
   }, [slug, projectId]);
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { PortalToBody } from "@/components/editorial/portal-to-body";
 
 // Keep this list short — the modal is a glance card, not the full manual.
 // /help is the full knowledge bank; the modal just points at it.
@@ -49,6 +50,7 @@ export function HelpModal() {
   if (!open) return null;
 
   return (
+    <PortalToBody>
     <div className="note-modal-bg" onClick={() => setOpen(false)}>
       <div
         className="note-modal"
@@ -169,5 +171,6 @@ export function HelpModal() {
         </div>
       </div>
     </div>
+    </PortalToBody>
   );
 }

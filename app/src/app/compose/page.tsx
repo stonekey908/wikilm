@@ -40,6 +40,44 @@ interface Job {
   createdAt: string;
 }
 
+interface OutputEntry {
+  slug: string;          // e.g. "outputs/2026-04-19-cheat"
+  title: string;
+  tags: string[];
+  updatedAt: string;
+  format: OutputTypeId;  // inferred from slug
+  baseSlug: string;      // tail after "outputs/", used for delete + download
+}
+
+// Map the output filename convention back to its format id so we can show the
+// right label + pick the right companion extensions. Generated filenames look
+// like "YYYY-MM-DD-HHMM-<format>[-<focus-slug>]" (see lib/output-types.ts).
+function inferFormat(baseSlug: string): OutputTypeId {
+  if (/(^|-)infographic(-|$)/.test(baseSlug)) return "infographic";
+  if (/(^|-)deck(-|$)/.test(baseSlug)) return "deck";
+  if (/(^|-)cheat(-|$)/.test(baseSlug)) return "cheat";
+  if (/(^|-)summary(-|$)/.test(baseSlug)) return "summary";
+  if (/(^|-)report(-|$)/.test(baseSlug)) return "report";
+  return "report";
+}
+
+function formatRelative(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return "";
+  const diff = Date.now() - then;
+  const min = Math.floor(diff / 60000);
+  if (min < 2) return "just now";
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  const d = Math.floor(hr / 24);
+  if (d < 7) return `${d}d ago`;
+  if (d < 30) return `${Math.floor(d / 7)}w ago`;
+  const mo = Math.floor(d / 30);
+  if (mo < 12) return `${mo}mo ago`;
+  return `${Math.floor(d / 365)}y ago`;
+}
+
 export default function DictationPage() {
   const router = useRouter();
   const { activeProject } = useProject();
@@ -54,9 +92,84 @@ export default function DictationPage() {
   const [baseSlug, setBaseSlug] = useState<string | null>(null);
   const [job, setJob] = useState<Job | null>(null);
   const [elapsed, setElapsed] = useState(0);
+  const [outputs, setOutputs] = useState<OutputEntry[]>([]);
+  const [deletingSlug, setDeletingSlug] = useState<string | null>(null);
   const jobStartRef = useRef<number>(0);
 
   const activeFmt = FORMATS.find((f) => f.id === format) ?? FORMATS[0];
+
+  const fetchOutputs = useCallback(async () => {
+    if (!projectId) return;
+    try {
+      const res = await fetch(`/api/wiki?projectId=${projectId}&type=output`);
+      if (!res.ok) return;
+      const d = (await res.json()) as {
+        pages: Array<{ slug: string; title: string; tags: string[]; updatedAt: string }>;
+      };
+      const rows: OutputEntry[] = (d.pages ?? [])
+        .filter((p) => p.slug.startsWith("outputs/"))
+        .map((p) => {
+          const baseSlugValue = p.slug.replace(/^outputs\//, "");
+          return {
+            slug: p.slug,
+            title: p.title,
+            tags: p.tags,
+            updatedAt: p.updatedAt,
+            format: inferFormat(baseSlugValue),
+            baseSlug: baseSlugValue,
+          };
+        })
+        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      setOutputs(rows);
+    } catch {}
+  }, [projectId]);
+
+  useEffect(() => {
+    fetchOutputs();
+    // Cross-page sync — a delete on another page, or a completed generation,
+    // should refresh this list.
+    const onChanged = (e: Event) => {
+      const detail = (e as CustomEvent<{ projectId?: number }>).detail;
+      if (!detail?.projectId || detail.projectId === projectId) fetchOutputs();
+    };
+    window.addEventListener("wikilm:outputs-changed", onChanged);
+    return () => window.removeEventListener("wikilm:outputs-changed", onChanged);
+  }, [fetchOutputs, projectId]);
+
+  const broadcastOutputsChanged = useCallback(() => {
+    if (!projectId) return;
+    window.dispatchEvent(
+      new CustomEvent("wikilm:outputs-changed", { detail: { projectId } })
+    );
+  }, [projectId]);
+
+  async function deleteOutput(entry: OutputEntry) {
+    if (!projectId) return;
+    if (!confirm(`Delete "${entry.title}" and all its companion files? This cannot be undone.`)) {
+      return;
+    }
+    setDeletingSlug(entry.slug);
+    try {
+      const res = await fetch(
+        `/api/projects/${projectId}/outputs/delete?baseSlug=${encodeURIComponent(entry.baseSlug)}`,
+        { method: "DELETE" }
+      );
+      if (!res.ok) throw new Error();
+      const body = (await res.json()) as { deleted: string[] };
+      addToast({
+        type: "success",
+        title: `Deleted · ${entry.title}`,
+        description: `Removed ${body.deleted.length} file${body.deleted.length === 1 ? "" : "s"}.`,
+      });
+      // Optimistically remove so the row disappears before the refetch arrives
+      setOutputs((prev) => prev.filter((o) => o.slug !== entry.slug));
+      broadcastOutputsChanged();
+    } catch {
+      addToast({ type: "error", title: "Couldn't delete output" });
+    } finally {
+      setDeletingSlug(null);
+    }
+  }
 
   async function commission() {
     if (!projectId || queueing) return;
@@ -97,7 +210,13 @@ export default function DictationPage() {
         if (res.ok) {
           const j: Job = await res.json();
           if (!cancelled) setJob(j);
-          if (j.status === "completed" || j.status === "failed" || j.status === "cancelled") {
+          if (j.status === "completed") {
+            // New output just landed — refresh both this list and any other
+            // page that's listening (e.g. /wiki).
+            broadcastOutputsChanged();
+            return;
+          }
+          if (j.status === "failed" || j.status === "cancelled") {
             return;
           }
         }
@@ -108,7 +227,7 @@ export default function DictationPage() {
     return () => {
       cancelled = true;
     };
-  }, [jobId]);
+  }, [jobId, broadcastOutputsChanged]);
 
   // Runtime ticker
   useEffect(() => {
@@ -344,7 +463,237 @@ export default function DictationPage() {
             </>
           )}
         </div>
+
+        {/* Existing outputs list — mirrors what's in /wiki under "output" type
+            but with direct download + delete affordances. Stays in sync with
+            the wiki view via the `wikilm:outputs-changed` custom event. */}
+        <div className="compose-archive">
+          <div className="compose-archive-head">
+            <span className="compose-archive-idx">§</span>
+            <h2>
+              Filed <em>outputs</em>
+            </h2>
+            <span className="compose-archive-count">{outputs.length}</span>
+          </div>
+
+          {outputs.length === 0 ? (
+            <p className="compose-archive-empty">
+              Nothing filed yet. When you dictate an output above, it lands here and in the Wiki.
+            </p>
+          ) : (
+            <ul className="compose-archive-list">
+              {outputs.map((o) => {
+                const primaryExt = o.format === "infographic" ? "html" : "md";
+                const derivedExts =
+                  o.format === "deck"
+                    ? ["pdf", "pptx"]
+                    : o.format === "infographic"
+                      ? ["png"]
+                      : ["docx"];
+                const labelFor = (ext: string) => {
+                  if (ext === "md") return "MD";
+                  if (ext === "html") return "HTML";
+                  return ext.toUpperCase();
+                };
+                const href = (ext: string) =>
+                  `/api/projects/${projectId}/outputs/download?file=${encodeURIComponent(o.baseSlug + "." + ext)}`;
+                const fmtLabel =
+                  FORMATS.find((f) => f.id === o.format)?.label ?? o.format;
+                return (
+                  <li key={o.slug} className="compose-archive-row">
+                    <div className="compose-archive-meta">
+                      <span className={`compose-archive-pill acc-${o.format}`}>{fmtLabel}</span>
+                      <span className="compose-archive-when">{formatRelative(o.updatedAt)}</span>
+                    </div>
+                    <div className="compose-archive-title">{o.title}</div>
+                    <div className="compose-archive-slug">{o.baseSlug}</div>
+                    <div className="compose-archive-actions">
+                      <button
+                        type="button"
+                        className="btn sm"
+                        onClick={() =>
+                          router.push(`/wiki?slug=${encodeURIComponent(o.slug)}`)
+                        }
+                      >
+                        Open
+                      </button>
+                      <a
+                        className="btn sm primary"
+                        href={href(primaryExt)}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                      >
+                        {labelFor(primaryExt)}
+                      </a>
+                      {derivedExts.map((ext) => (
+                        <a
+                          key={ext}
+                          className="btn sm ghost"
+                          href={href(ext)}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                        >
+                          {labelFor(ext)}
+                        </a>
+                      ))}
+                      <button
+                        type="button"
+                        className="btn sm red"
+                        onClick={() => deleteOutput(o)}
+                        disabled={deletingSlug === o.slug}
+                      >
+                        {deletingSlug === o.slug ? "Deleting…" : "Delete"}
+                      </button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       </div>
+
+      <style jsx>{`
+        .compose-archive {
+          margin-top: 48px;
+          padding-top: 20px;
+          border-top: 1.5px solid var(--rule);
+        }
+        .compose-archive-head {
+          display: flex;
+          align-items: baseline;
+          gap: 12px;
+          margin-bottom: 16px;
+        }
+        .compose-archive-idx {
+          font-family: var(--font-serif);
+          font-size: 22px;
+          color: var(--ink-4);
+          font-style: italic;
+        }
+        .compose-archive-head h2 {
+          font-family: var(--font-serif);
+          font-size: 22px;
+          font-weight: 700;
+          margin: 0;
+          color: var(--ink);
+          flex: 1;
+        }
+        .compose-archive-head h2 em {
+          font-family: var(--font-inst);
+          font-style: italic;
+          color: var(--accent);
+          font-weight: 400;
+        }
+        .compose-archive-count {
+          font-family: var(--font-mono);
+          font-size: 11px;
+          color: var(--ink-4);
+          font-variant-numeric: tabular-nums;
+        }
+        .compose-archive-empty {
+          font-family: var(--font-inst);
+          font-style: italic;
+          font-size: 14px;
+          color: var(--ink-3);
+          margin: 0;
+          padding: 12px 0;
+        }
+        .compose-archive-list {
+          list-style: none;
+          margin: 0;
+          padding: 0;
+          display: grid;
+          gap: 10px;
+        }
+        .compose-archive-row {
+          display: grid;
+          grid-template-columns: 1fr auto;
+          grid-template-areas:
+            "meta actions"
+            "title actions"
+            "slug actions";
+          gap: 2px 16px;
+          padding: 12px 14px;
+          border: 1px solid var(--rule-faint);
+          background: var(--paper);
+          transition: border-color 140ms, box-shadow 140ms;
+        }
+        .compose-archive-row:hover {
+          border-color: var(--ink-3);
+          box-shadow: 2px 2px 0 var(--rule-faint);
+        }
+        .compose-archive-meta {
+          grid-area: meta;
+          display: flex;
+          align-items: baseline;
+          gap: 10px;
+        }
+        .compose-archive-pill {
+          font-family: var(--font-mono);
+          font-size: 9px;
+          font-weight: 700;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          padding: 2px 7px;
+          border: 1px solid var(--ink);
+          background: var(--paper);
+          color: var(--ink);
+        }
+        .compose-archive-pill.acc-report { background: var(--accent); color: var(--paper); border-color: var(--accent); }
+        .compose-archive-pill.acc-summary { background: var(--paper-2); color: var(--ink-2); }
+        .compose-archive-pill.acc-cheat { background: var(--paper-2); color: var(--ink-2); }
+        .compose-archive-pill.acc-deck { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+        .compose-archive-pill.acc-infographic { background: var(--paper); color: var(--accent); border-color: var(--accent); }
+        .compose-archive-when {
+          font-family: var(--font-mono);
+          font-size: 10px;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          color: var(--ink-4);
+        }
+        .compose-archive-title {
+          grid-area: title;
+          font-family: var(--font-serif);
+          font-size: 15.5px;
+          font-weight: 600;
+          color: var(--ink);
+          line-height: 1.3;
+          margin-top: 2px;
+        }
+        .compose-archive-slug {
+          grid-area: slug;
+          font-family: var(--font-mono);
+          font-size: 10px;
+          color: var(--ink-4);
+          letter-spacing: 0.02em;
+          margin-top: 2px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .compose-archive-actions {
+          grid-area: actions;
+          display: flex;
+          gap: 6px;
+          align-items: center;
+          flex-wrap: wrap;
+          justify-content: flex-end;
+        }
+        @media (max-width: 720px) {
+          .compose-archive-row {
+            grid-template-columns: 1fr;
+            grid-template-areas:
+              "meta"
+              "title"
+              "slug"
+              "actions";
+          }
+          .compose-archive-actions {
+            justify-content: flex-start;
+          }
+        }
+      `}</style>
     </div>
   );
 }

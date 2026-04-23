@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useProject } from "@/components/project-switcher";
 import { useToast } from "@/components/toast-provider";
+import { PortalToBody } from "@/components/editorial/portal-to-body";
 
 type OutputTypeId = "report" | "cheat" | "summary" | "deck" | "infographic";
 
@@ -59,6 +60,7 @@ export function QuickGenerateModal({ open, onClose, seedNudge }: Props) {
   }
 
   return (
+    <PortalToBody>
     <div className="note-modal-bg" onClick={() => !busy && onClose()}>
       <div className="note-modal" style={{ width: 560 }} onClick={(e) => e.stopPropagation()}>
         <div className="note-modal-head">
@@ -129,5 +131,6 @@ export function QuickGenerateModal({ open, onClose, seedNudge }: Props) {
         </div>
       </div>
     </div>
+    </PortalToBody>
   );
 }

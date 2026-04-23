@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useProject } from "@/components/project-switcher";
 import { useToast } from "@/components/toast-provider";
+import { PortalToBody } from "@/components/editorial/portal-to-body";
 
 interface Props {
   open: boolean;
@@ -88,6 +89,7 @@ export function NoteComposerModal({
 
   if (!open) return null;
   return (
+    <PortalToBody>
     <div className="note-modal-bg" onClick={() => !saving && onClose()}>
       <div className="note-modal" onClick={(e) => e.stopPropagation()}>
         <div className="note-modal-head">
@@ -146,5 +148,6 @@ export function NoteComposerModal({
         </div>
       </div>
     </div>
+    </PortalToBody>
   );
 }

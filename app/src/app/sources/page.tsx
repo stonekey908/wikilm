@@ -6,6 +6,7 @@ import { useProject } from "@/components/project-switcher";
 import { useToast } from "@/components/toast-provider";
 import { EditorialBreadcrumbs } from "@/components/editorial/wiki/breadcrumbs";
 import { NoteComposerModal } from "@/components/editorial/note-composer-modal";
+import { PortalToBody } from "@/components/editorial/portal-to-body";
 
 interface Source {
   id: number;
@@ -1058,6 +1059,7 @@ function IntakePageInner() {
       />
 
       {clearWarning && (
+        <PortalToBody>
         <div className="note-modal-bg" onClick={() => setClearWarning(null)}>
           <div
             className="note-modal"
@@ -1133,6 +1135,7 @@ function IntakePageInner() {
             </div>
           </div>
         </div>
+        </PortalToBody>
       )}
     </div>
   );
