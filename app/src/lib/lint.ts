@@ -8,6 +8,7 @@ export const FIXABLE_CATEGORIES = new Set([
   "missing_concept",
   "missing_cross_ref",
   "stale_claim",
+  "contradiction",
 ]);
 
 const LINT_CATEGORIES = [
