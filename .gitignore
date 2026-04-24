@@ -24,6 +24,9 @@ backups/
 design_handoff_wikilm_editorial/
 design-handoff/
 
+# Per-session handoff notes for Claude Code continuity — local only.
+.claude/HANDOFF.md
+
 # ─────────────────────────────────────────────────────────────────────
 # User content — ignored by default so the shared repo is a clean install.
 # The empty .gitkeep scaffolding stays in source control so every clone
