@@ -97,6 +97,58 @@ SecondBrain/
   secondbrain.db        # SQLite database (auto-created)
 ```
 
+## Web Clipper (browser → WikiLM)
+
+Send any webpage from your browser to WikiLM as a pending source. The page lands in the chosen project's library, ready for you to triage (approve, move to a different project, or delete) from `/sources`.
+
+### Endpoints
+
+Two endpoints accept clips:
+
+| Endpoint | When to use | Body |
+|---|---|---|
+| `POST /api/sources/upload-md` | The clipper renders the page to markdown locally and sends the body. **Defaults to pending** — no flag needed. | `{ title, content, projectId, tags? }` |
+| `POST /api/sources/ingest-web` | The clipper just sends the URL; the server does the fetch + ingest later. **Add `defer: true`** to land as pending. | `{ title, url, projectId, defer: true, ... }` |
+
+### Find a project ID
+
+`http://localhost:3000` → open the project switcher (top-left) → hover the project. The ID is also visible at `GET /api/projects` if you prefer JSON.
+
+### Option A — MarkDownload (Chrome/Firefox)
+
+1. Install [MarkDownload](https://github.com/deathau/markdownload).
+2. Right-click the toolbar icon → **Options** → **Send to URL** section.
+3. Configure:
+   - **URL:** `http://localhost:3000/api/sources/upload-md`
+   - **Method:** `POST`
+   - **Content-Type:** `application/json`
+   - **Body template:** `{ "title": "{pageTitle}", "content": "{markdown}", "projectId": <YOUR_PROJECT_ID> }`
+4. Save options.
+5. On any webpage, click the MarkDownload icon → **Download → Send to URL**. The page lands as pending in your project. Open `/sources` to triage it.
+
+### Option B — Obsidian Web Clipper
+
+1. Install the Obsidian Web Clipper browser extension.
+2. Settings → **Custom output** → add a new output with type **Web request**.
+3. Use the same endpoint + body shape as Option A above.
+
+### Triage flow
+
+After a clip lands:
+
+1. Go to `/sources` → the new source shows as **pending** at the top.
+2. Three options on the row:
+   - **Approve** — kicks off ingest, generates wiki pages.
+   - **Project picker dropdown** — move to a different project (only available while pending).
+   - **Delete** — remove the source and its raw file.
+
+If you want clips to *not* auto-fire synthesis after approval, set Synthesis to **Manual** in `/settings`. Then re-run synthesis explicitly with the **Run synthesis** button on `/sources` after a triage batch.
+
+### Limitations
+
+- Moving a source between projects only works while it's still pending. Once ingested, the wiki pages it generated are project-scoped — workaround is delete + re-clip.
+- No auth on the endpoints (matches the rest of the app — assumes localhost-only access). Don't expose this app to the public internet without adding auth.
+
 ## Tech Stack
 
 - **Framework**: Next.js 16 (App Router, Turbopack)

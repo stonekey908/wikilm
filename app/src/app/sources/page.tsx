@@ -102,7 +102,7 @@ function relevanceClass(pct: number): string {
 function IntakePageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { activeProject } = useProject();
+  const { activeProject, projects, refreshProjects } = useProject();
   const { addToast } = useToast();
   const projectId = activeProject?.id ?? null;
 
@@ -260,6 +260,36 @@ function IntakePageInner() {
   const weekMax = Math.max(1, ...weekBuckets);
 
   // ── Library actions ─────────────────────────────────────────────
+  const [movingId, setMovingId] = useState<number | null>(null);
+
+  const moveSource = useCallback(
+    async (s: Source, newProjectId: number) => {
+      if (newProjectId === s.projectId || movingId === s.id) return;
+      setMovingId(s.id);
+      try {
+        const res = await fetch(`/api/sources/${s.id}/move`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ newProjectId }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error ?? "Move failed");
+        }
+        const target = projects.find((p) => p.id === newProjectId);
+        addToast({ type: "success", title: `Moved to ${target?.name ?? "project"}` });
+        // Source no longer belongs to active project — drop it from the list.
+        setSources((p) => p.filter((x) => x.id !== s.id));
+        refreshProjects();
+      } catch (e) {
+        addToast({ type: "error", title: (e as Error).message ?? "Move failed" });
+      } finally {
+        setMovingId(null);
+      }
+    },
+    [movingId, projects, addToast, refreshProjects]
+  );
+
   async function approve(s: Source) {
     if (s.status !== "pending" || approving.has(s.id)) return;
     setApproving((p) => new Set(p).add(s.id));
@@ -869,6 +899,21 @@ function IntakePageInner() {
                         <span className={`seal ${isPending ? "acc" : s.status === "failed" ? "red" : "ghost"}`}>
                           {s.status}
                         </span>
+                        {isPending && !isApproved && projects.length > 1 && (
+                          <select
+                            value={s.projectId}
+                            onChange={(e) => moveSource(s, parseInt(e.target.value, 10))}
+                            disabled={movingId === s.id}
+                            title="Move to a different project"
+                            style={{ fontSize: 12, padding: "4px 6px" }}
+                          >
+                            {projects.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                         {isPending && !isApproved && (
                           <button className="btn primary" onClick={() => approve(s)}>
                             Approve

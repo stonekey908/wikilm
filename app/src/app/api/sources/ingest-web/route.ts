@@ -58,6 +58,11 @@ function relatedExistingPages(project: Project): Array<{
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const { title, url, domain, author, type, summary, tags, projectId } = body;
+  // Opt-in defer: clipper-style callers pass `defer: true` so the source
+  // lands as pending in the library; the user later triages and approves
+  // from /sources. Default stays "ingest now" so the existing "Commission →"
+  // UI flow on /sources is unchanged.
+  const defer = body?.defer === true;
 
   if (!title || !url) {
     return Response.json({ error: "Missing required fields: title, url" }, { status: 400 });
@@ -79,12 +84,19 @@ export async function POST(request: NextRequest) {
       filePath: url,
       author: author ?? null,
       meta: JSON.stringify({ domain, summary, tags }),
-      status: "ingesting",
+      status: defer ? "pending" : "ingesting",
     })
     .returning({ id: sources.id })
     .all();
 
   const sourceId = result[0].id;
+
+  if (defer) {
+    return Response.json(
+      { sourceId, status: "pending" },
+      { status: 201 }
+    );
+  }
 
   const projectCwd = projectRoot(project);
 
