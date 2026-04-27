@@ -97,6 +97,86 @@ SecondBrain/
   secondbrain.db        # SQLite database (auto-created)
 ```
 
+## Web Clipper (browser → WikiLM)
+
+Send any webpage from your browser to WikiLM as a pending source. The page lands in the chosen project's library, ready for you to triage (approve, move to a different project, or delete) from `/sources`.
+
+### Endpoints
+
+Two endpoints accept clips:
+
+| Endpoint | When to use | Body |
+|---|---|---|
+| `POST /api/sources/upload-md` | The clipper renders the page to markdown locally and sends the body. **Defaults to pending** — no flag needed. | `{ title, content, projectId, tags? }` |
+| `POST /api/sources/ingest-web` | The clipper just sends the URL; the server does the fetch + ingest later. **Add `defer: true`** to land as pending. | `{ title, url, projectId, defer: true, ... }` |
+
+### Find a project ID
+
+`http://localhost:3000` → open the project switcher (top-left) → hover the project. The ID is also visible at `GET /api/projects` if you prefer JSON.
+
+### Option A — MarkDownload (Chrome/Firefox)
+
+1. Install [MarkDownload](https://github.com/deathau/markdownload).
+2. Right-click the toolbar icon → **Options** → **Send to URL** section.
+3. Configure:
+   - **URL:** `http://localhost:3000/api/sources/upload-md`
+   - **Method:** `POST`
+   - **Content-Type:** `application/json`
+   - **Body template:** `{ "title": "{pageTitle}", "content": "{markdown}", "projectId": <YOUR_PROJECT_ID> }`
+4. Save options.
+5. On any webpage, click the MarkDownload icon → **Download → Send to URL**. The page lands as pending in your project. Open `/sources` to triage it.
+
+### Option B — Safari/Chrome bookmarklet (no install)
+
+The fastest setup if you don't want a browser extension. Lists your projects in a prompt, accepts either the project number or its name.
+
+**One-time setup: HTTPS dev server.** Modern browsers (Safari especially) refuse to fetch HTTP localhost from an HTTPS page (Wikipedia, blog posts, etc.). To make the bookmarklet work from real websites, run WikiLM on HTTPS:
+
+1. Stop the dev server if it's running.
+2. Start it with: `npm run dev:https` (this is `next dev --experimental-https` — Next.js auto-generates a self-signed cert).
+3. Visit `https://localhost:3000` once. Safari will warn "this connection is not private". Click **Show Details** → **visit this website** → confirm. Safari remembers the trust forever.
+
+After this one-time trust, the bookmarklet works on any webpage.
+
+**Install the bookmarklet:**
+
+1. In your browser's bookmark bar, create a new bookmark on any page (Safari: `⌘D` → save to **Favorites**; Chrome: `⌘D` → **Bookmarks Bar**).
+2. Edit the saved bookmark's URL (Safari: `Bookmarks → Edit Bookmarks` → right-click the new entry → **Edit Address**; Chrome: right-click → **Edit**).
+3. Replace the URL with the entire snippet below (one line, starts with `javascript:`):
+
+```javascript
+javascript:(async()=>{try{const r=await fetch('https://localhost:3000/api/projects');if(!r.ok)throw new Error('WikiLM not reachable at https://localhost:3000');const list=(await r.json()).projects||[];if(!list.length)throw new Error('No projects found');const menu=list.map((p,i)=>(i+1)+'. '+p.name).join('\n');const pick=prompt('Clip "'+document.title+'" to which project?\n\n'+menu,'1');if(!pick)return;const asNum=parseInt(pick,10);let proj=(Number.isFinite(asNum)&&asNum>=1&&asNum<=list.length)?list[asNum-1]:list.find(p=>p.name.toLowerCase()===pick.toLowerCase()||p.slug===pick);if(!proj){alert('No match for "'+pick+'"');return;}const res=await fetch('https://localhost:3000/api/sources/upload-md',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:document.title,content:'# '+document.title+'\n\nSource: '+location.href+'\n\n'+document.body.innerText.slice(0,30000),projectId:proj.id})});const j=await res.json();alert(res.ok?'\u2713 Clipped to '+proj.name+' (#'+j.sourceId+')':'\u2717 '+(j.error||res.status));}catch(e){alert('Failed: '+e.message);}})();
+```
+
+4. Save the bookmark. On any webpage, click it → pick a project (number or name) → success alert. The page lands as pending in `/sources`.
+
+**Notes:**
+- The bookmarklet uses `document.body.innerText` rather than full HTML-to-markdown conversion, so the body is plaintext. Good enough for ingestion (Claude reads it fine), but MarkDownload (Option A) produces nicer markdown for code blocks and structured pages.
+- If you forgot to run with HTTPS and clicked the bookmarklet, you'll see "TLS error" or "secure connection failed" in the Web Inspector console. Restart the server with `npm run dev:https`.
+
+### Option C — Obsidian Web Clipper
+
+1. Install the Obsidian Web Clipper browser extension.
+2. Settings → **Custom output** → add a new output with type **Web request**.
+3. Use the same endpoint + body shape as Option A above.
+
+### Triage flow
+
+After a clip lands:
+
+1. Go to `/sources` → the new source shows as **pending** at the top.
+2. Three options on the row:
+   - **Approve** — kicks off ingest, generates wiki pages.
+   - **Project picker dropdown** — move to a different project (only available while pending).
+   - **Delete** — remove the source and its raw file.
+
+If you want clips to *not* auto-fire synthesis after approval, set Synthesis to **Manual** in `/settings`. Then re-run synthesis explicitly with the **Run synthesis** button on `/sources` after a triage batch.
+
+### Limitations
+
+- Moving a source between projects only works while it's still pending. Once ingested, the wiki pages it generated are project-scoped — workaround is delete + re-clip.
+- No auth on the endpoints (matches the rest of the app — assumes localhost-only access). Don't expose this app to the public internet without adding auth.
+
 ## Tech Stack
 
 - **Framework**: Next.js 16 (App Router, Turbopack)
