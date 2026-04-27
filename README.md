@@ -56,6 +56,7 @@ Follow-up work layered on after the stabilisation cut. Everything below is on `m
 - **Project tree ⋯ menu.** Move / Delete finally fire (ref attached to menu div; doc listener uses contains-check). Delete failures surface the real server error in the toast (e.g. "Cannot delete a project that has children").
 - **Source upload fixes.** Field-name mismatch (`file` vs `files`) + per-project raw dir (was writing to top-level `raw/` regardless of project). Uploads now land in the correct project and ingestion finds them.
 - **Cleaner source cards.** Extract line reads *"Note · ingested."* (or type-appropriate label) once the row is done — no more false "awaiting ingestion" on already-ingested rows.
+- **Web clipper (browser bookmarklet).** One-click clip from any webpage into a chosen project. Bookmarklet sends the page HTML; the server runs Turndown to produce real markdown and lands the source as `pending` for triage. Works in Safari, Chrome, Firefox — no extension install. A useful no-web-grounding ingest path: when you've already done the reading and just want the page in the wiki, this beats firing a research job. Run the dev server with `npm run dev:https` (one-time cert trust) so the bookmarklet works from HTTPS pages. Pending sources get a **Preview** button + project picker dropdown for triage before approving. Setup snippet + Safari install steps in [SETUP.md](SETUP.md#web-clipper-browser--wikilm).
 
 ## What it does
 

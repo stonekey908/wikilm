@@ -8,6 +8,7 @@ import { writeFile, mkdir } from "fs/promises";
 import fs from "fs";
 import { getProject, projectRoot } from "@/lib/projects";
 import { corsPreflight, withCors } from "@/lib/cors";
+import { htmlToMarkdown } from "@/lib/clip-to-markdown";
 
 export async function OPTIONS() {
   return corsPreflight();
@@ -67,7 +68,7 @@ function buildFrontmatter(title: string, tags: string[]): string {
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
-  const { title, content } = body ?? {};
+  const { title } = body ?? {};
   const tags: string[] = Array.isArray(body?.tags)
     ? body.tags.filter((t: unknown): t is string => typeof t === "string")
     : [];
@@ -78,11 +79,29 @@ export async function POST(request: NextRequest) {
   // that want the "upload + ingest now" experience).
   const ingestNow = body?.ingest === true;
 
+  // Clipper-style callers send `html` (the page DOM) + `url` (the source
+  // page); MCP / programmatic callers send `content` (already-markdown).
+  // When html is provided we run it through Turndown and prepend a small
+  // source-attribution header so the ingest knows where the page came from.
+  let content: string;
+  if (typeof body?.html === "string" && body.html.trim()) {
+    const sourceUrl = typeof body?.url === "string" ? body.url : "";
+    const md = htmlToMarkdown(body.html);
+    const header = sourceUrl
+      ? `# ${typeof title === "string" ? title : ""}\n\n> Source: ${sourceUrl}\n\n`
+      : `# ${typeof title === "string" ? title : ""}\n\n`;
+    content = header + md;
+  } else if (typeof body?.content === "string" && body.content.trim()) {
+    content = body.content;
+  } else {
+    return Response.json(
+      { error: "Either `html` or `content` is required" },
+      { status: 400 }
+    );
+  }
+
   if (typeof title !== "string" || !title.trim()) {
     return Response.json({ error: "title is required" }, { status: 400 });
-  }
-  if (typeof content !== "string" || !content.trim()) {
-    return Response.json({ error: "content is required" }, { status: 400 });
   }
 
   const project = getProject(projectIdInput) ?? getProject(1);
