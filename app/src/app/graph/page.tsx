@@ -3,8 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useProject } from "@/components/project-switcher";
+import { useToast } from "@/components/toast-provider";
 import { EditorialBreadcrumbs } from "@/components/editorial/wiki/breadcrumbs";
-import { forceLayout, type LaidEdge, type LaidNode } from "@/components/editorial/map/force-layout";
+import {
+  forceLayout,
+  radiusFor,
+  type LaidEdge,
+  type LaidNode,
+} from "@/components/editorial/map/force-layout";
 
 interface GraphNode {
   id: string;
@@ -13,6 +19,7 @@ interface GraphNode {
   type: string;
   projectId: number;
   projectSlug: string;
+  mtime: number;
 }
 interface GraphEdge {
   from: string;
@@ -191,6 +198,64 @@ function clusteringCoef(nodes: LaidNode[], edges: LaidEdge[]): number {
   return counted === 0 ? 0 : sum / counted;
 }
 
+/**
+ * Shown when constellation view is on but the project has no synthesis
+ * pages to anchor the view. Surfaces the gap (no silent fallback to full
+ * graph) and offers a one-click trigger for the synthesis job.
+ */
+function ConstellationEmpty({
+  projectId,
+  onSwitchToFull,
+}: {
+  projectId: number | null;
+  onSwitchToFull: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [queued, setQueued] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fire = useCallback(async () => {
+    if (projectId === null || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await fetch(`/api/projects/${projectId}/synthesis/run`, { method: "POST" });
+      if (!r.ok) {
+        const body = (await r.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? `HTTP ${r.status}`);
+      }
+      setQueued(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }, [projectId, busy]);
+  return (
+    <div className="map-empty constellation-empty">
+      <div className="ce-eyebrow">Constellation view</div>
+      <h3>No synthesis page yet.</h3>
+      <p>
+        The constellation view anchors itself to synthesis pages — the wiki's
+        deliberate overviews. This project doesn&rsquo;t have one yet.
+      </p>
+      <div className="ce-actions">
+        <button
+          type="button"
+          className="ce-primary"
+          onClick={fire}
+          disabled={busy || queued || projectId === null}
+        >
+          {queued ? "Synthesis queued — check Jobs" : busy ? "Queuing…" : "Generate a synthesis →"}
+        </button>
+        <button type="button" className="ce-secondary" onClick={onSwitchToFull}>
+          Or switch to Full graph
+        </button>
+      </div>
+      {error && <div className="ce-error">Couldn&rsquo;t queue: {error}</div>}
+    </div>
+  );
+}
+
 export default function MapPage() {
   const router = useRouter();
   const { activeProject } = useProject();
@@ -205,6 +270,99 @@ export default function MapPage() {
   const [dragging, setDragging] = useState(false);
   const dragStart = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
+
+  // ── View mode (constellation | full) + weight encoding toggle ───
+  // Per-project preference, hydrated from localStorage on mount.
+  // Defaults: constellation + weight on. Slice 1 wires state only;
+  // slices 2 & 4 read these to filter and style nodes.
+  type MapView = "constellation" | "full";
+  const [view, setView] = useState<MapView>("constellation");
+  const [weight, setWeight] = useState<boolean>(true);
+  const [bloomOn, setBloomOn] = useState<boolean>(true);
+  const [trailOn, setTrailOn] = useState<boolean>(true);
+  useEffect(() => {
+    if (projectId === null) return;
+    const v = window.localStorage.getItem(`wikilm.map.view.${projectId}`);
+    if (v === "constellation" || v === "full") setView(v);
+    const w = window.localStorage.getItem(`wikilm.map.weight.${projectId}`);
+    if (w === "on" || w === "off") setWeight(w === "on");
+    const b = window.localStorage.getItem(`wikilm.map.bloom.${projectId}`);
+    if (b === "on" || b === "off") setBloomOn(b === "on");
+    const t = window.localStorage.getItem(`wikilm.map.trail.${projectId}`);
+    if (t === "on" || t === "off") setTrailOn(t === "on");
+  }, [projectId]);
+  const setViewPersist = useCallback(
+    (v: MapView) => {
+      setView(v);
+      if (projectId !== null) window.localStorage.setItem(`wikilm.map.view.${projectId}`, v);
+    },
+    [projectId],
+  );
+  const setWeightPersist = useCallback(
+    (w: boolean) => {
+      setWeight(w);
+      if (projectId !== null)
+        window.localStorage.setItem(`wikilm.map.weight.${projectId}`, w ? "on" : "off");
+    },
+    [projectId],
+  );
+  const setBloomPersist = useCallback(
+    (b: boolean) => {
+      setBloomOn(b);
+      if (projectId !== null)
+        window.localStorage.setItem(`wikilm.map.bloom.${projectId}`, b ? "on" : "off");
+    },
+    [projectId],
+  );
+  const setTrailPersist = useCallback(
+    (t: boolean) => {
+      setTrailOn(t);
+      if (projectId !== null)
+        window.localStorage.setItem(`wikilm.map.trail.${projectId}`, t ? "on" : "off");
+    },
+    [projectId],
+  );
+
+  // ── Trail (slice 5) ──────────────────────────────────────────────
+  // Records the user's wandering path as they bloom nodes. Persists per-project
+  // in localStorage so refreshes and revisits don't lose the thread. Ends only
+  // when the user saves it as a query page or hits "Clear trail" — no idle
+  // timeout. Duplicates of the immediately-previous stop are suppressed
+  // (clicking the same node to collapse + reclick to bloom shouldn't double-log).
+  interface TrailStop {
+    id: string;
+    slug: string;
+    title: string;
+    type: string;
+    ts: number;
+  }
+  const [trail, setTrail] = useState<TrailStop[]>([]);
+  const [savingTrail, setSavingTrail] = useState(false);
+  const { addToast } = useToast();
+  useEffect(() => {
+    if (projectId === null) return;
+    try {
+      const raw = window.localStorage.getItem(`wikilm.trail.${projectId}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setTrail(parsed as TrailStop[]);
+        else setTrail([]);
+      } else {
+        setTrail([]);
+      }
+    } catch {
+      setTrail([]);
+    }
+  }, [projectId]);
+  const persistTrail = useCallback(
+    (next: TrailStop[]) => {
+      setTrail(next);
+      if (projectId !== null)
+        window.localStorage.setItem(`wikilm.trail.${projectId}`, JSON.stringify(next));
+    },
+    [projectId],
+  );
+  const clearTrail = useCallback(() => persistTrail([]), [persistTrail]);
 
   // ── Selection (neighborhood view) ────────────────────────────────
   // Clicking a node selects it; clicking the SVG background deselects.
@@ -239,25 +397,59 @@ export default function MapPage() {
     };
   }, [projectId]);
 
+  // ── Constellation filter ─────────────────────────────────────────
+  // In "constellation" view, the layout sees only synthesis pages + their
+  // 1-hop concept/entity neighbors. Sources, queries, outputs are dropped
+  // from the layout entirely so the spread reflects the visible set.
+  // In "full" view, everything goes in.
+  const synthesisCount = useMemo(
+    () => rawNodes.filter((n) => n.type === "synthesis").length,
+    [rawNodes],
+  );
+  // mtime lookup for the recency border encoding (slice 4). The forceLayout
+  // pipeline drops mtime to keep its node interface lean — read from rawNodes
+  // by id at render time instead.
+  const mtimeById = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const n of rawNodes) m.set(n.id, n.mtime);
+    return m;
+  }, [rawNodes]);
+  const { layoutNodes, layoutEdges } = useMemo(() => {
+    if (view === "full") return { layoutNodes: rawNodes, layoutEdges: rawEdges };
+    const synthIds = new Set(rawNodes.filter((n) => n.type === "synthesis").map((n) => n.id));
+    if (synthIds.size === 0) return { layoutNodes: [], layoutEdges: [] };
+    const keep = new Set(synthIds);
+    for (const e of rawEdges) {
+      if (synthIds.has(e.from)) keep.add(e.to);
+      if (synthIds.has(e.to)) keep.add(e.from);
+    }
+    const filteredNodes = rawNodes.filter(
+      (n) => keep.has(n.id) && (n.type === "synthesis" || n.type === "concept" || n.type === "entity"),
+    );
+    const visibleIds = new Set(filteredNodes.map((n) => n.id));
+    const filteredEdges = rawEdges.filter((e) => visibleIds.has(e.from) && visibleIds.has(e.to));
+    return { layoutNodes: filteredNodes, layoutEdges: filteredEdges };
+  }, [rawNodes, rawEdges, view]);
+
   const { nodes, edges, bounds } = useMemo(() => {
-    if (rawNodes.length === 0)
+    if (layoutNodes.length === 0)
       return {
         nodes: [] as LaidNode[],
         edges: [] as LaidEdge[],
         bounds: { width: BASE_WIDTH, height: BASE_HEIGHT },
       };
-    const layoutScale = Math.max(1, Math.sqrt(rawNodes.length / 40));
+    const layoutScale = Math.max(1, Math.sqrt(layoutNodes.length / 40));
     const width = BASE_WIDTH * layoutScale;
     const height = BASE_HEIGHT * layoutScale;
     const result = forceLayout({
-      nodes: rawNodes.map((n) => ({ id: n.id, type: n.type, title: n.title, slug: n.slug })),
-      edges: rawEdges,
+      nodes: layoutNodes.map((n) => ({ id: n.id, type: n.type, title: n.title, slug: n.slug })),
+      edges: layoutEdges,
       width: BASE_WIDTH,
       height: BASE_HEIGHT,
       iterations: 260,
     });
     return { ...result, bounds: { width, height } };
-  }, [rawNodes, rawEdges]);
+  }, [layoutNodes, layoutEdges]);
 
   const WIDTH = bounds.width;
   const HEIGHT = bounds.height;
@@ -299,21 +491,46 @@ export default function MapPage() {
   }, [adjacency, nodes]);
 
   // 1-hop neighborhood of the selected node (includes the node itself).
+  // Bloom toggle gates the dim/highlight side-effect — when off, selection
+  // still happens (preview card opens) but the rest of the graph stays bright.
   const neighborhood = useMemo(() => {
-    if (!selectedId) return null;
+    if (!selectedId || !bloomOn) return null;
     const set = new Set<string>([selectedId]);
     for (const n of adjacency.get(selectedId) ?? []) set.add(n);
     return set;
-  }, [selectedId, adjacency]);
+  }, [selectedId, adjacency, bloomOn]);
 
   const tooltipNode = hoverId ? nodes.find((n) => n.id === hoverId) : null;
 
-  // Click → select (opens sidebar). Double-click → open the wiki page.
+  // Trail-stop sequence number per visited node id (1-indexed). A node visited
+  // multiple times shows the most recent index — the badge tracks "where you
+  // are in the trail" not "how many times you've been here."
+  const trailIndexById = useMemo(() => {
+    const m = new Map<string, number>();
+    trail.forEach((s, i) => m.set(s.id, i + 1));
+    return m;
+  }, [trail]);
+
+  // Click → select (opens preview card; blooms if Bloom toggle is on).
+  // Double-click → open the wiki page directly.
+  // Trail toggle gates whether the click is recorded as a journey stop.
   const onNodeClick = useCallback(
     (n: LaidNode) => {
-      setSelectedId((prev) => (prev === n.id ? null : n.id));
+      setSelectedId((prev) => {
+        if (prev === n.id) return null; // collapse
+        if (trailOn) {
+          const last = trail[trail.length - 1];
+          if (!last || last.id !== n.id) {
+            persistTrail([
+              ...trail,
+              { id: n.id, slug: n.slug, title: n.title, type: n.type, ts: Date.now() },
+            ]);
+          }
+        }
+        return n.id;
+      });
     },
-    []
+    [trail, persistTrail, trailOn],
   );
   const onNodeDoubleClick = useCallback(
     (n: LaidNode) => {
@@ -321,6 +538,43 @@ export default function MapPage() {
     },
     [router]
   );
+
+  // Save trail → query page. Spawns a Claude job that reads each stop's page
+  // and writes wiki/queries/{slug}.md. Trail clears on success so the next
+  // wander starts fresh.
+  const saveTrailAsQuery = useCallback(async () => {
+    if (projectId === null || trail.length < 2 || savingTrail) return;
+    setSavingTrail(true);
+    try {
+      const r = await fetch("/api/queries/from-trail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          trail: trail.map((s) => ({ slug: s.slug, title: s.title, type: s.type })),
+        }),
+      });
+      if (!r.ok) {
+        const body = (await r.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error ?? `HTTP ${r.status}`);
+      }
+      addToast({
+        type: "success",
+        title: "Trail queued",
+        description: "A query page is being written from your wandering path.",
+      });
+      clearTrail();
+      setSelectedId(null);
+    } catch (e) {
+      addToast({
+        type: "error",
+        title: "Couldn't save trail",
+        description: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setSavingTrail(false);
+    }
+  }, [projectId, trail, savingTrail, addToast, clearTrail]);
 
   // Fetch the selected node's page body + resolve neighbor titles whenever
   // selection changes. Keep prior state visible while the new fetch runs.
@@ -337,11 +591,7 @@ export default function MapPage() {
       .then((r) => (r.ok ? r.json() : null))
       .then((d: { title?: string; type?: string; body?: string } | null) => {
         if (cancelled || !d) return;
-        // First non-empty, non-heading paragraph. Strip wikilink pipes for the
-        // one-liner so `[[x|y]]` renders as `y`.
         const body = d.body ?? "";
-        const excerpt = extractExcerpt(body);
-        const neighborIds = Array.from(adjacency.get(selectedId) ?? []);
         const incomingEdges = edges.filter((e) => e.to === selectedId);
         const outgoingEdges = edges.filter((e) => e.from === selectedId);
         const titleFor = (id: string) => {
@@ -354,12 +604,11 @@ export default function MapPage() {
         const incoming = incomingEdges
           .map((e) => titleFor(e.from))
           .filter((x): x is { slug: string; title: string } => x !== null);
-        void neighborIds; // (used later if we add a unified list)
         setSelectedDetail({
           slug: node.slug,
           title: d.title ?? node.title,
           type: d.type ?? node.type,
-          excerpt,
+          excerpt: extractExcerpt(body),
           outgoing,
           incoming,
         });
@@ -371,7 +620,7 @@ export default function MapPage() {
     return () => {
       cancelled = true;
     };
-  }, [selectedId, nodes, edges, adjacency, projectId]);
+  }, [selectedId, nodes, edges, projectId]);
 
   function edgeVisible(e: LaidEdge): boolean {
     if (!activeType) return true;
@@ -460,9 +709,103 @@ export default function MapPage() {
         </div>
       </div>
 
+      <div className="map-rail">
+        <div className="map-rail-group">
+          <span className="map-rail-lab">View</span>
+          <div className="map-seg">
+            <button
+              type="button"
+              className={`map-seg-btn${view === "constellation" ? " active" : ""}`}
+              onClick={() => setViewPersist("constellation")}
+            >
+              Constellation
+            </button>
+            <button
+              type="button"
+              className={`map-seg-btn${view === "full" ? " active" : ""}`}
+              onClick={() => setViewPersist("full")}
+            >
+              Full graph
+            </button>
+          </div>
+        </div>
+        <div className="map-rail-group">
+          <span className="map-rail-lab">Weight</span>
+          <div className="map-seg">
+            <button
+              type="button"
+              className={`map-seg-btn${weight ? " active" : ""}`}
+              onClick={() => setWeightPersist(true)}
+            >
+              On
+            </button>
+            <button
+              type="button"
+              className={`map-seg-btn${!weight ? " active" : ""}`}
+              onClick={() => setWeightPersist(false)}
+            >
+              Off
+            </button>
+          </div>
+        </div>
+        <div className="map-rail-group">
+          <span className="map-rail-lab">Bloom</span>
+          <div className="map-seg">
+            <button
+              type="button"
+              className={`map-seg-btn${bloomOn ? " active" : ""}`}
+              onClick={() => setBloomPersist(true)}
+            >
+              On
+            </button>
+            <button
+              type="button"
+              className={`map-seg-btn${!bloomOn ? " active" : ""}`}
+              onClick={() => setBloomPersist(false)}
+            >
+              Off
+            </button>
+          </div>
+        </div>
+        <div className="map-rail-group">
+          <span className="map-rail-lab">Trail</span>
+          <div className="map-seg">
+            <button
+              type="button"
+              className={`map-seg-btn${trailOn ? " active" : ""}`}
+              onClick={() => setTrailPersist(true)}
+            >
+              On
+            </button>
+            <button
+              type="button"
+              className={`map-seg-btn${!trailOn ? " active" : ""}`}
+              onClick={() => setTrailPersist(false)}
+            >
+              Off
+            </button>
+          </div>
+        </div>
+        {trail.length > 0 && (
+          <button
+            type="button"
+            className="map-rail-reset"
+            onClick={clearTrail}
+            title="Clear the recorded journey"
+          >
+            Reset journey
+          </button>
+        )}
+      </div>
+
       <div className="mapwrap">
         {rawNodes.length === 0 ? (
           <div className="map-empty">No pages yet — the map will populate as you ingest.</div>
+        ) : view === "constellation" && synthesisCount === 0 ? (
+          <ConstellationEmpty
+            projectId={projectId}
+            onSwitchToFull={() => setViewPersist("full")}
+          />
         ) : (
           <>
             <svg
@@ -528,6 +871,61 @@ export default function MapPage() {
                 );
               })}
 
+              {/* trail path — slice 5
+                    Connects the user's wandering path (in order). Drawn
+                    after edges + before nodes so it overlays the graph
+                    skeleton but sits beneath the node circles. Only
+                    stops that have a positioned counterpart in `nodes`
+                    are joined; stops from a different view (filtered
+                    out by Constellation) skip a segment. */}
+              {trailOn && trail.length >= 2 && (() => {
+                // Walk the trail in order; render each consecutive pair as
+                // its own arrow-headed segment so direction is unambiguous.
+                // Stops not currently positioned (e.g. filtered out by the
+                // Constellation view) are skipped — the next visible pair
+                // continues the journey.
+                const segments: { from: LaidNode; to: LaidNode; idx: number }[] = [];
+                let prev: LaidNode | undefined;
+                trail.forEach((s, i) => {
+                  const here = nodes.find((n) => n.id === s.id);
+                  if (!here) return;
+                  if (prev) segments.push({ from: prev, to: here, idx: i });
+                  prev = here;
+                });
+                if (segments.length === 0) return null;
+                return (
+                  <g pointerEvents="none">
+                    <defs>
+                      <marker
+                        id="trail-arrow"
+                        viewBox="0 0 10 10"
+                        refX="9"
+                        refY="5"
+                        markerWidth="7"
+                        markerHeight="7"
+                        orient="auto-start-reverse"
+                      >
+                        <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--accent)" />
+                      </marker>
+                    </defs>
+                    {segments.map((seg) => (
+                      <line
+                        key={`trail-${seg.idx}`}
+                        x1={seg.from.x}
+                        y1={seg.from.y}
+                        x2={seg.to.x}
+                        y2={seg.to.y}
+                        stroke="var(--accent)"
+                        strokeWidth={2}
+                        strokeDasharray="6 4"
+                        opacity={0.8}
+                        markerEnd="url(#trail-arrow)"
+                      />
+                    ))}
+                  </g>
+                );
+              })()}
+
               {/* hub pulse */}
               {hubId && nodes.length > 0 && (() => {
                 const hub = nodes.find((n) => n.id === hubId);
@@ -565,16 +963,43 @@ export default function MapPage() {
                 const isBridge = bridges.has(n.id);
                 const isOrphan = orphans.has(n.id);
                 const isSelected = selectedId === n.id;
+                const isSynthesis = n.type === "synthesis";
                 const fill = isBigHub ? "var(--accent)" : TYPE_COLOR_VAR[n.type] ?? "var(--ink)";
                 const op = selectionDim(n.id);
-                const scale = isHub ? 1.3 : 1;
+                // Weight encoding (slice 4):
+                //   ON  → radius scales with degree (built into n.r by the
+                //         layout) + hub gets a 1.3× boost; border thickness
+                //         encodes recency (≤14d bold, fading to thin >60d).
+                //   OFF → fixed type-based radius, no hub boost, uniform 1.5px
+                //         border. Useful when you want to read structure
+                //         without the visual heatmap.
+                const baseR = weight ? n.r : radiusFor(n.type);
+                const hubBoost = weight && isHub ? 1.3 : 1;
+                const constellationBoost = view === "constellation" && isSynthesis ? 1.6 : 1;
+                const scale = hubBoost * constellationBoost;
+                // Recency border: ≤14d → 2.5px, 14–60d → linear 2.5→0.8,
+                // >60d → 0.8px. Orphans keep their dashed thin ring.
+                const recencyStroke = (() => {
+                  if (!weight) return 1.5;
+                  const mt = mtimeById.get(n.id);
+                  if (!mt) return 1.5;
+                  const ageDays = (Date.now() - mt) / 86_400_000;
+                  if (ageDays <= 14) return 2.5;
+                  if (ageDays >= 60) return 0.8;
+                  return 2.5 - ((ageDays - 14) / 46) * 1.7;
+                })();
+                // In constellation view, syntheses always show their label
+                // regardless of radius; orbiters keep the existing rule.
+                const showLabel = (view === "constellation" && isSynthesis) || baseR >= 8;
+                const labelSize = view === "constellation" && isSynthesis ? 13 : 10.5;
+                const labelFill = view === "constellation" && isSynthesis ? "var(--ink)" : "var(--ink-2)";
                 return (
                   <g key={n.id} opacity={op}>
                     {isBridge && !isOrphan && (
                       <circle
                         cx={n.x}
                         cy={n.y}
-                        r={n.r * scale + 3}
+                        r={baseR * scale + 3}
                         fill="none"
                         stroke="var(--accent)"
                         strokeWidth={1.2}
@@ -585,7 +1010,7 @@ export default function MapPage() {
                       <circle
                         cx={n.x}
                         cy={n.y}
-                        r={n.r * scale + 6}
+                        r={baseR * scale + 6}
                         fill="none"
                         stroke="var(--green, #2f7d3b)"
                         strokeWidth={2}
@@ -595,10 +1020,10 @@ export default function MapPage() {
                     <circle
                       cx={n.x}
                       cy={n.y}
-                      r={n.r * scale}
+                      r={baseR * scale}
                       fill={isOrphan ? "var(--paper)" : fill}
                       stroke={isOrphan ? "var(--ink-3)" : "var(--paper)"}
-                      strokeWidth={isOrphan ? 1.2 : 1.5}
+                      strokeWidth={isOrphan ? 1.2 : recencyStroke}
                       strokeDasharray={isOrphan ? "3 2" : undefined}
                       className="map-node"
                       onMouseEnter={() => setHoverId(n.id)}
@@ -607,18 +1032,41 @@ export default function MapPage() {
                       onDoubleClick={() => onNodeDoubleClick(n)}
                       style={{ cursor: "pointer" }}
                     />
-                    {n.r >= 8 && (
+                    {showLabel && (
                       <text
                         x={n.x}
-                        y={n.y + n.r * scale + 12}
+                        y={n.y + baseR * scale + 12}
                         textAnchor="middle"
                         fontFamily="var(--font-serif)"
-                        fontSize={10.5}
-                        fill="var(--ink-2)"
+                        fontSize={labelSize}
+                        fill={labelFill}
                         pointerEvents="none"
                       >
                         {n.title.length > 28 ? n.title.slice(0, 26) + "…" : n.title}
                       </text>
+                    )}
+                    {trailOn && trailIndexById.has(n.id) && (
+                      <g pointerEvents="none">
+                        <circle
+                          cx={n.x + baseR * scale + 4}
+                          cy={n.y - baseR * scale - 4}
+                          r={8}
+                          fill="var(--accent)"
+                          stroke="var(--paper)"
+                          strokeWidth={1.5}
+                        />
+                        <text
+                          x={n.x + baseR * scale + 4}
+                          y={n.y - baseR * scale - 1}
+                          textAnchor="middle"
+                          fontFamily="var(--font-mono)"
+                          fontSize={9}
+                          fontWeight={700}
+                          fill="var(--paper)"
+                        >
+                          {trailIndexById.get(n.id)}
+                        </text>
+                      </g>
                     )}
                   </g>
                 );
@@ -725,7 +1173,7 @@ export default function MapPage() {
                                 type="button"
                                 onClick={() => {
                                   const target = nodes.find((n) => n.slug === o.slug);
-                                  if (target) setSelectedId(target.id);
+                                  if (target) onNodeClick(target);
                                 }}
                               >
                                 {o.title}
@@ -750,7 +1198,7 @@ export default function MapPage() {
                                 type="button"
                                 onClick={() => {
                                   const target = nodes.find((n) => n.slug === o.slug);
-                                  if (target) setSelectedId(target.id);
+                                  if (target) onNodeClick(target);
                                 }}
                               >
                                 {o.title}
@@ -801,13 +1249,54 @@ export default function MapPage() {
         )}
       </div>
 
+      {trailOn && trail.length > 0 && (
+        <div className="trail-rail">
+          <div className="trail-head">
+            <h3>
+              The journey you&rsquo;ve <em>wandered.</em>
+            </h3>
+            <div className="trail-actions">
+              <button
+                type="button"
+                className="trail-clear"
+                onClick={clearTrail}
+                disabled={savingTrail}
+              >
+                Reset journey
+              </button>
+              <button
+                type="button"
+                className="trail-save"
+                onClick={saveTrailAsQuery}
+                disabled={savingTrail || trail.length < 2}
+                title={trail.length < 2 ? "Need at least 2 stops to synthesise" : undefined}
+              >
+                {savingTrail ? "Queuing…" : "Save as query →"}
+              </button>
+            </div>
+          </div>
+          <div className="trail-crumbs">
+            {trail.map((s, i) => (
+              <span key={`${s.id}-${i}`} className="trail-row">
+                {i > 0 && <span className="trail-arrow">→</span>}
+                <span className="trail-step">
+                  <span className="trail-num">{i + 1}</span>
+                  <span className="trail-kind">{s.type}</span>
+                  <span className="trail-title">{s.title}</span>
+                </span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       <style jsx>{`
         .map-focus {
           position: absolute;
           top: 14px;
           right: 14px;
           bottom: 14px;
-          width: 320px;
+          width: 340px;
           background: var(--paper);
           border: 1.5px solid var(--ink);
           box-shadow: 4px 4px 0 var(--ink);
@@ -817,6 +1306,11 @@ export default function MapPage() {
           flex-direction: column;
           gap: 14px;
           z-index: 20;
+          animation: focusIn 220ms ease;
+        }
+        @keyframes focusIn {
+          from { transform: translateX(12px); opacity: 0; }
+          to   { transform: translateX(0);    opacity: 1; }
         }
         .map-focus-head {
           display: flex;
@@ -825,7 +1319,7 @@ export default function MapPage() {
         }
         .map-focus-type {
           font-family: var(--font-mono);
-          font-size: 9px;
+          font-size: 9.5px;
           font-weight: 700;
           letter-spacing: 0.16em;
           color: var(--accent);
@@ -833,20 +1327,19 @@ export default function MapPage() {
         .map-focus-x {
           background: none;
           border: none;
-          font-size: 20px;
+          font-size: 22px;
           cursor: pointer;
           color: var(--ink-3);
           line-height: 1;
           padding: 0 4px;
         }
-        .map-focus-x:hover {
-          color: var(--ink);
-        }
+        .map-focus-x:hover { color: var(--ink); }
         .map-focus h3 {
           font-family: var(--font-serif);
-          font-size: 20px;
-          font-weight: 700;
-          line-height: 1.2;
+          font-size: 22px;
+          font-weight: 600;
+          letter-spacing: -0.01em;
+          line-height: 1.15;
           color: var(--ink);
           margin: -2px 0 0;
         }
@@ -858,11 +1351,12 @@ export default function MapPage() {
           margin: 0;
         }
         .map-focus-excerpt-missing {
+          font-family: var(--font-inst);
           font-style: italic;
           color: var(--ink-4);
         }
         .map-focus-section {
-          border-top: 1px dashed var(--rule-faint);
+          border-top: 1px dashed var(--rule);
           padding-top: 10px;
         }
         .map-focus-section-h {
@@ -894,9 +1388,7 @@ export default function MapPage() {
           text-decoration-color: var(--rule);
           text-underline-offset: 3px;
         }
-        .map-focus-list button:hover {
-          color: var(--accent);
-        }
+        .map-focus-list button:hover { color: var(--accent); }
         .map-focus-empty {
           font-family: var(--font-inst);
           font-style: italic;

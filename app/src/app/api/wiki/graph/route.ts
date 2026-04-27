@@ -22,6 +22,7 @@ interface GraphNode {
   type: string;
   projectId: number;
   projectSlug: string;
+  mtime: number; // file modification time (epoch ms) — drives recency encoding
 }
 
 interface GraphEdge {
@@ -66,6 +67,7 @@ function collectFromProject(project: Project): {
     const pageType = (meta.type as string) || "unknown";
     const title = titleFromMeta(meta, body, slug);
     const id = nodeId(project.id, slug);
+    const mtime = fs.statSync(filePath).mtimeMs;
     nodes.push({
       id,
       slug,
@@ -73,6 +75,7 @@ function collectFromProject(project: Project): {
       type: pageType,
       projectId: project.id,
       projectSlug: project.slug,
+      mtime,
     });
     bodies.set(id, body);
   }

@@ -22,6 +22,10 @@ backups/
 
 # Internal design-handoff docs — kept locally for reference, not for public.
 design_handoff_wikilm_editorial/
+design-handoff/
+
+# Per-session handoff notes for Claude Code continuity — local only.
+.claude/HANDOFF.md
 
 # ─────────────────────────────────────────────────────────────────────
 # User content — ignored by default so the shared repo is a clean install.
