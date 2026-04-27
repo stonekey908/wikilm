@@ -188,6 +188,27 @@ export default function SettingsPage() {
     [addToast]
   );
 
+  const synthesisMode: "auto" | "manual" =
+    modelSettings.synthesis_mode === "manual" ? "manual" : "auto";
+
+  const saveSynthesisMode = useCallback(
+    async (mode: "auto" | "manual") => {
+      setModelSettings((prev) => ({ ...prev, synthesis_mode: mode }));
+      try {
+        const res = await fetch("/api/settings", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ synthesis_mode: mode }),
+        });
+        if (!res.ok) throw new Error();
+        addToast({ type: "success", title: `Synthesis → ${mode}` });
+      } catch {
+        addToast({ type: "error", title: "Couldn't save" });
+      }
+    },
+    [addToast]
+  );
+
   const modelOptions = useMemo(() => {
     const opts: { value: string; label: string; group: string }[] = [];
     for (const c of CLAUDE_MODELS) opts.push({ value: c.value, label: `${c.label} · ${c.desc}`, group: "Claude" });
@@ -402,6 +423,40 @@ export default function SettingsPage() {
               role="button"
               tabIndex={0}
             />
+          </div>
+        </div>
+
+        {/* ── Synthesis behavior ──────────────── */}
+        <div className="settings-card">
+          <h3>
+            <em>Synthesis</em>
+          </h3>
+          <div className="sub">When the project overview re-builds.</div>
+          <div className="setting-row">
+            <div>
+              <div className="k">Mode</div>
+              <div className="desc">
+                Auto: synthesis fires after every ingest (today&apos;s behavior). Manual: nothing
+                fires automatically — use the Run synthesis button on the Sources page when
+                you&apos;re ready.
+              </div>
+            </div>
+            <div className="seg">
+              <button
+                type="button"
+                className={synthesisMode === "auto" ? "on" : ""}
+                onClick={() => saveSynthesisMode("auto")}
+              >
+                Auto
+              </button>
+              <button
+                type="button"
+                className={synthesisMode === "manual" ? "on" : ""}
+                onClick={() => saveSynthesisMode("manual")}
+              >
+                Manual
+              </button>
+            </div>
           </div>
         </div>
 
