@@ -6,9 +6,11 @@ import { triggerSynthesisUpdate } from "@/lib/claude-runner";
  * POST /api/projects/:id/synthesis/run
  *
  * On-demand synthesis trigger for a single (leaf) project. Used by the
- * Map's constellation empty-state CTA when a project has wiki pages but
- * no synthesis to anchor the view. Coalesces via triggerSynthesisUpdate's
- * pending flag — the actual run is deferred until the job queue is idle.
+ * Map's constellation empty-state CTA and by the manual "Run synthesis"
+ * button (Sources page). Forces through the global synthesis-mode gate so
+ * manual-mode users can still fire synthesis on demand. Coalesces via
+ * triggerSynthesisUpdate's pending flag — the actual run is deferred
+ * until the job queue is idle.
  */
 export async function POST(
   _request: NextRequest,
@@ -27,6 +29,6 @@ export async function POST(
   }
 
   const cwd = projectRoot(project);
-  await triggerSynthesisUpdate(cwd, projectId);
+  await triggerSynthesisUpdate(cwd, projectId, { force: true });
   return Response.json({ status: "queued" }, { status: 202 });
 }

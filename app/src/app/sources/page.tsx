@@ -121,6 +121,33 @@ function IntakePageInner() {
   const [quickBusy, setQuickBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // ── Synthesis mode (global setting) ─────────────────────────────
+  const [synthesisMode, setSynthesisMode] = useState<"auto" | "manual">("auto");
+  const [synthesisBusy, setSynthesisBusy] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/settings")
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((d: Record<string, string>) => {
+        setSynthesisMode(d?.synthesis_mode === "manual" ? "manual" : "auto");
+      })
+      .catch(() => {});
+  }, []);
+
+  const runSynthesis = useCallback(async () => {
+    if (projectId === null || synthesisBusy || synthesisMode === "auto") return;
+    setSynthesisBusy(true);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/synthesis/run`, { method: "POST" });
+      if (!res.ok) throw new Error();
+      addToast({ type: "success", title: "Synthesis queued" });
+    } catch {
+      addToast({ type: "error", title: "Couldn't queue synthesis" });
+    } finally {
+      setSynthesisBusy(false);
+    }
+  }, [projectId, synthesisBusy, synthesisMode, addToast]);
+
   // ── Research state (project-scoped persistence) ─────────────────
   const [researchQuery, setResearchQuery] = useState<string>("");
   const [results, setResults] = useState<ResearchResult[]>([]);
@@ -674,6 +701,19 @@ function IntakePageInner() {
           <div>
             <b>{weekTotal}</b> this week
           </div>
+          <button
+            type="button"
+            className="btn"
+            onClick={runSynthesis}
+            disabled={synthesisMode === "auto" || synthesisBusy || projectId === null}
+            title={
+              synthesisMode === "auto"
+                ? "Synthesis is set to auto — it fires after every ingest. Switch to manual in Settings to enable this button."
+                : "Re-run the project synthesis now"
+            }
+          >
+            {synthesisBusy ? "Queueing…" : "Run synthesis"}
+          </button>
         </div>
       </div>
 

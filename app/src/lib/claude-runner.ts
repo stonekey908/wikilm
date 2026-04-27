@@ -751,6 +751,23 @@ function getBooleanSetting(key: string): boolean {
   return v === "true" || v === "1";
 }
 
+export const SYNTHESIS_MODE_KEY = "synthesis_mode";
+export type SynthesisMode = "auto" | "manual";
+
+export function getSynthesisMode(): SynthesisMode {
+  const row = db.select().from(settings).where(eq(settings.key, SYNTHESIS_MODE_KEY)).get();
+  return row?.value === "manual" ? "manual" : "auto";
+}
+
+/**
+ * Pure gate used by triggerSynthesisUpdate. Extracted for testability —
+ * the function itself touches the DB and the job queue, which are awkward
+ * to mock; this lets us exhaustively test the auto/manual × force matrix.
+ */
+export function shouldRunSynthesis(mode: SynthesisMode, force: boolean): boolean {
+  return force || mode !== "manual";
+}
+
 function scheduleSynthesisJob(projectCwd: string, projectId: number): Promise<number> {
   synthesisInFlight = true;
   synthesisPending = false;
@@ -797,13 +814,22 @@ function scheduleSynthesisJob(projectCwd: string, projectId: number): Promise<nu
  * burst of ingests produces exactly one synthesis at the end rather than
  * multiple snapshots of a still-changing wiki.
  *
+ * Honors the global `synthesis_mode` setting — when set to "manual", auto
+ * triggers from ingest/lint/etc. are skipped entirely. Pass `{ force: true }`
+ * from the on-demand /synthesis/run endpoint so manual users can still fire
+ * synthesis themselves.
+ *
  * Always returns null now; callers used the returned jobId only for
  * logging (none rely on it synchronously).
  */
 export async function triggerSynthesisUpdate(
   projectCwd: string,
-  projectId: number
+  projectId: number,
+  opts?: { force?: boolean }
 ): Promise<number | null> {
+  if (!shouldRunSynthesis(getSynthesisMode(), opts?.force ?? false)) {
+    return null;
+  }
   lastProjectCwd = projectCwd;
   lastProjectId = projectId;
   synthesisPending = true;
