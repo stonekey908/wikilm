@@ -145,13 +145,14 @@ After this one-time trust, the bookmarklet works on any webpage.
 3. Replace the URL with the entire snippet below (one line, starts with `javascript:`):
 
 ```javascript
-javascript:(async()=>{try{const r=await fetch('https://localhost:3000/api/projects');if(!r.ok)throw new Error('WikiLM not reachable at https://localhost:3000');const list=(await r.json()).projects||[];if(!list.length)throw new Error('No projects found');const menu=list.map((p,i)=>(i+1)+'. '+p.name).join('\n');const pick=prompt('Clip "'+document.title+'" to which project?\n\n'+menu,'1');if(!pick)return;const asNum=parseInt(pick,10);let proj=(Number.isFinite(asNum)&&asNum>=1&&asNum<=list.length)?list[asNum-1]:list.find(p=>p.name.toLowerCase()===pick.toLowerCase()||p.slug===pick);if(!proj){alert('No match for "'+pick+'"');return;}const res=await fetch('https://localhost:3000/api/sources/upload-md',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:document.title,content:'# '+document.title+'\n\nSource: '+location.href+'\n\n'+document.body.innerText.slice(0,30000),projectId:proj.id})});const j=await res.json();alert(res.ok?'\u2713 Clipped to '+proj.name+' (#'+j.sourceId+')':'\u2717 '+(j.error||res.status));}catch(e){alert('Failed: '+e.message);}})();
+javascript:(async()=>{try{const r=await fetch('https://localhost:3000/api/projects');if(!r.ok)throw new Error('WikiLM not reachable at https://localhost:3000');const list=(await r.json()).projects||[];if(!list.length)throw new Error('No projects found');const menu=list.map((p,i)=>(i+1)+'. '+p.name).join('\n');const pick=prompt('Clip "'+document.title+'" to which project?\n\n'+menu,'1');if(!pick)return;const asNum=parseInt(pick,10);let proj=(Number.isFinite(asNum)&&asNum>=1&&asNum<=list.length)?list[asNum-1]:list.find(p=>p.name.toLowerCase()===pick.toLowerCase()||p.slug===pick);if(!proj){alert('No match for "'+pick+'"');return;}const html=document.documentElement.outerHTML.slice(0,500000);const res=await fetch('https://localhost:3000/api/sources/upload-md',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:document.title,html,url:location.href,projectId:proj.id})});const j=await res.json();alert(res.ok?'\u2713 Clipped to '+proj.name+' (#'+j.sourceId+')':'\u2717 '+(j.error||res.status));}catch(e){alert('Failed: '+e.message);}})();
 ```
 
 4. Save the bookmark. On any webpage, click it → pick a project (number or name) → success alert. The page lands as pending in `/sources`.
 
 **Notes:**
-- The bookmarklet uses `document.body.innerText` rather than full HTML-to-markdown conversion, so the body is plaintext. Good enough for ingestion (Claude reads it fine), but MarkDownload (Option A) produces nicer markdown for code blocks and structured pages.
+- The bookmarklet sends the full page HTML to the server, where Turndown converts it to real markdown (preserving headings, lists, code blocks, links). Quality is comparable to MarkDownload.
+- The HTML payload is capped at 500KB to keep requests sane on long pages. Most articles fit comfortably.
 - If you forgot to run with HTTPS and clicked the bookmarklet, you'll see "TLS error" or "secure connection failed" in the Web Inspector console. Restart the server with `npm run dev:https`.
 
 ### Option C — Obsidian Web Clipper

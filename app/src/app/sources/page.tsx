@@ -6,6 +6,7 @@ import { useProject } from "@/components/project-switcher";
 import { useToast } from "@/components/toast-provider";
 import { EditorialBreadcrumbs } from "@/components/editorial/wiki/breadcrumbs";
 import { NoteComposerModal } from "@/components/editorial/note-composer-modal";
+import { SourcePreviewModal } from "@/components/editorial/source-preview-modal";
 import { PortalToBody } from "@/components/editorial/portal-to-body";
 
 interface Source {
@@ -261,6 +262,7 @@ function IntakePageInner() {
 
   // ── Library actions ─────────────────────────────────────────────
   const [movingId, setMovingId] = useState<number | null>(null);
+  const [previewSourceId, setPreviewSourceId] = useState<number | null>(null);
 
   const moveSource = useCallback(
     async (s: Source, newProjectId: number) => {
@@ -914,6 +916,15 @@ function IntakePageInner() {
                             ))}
                           </select>
                         )}
+                        {isPending && (
+                          <button
+                            className="btn ghost"
+                            onClick={() => setPreviewSourceId(s.id)}
+                            title="Preview captured content"
+                          >
+                            Preview
+                          </button>
+                        )}
                         {isPending && !isApproved && (
                           <button className="btn primary" onClick={() => approve(s)}>
                             Approve
@@ -1141,6 +1152,12 @@ function IntakePageInner() {
         open={noteOpen}
         onClose={() => setNoteOpen(false)}
         onSaved={() => fetchSources()}
+      />
+
+      <SourcePreviewModal
+        open={previewSourceId !== null}
+        sourceId={previewSourceId}
+        onClose={() => setPreviewSourceId(null)}
       />
 
       {clearWarning && (
