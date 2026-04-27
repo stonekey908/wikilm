@@ -177,3 +177,41 @@ This is a general-purpose knowledge base. Topics are handled via tags in frontma
 - Claims should be traceable back to a source
 - When sources contradict each other, note the contradiction explicitly rather than silently picking a side
 
+---
+
+## Current Phase
+
+**Web clipper + per-project synthesis tooling shipped.** WikiLM is a daily-use research tool: bookmarklet captures any HTTPS webpage as real markdown without web grounding; pending sources triage on `/sources` (Preview / Approve / Move / Delete); manual synthesis mode keeps token spend in check during batch ingest.
+
+## Known Issues
+
+- **Pre-existing lint errors elsewhere.** ~33 lint warnings + 15 errors carry from before this session (notably `react-hooks/set-state-in-effect` violations in `src/app/wiki/page.tsx:123`, `src/components/theme-provider.tsx:21`, etc.). None blocking. No new ones introduced by this session.
+- **Site-CSP `script-src` blocks the bookmarklet** on enforcing sites (Wikipedia is report-only so it works). For those sites use MarkDownload (Chrome extension). Documented in SETUP.md.
+- **No tests for `/api/clip` route** — thin shim around `lib/clip-to-markdown` (already covered by 6 vitest cases) + filesystem write. Visual UAT only.
+
+## Last Session
+
+**Date:** 2026-04-27
+**Who:** Claude session
+**What was done:**
+- STO-1952 — global manual synthesis mode (auto/manual toggle in Settings, Run synthesis button on `/sources`, gates `triggerSynthesisUpdate` via `shouldRunSynthesis` helper, 4 unit tests). Merged.
+- STO-1953 — web clipper foundations: `defer: true` flag on `/api/sources/ingest-web`, new `/api/sources/[id]/move` (pending-only) endpoint, `/sources` project picker dropdown, `lib/cors.ts` (CORS preflight + headers on clipper endpoints), `npm run dev:https` script, SETUP.md Web Clipper section. Merged.
+- STO-1959 — preview pending source: `lib/clip-to-markdown.ts` (Turndown wrapper, 6 tests), `/api/sources/[id]/raw` GET endpoint, `SourcePreviewModal` component, `upload-md` accepts `html` OR `content`. README clipper bullet added. Merged.
+- STO-1960 — Safari-proof clipper: `app/public/clip.js` hosted form-builder, `/api/clip` route handler, rewrote `/clip` page in editorial layout, ~140-char script-injection bookmarklet. Five failed rounds documented in Linear closing comment. Merged.
+- Filed STO-1954 (Mac app packaging — Tauri sidecar, Large, deferred) and STO-1958/STO-1959 follow-ups during the journey.
+
+**What's next:**
+- STO-1954 (Mac app packaging) is the next big ticket. Pre-flagged Large; recommend splitting at sprint pickup into 3a (Tauri shell) / 3b (data dir + CLI detection) / 3c (signing + .dmg).
+- README clipper bullet wording is async — user wanted to spot-check on GitHub. File a follow-up if rewording is needed.
+- Optional: a real Safari/Chrome browser extension (Phase B from STO-1953) — bypasses CSP-enforcing sites that block the bookmarklet's script injection.
+
+**Branch:** `main` (all session work merged + branches cleaned)
+**Blockers:** None
+
+## Known Gotchas
+
+- **Safari mangles bookmarklet JS > ~140 chars** → URL field injects whitespace mid-identifier on save (random spots each paste — `Number.isFinite`, `'POST'`, `'application/json'`, `outerHTML` all hit) → use the script-injection pattern: tiny bookmarklet loads a hosted JS file from localhost. See `app/public/clip.js` for the canonical example.
+- **HTTPS pages can't fetch HTTP localhost** → mixed-content block (Safari especially) → run dev server with `npm run dev:https` and trust the self-signed cert once.
+- **Local main may lose upstream tracking after a fresh checkout** → `git push` errors with "no upstream branch" → `git branch --set-upstream-to=origin/main main` (one-time fix per checkout). Or use `git push origin main` explicitly.
+- **Next.js 16 dev server doesn't always hot-reload new route handlers** → 404s on freshly-added routes → restart with Ctrl-C + `npm run dev:https`.
+
