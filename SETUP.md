@@ -126,34 +126,32 @@ Two endpoints accept clips:
 4. Save options.
 5. On any webpage, click the MarkDownload icon → **Download → Send to URL**. The page lands as pending in your project. Open `/sources` to triage it.
 
-### Option B — Safari/Chrome bookmarklet (no install)
+### Option B — Tiny bookmarklet → /clip page (recommended for Safari)
 
-The fastest setup if you don't want a browser extension. Lists your projects in a prompt, accepts either the project number or its name.
+The simplest setup if you don't want a browser extension. A tiny bookmarklet opens a localhost `/clip` page in a new tab; the page handles the project picker UI and submits server-side. The bookmarklet is short enough that Safari's URL field can't mangle it (long bookmarklets get whitespace injected mid-identifier in Safari — see [STO-1960](https://linear.app/stonekey/issue/STO-1960)).
 
-**One-time setup: HTTPS dev server.** Modern browsers (Safari especially) refuse to fetch HTTP localhost from an HTTPS page (Wikipedia, blog posts, etc.). To make the bookmarklet work from real websites, run WikiLM on HTTPS:
+**One-time setup: HTTPS dev server.** Modern browsers refuse to fetch HTTP localhost from an HTTPS page. To make the clipper work from real websites, run WikiLM on HTTPS:
 
 1. Stop the dev server if it's running.
 2. Start it with: `npm run dev:https` (this is `next dev --experimental-https` — Next.js auto-generates a self-signed cert).
 3. Visit `https://localhost:3000` once. Safari will warn "this connection is not private". Click **Show Details** → **visit this website** → confirm. Safari remembers the trust forever.
 
-After this one-time trust, the bookmarklet works on any webpage.
-
 **Install the bookmarklet:**
 
 1. In your browser's bookmark bar, create a new bookmark on any page (Safari: `⌘D` → save to **Favorites**; Chrome: `⌘D` → **Bookmarks Bar**).
 2. Edit the saved bookmark's URL (Safari: `Bookmarks → Edit Bookmarks` → right-click the new entry → **Edit Address**; Chrome: right-click → **Edit**).
-3. Replace the URL with the entire snippet below (one line, starts with `javascript:`):
+3. Replace the URL with the snippet below:
 
 ```javascript
-javascript:(async()=>{try{const r=await fetch('https://localhost:3000/api/projects');if(!r.ok)throw new Error('WikiLM not reachable at https://localhost:3000');const list=(await r.json()).projects||[];if(!list.length)throw new Error('No projects found');const menu=list.map((p,i)=>(i+1)+'. '+p.name).join('\n');const pick=prompt('Clip "'+document.title+'" to which project?\n\n'+menu,'1');if(!pick)return;const asNum=parseInt(pick,10);let proj=(Number.isFinite(asNum)&&asNum>=1&&asNum<=list.length)?list[asNum-1]:list.find(p=>p.name.toLowerCase()===pick.toLowerCase()||p.slug===pick);if(!proj){alert('No match for "'+pick+'"');return;}const html=document.documentElement.outerHTML.slice(0,500000);const res=await fetch('https://localhost:3000/api/sources/upload-md',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:document.title,html,url:location.href,projectId:proj.id})});const j=await res.json();alert(res.ok?'\u2713 Clipped to '+proj.name+' (#'+j.sourceId+')':'\u2717 '+(j.error||res.status));}catch(e){alert('Failed: '+e.message);}})();
+javascript:window.open('https://localhost:3000/clip?url='+encodeURIComponent(location.href)+'&title='+encodeURIComponent(document.title))
 ```
 
-4. Save the bookmark. On any webpage, click it → pick a project (number or name) → success alert. The page lands as pending in `/sources`.
+4. Save the bookmark. On any webpage, click it → a new tab opens with the WikiLM clip form pre-filled with the URL + title → pick a project → click **Clip →**. The source lands as pending in `/sources`.
 
 **Notes:**
-- The bookmarklet sends the full page HTML to the server, where Turndown converts it to real markdown (preserving headings, lists, code blocks, links). Quality is comparable to MarkDownload.
-- The HTML payload is capped at 500KB to keep requests sane on long pages. Most articles fit comfortably.
-- If you forgot to run with HTTPS and clicked the bookmarklet, you'll see "TLS error" or "secure connection failed" in the Web Inspector console. Restart the server with `npm run dev:https`.
+- The server fetches the URL fresh during ingest. This means **auth-walled / paywalled / single-page-app content won't work** — for those, use MarkDownload (Option A) which captures the page as you see it.
+- For everything else (Wikipedia, blogs, news, docs, papers), the server fetch produces a clean ingest with proper markdown via the existing ingest pipeline.
+- If the bookmarklet does nothing visible, confirm dev server is on HTTPS (`npm run dev:https`, terminal shows `https://localhost:3000`).
 
 ### Option C — Obsidian Web Clipper
 
