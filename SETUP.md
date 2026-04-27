@@ -128,19 +128,31 @@ Two endpoints accept clips:
 
 ### Option B — Safari/Chrome bookmarklet (no install)
 
-The fastest setup if you're on Safari (or just don't want a browser extension). Lists your projects in a prompt, accepts either the project number or its name.
+The fastest setup if you don't want a browser extension. Lists your projects in a prompt, accepts either the project number or its name.
+
+**One-time setup: HTTPS dev server.** Modern browsers (Safari especially) refuse to fetch HTTP localhost from an HTTPS page (Wikipedia, blog posts, etc.). To make the bookmarklet work from real websites, run WikiLM on HTTPS:
+
+1. Stop the dev server if it's running.
+2. Start it with: `npm run dev:https` (this is `next dev --experimental-https` — Next.js auto-generates a self-signed cert).
+3. Visit `https://localhost:3000` once. Safari will warn "this connection is not private". Click **Show Details** → **visit this website** → confirm. Safari remembers the trust forever.
+
+After this one-time trust, the bookmarklet works on any webpage.
+
+**Install the bookmarklet:**
 
 1. In your browser's bookmark bar, create a new bookmark on any page (Safari: `⌘D` → save to **Favorites**; Chrome: `⌘D` → **Bookmarks Bar**).
 2. Edit the saved bookmark's URL (Safari: `Bookmarks → Edit Bookmarks` → right-click the new entry → **Edit Address**; Chrome: right-click → **Edit**).
 3. Replace the URL with the entire snippet below (one line, starts with `javascript:`):
 
 ```javascript
-javascript:(async()=>{try{const r=await fetch('http://localhost:3000/api/projects');if(!r.ok)throw new Error('WikiLM not reachable at localhost:3000');const list=(await r.json()).projects||[];if(!list.length)throw new Error('No projects found');const menu=list.map((p,i)=>(i+1)+'. '+p.name).join('\n');const pick=prompt('Clip "'+document.title+'" to which project?\n\n'+menu,'1');if(!pick)return;const asNum=parseInt(pick,10);let proj=(Number.isFinite(asNum)&&asNum>=1&&asNum<=list.length)?list[asNum-1]:list.find(p=>p.name.toLowerCase()===pick.toLowerCase()||p.slug===pick);if(!proj){alert('No match for "'+pick+'"');return;}const res=await fetch('http://localhost:3000/api/sources/upload-md',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:document.title,content:'# '+document.title+'\n\nSource: '+location.href+'\n\n'+document.body.innerText.slice(0,30000),projectId:proj.id})});const j=await res.json();alert(res.ok?'\u2713 Clipped to '+proj.name+' (#'+j.sourceId+')':'\u2717 '+(j.error||res.status));}catch(e){alert('Failed: '+e.message);}})();
+javascript:(async()=>{try{const r=await fetch('https://localhost:3000/api/projects');if(!r.ok)throw new Error('WikiLM not reachable at https://localhost:3000');const list=(await r.json()).projects||[];if(!list.length)throw new Error('No projects found');const menu=list.map((p,i)=>(i+1)+'. '+p.name).join('\n');const pick=prompt('Clip "'+document.title+'" to which project?\n\n'+menu,'1');if(!pick)return;const asNum=parseInt(pick,10);let proj=(Number.isFinite(asNum)&&asNum>=1&&asNum<=list.length)?list[asNum-1]:list.find(p=>p.name.toLowerCase()===pick.toLowerCase()||p.slug===pick);if(!proj){alert('No match for "'+pick+'"');return;}const res=await fetch('https://localhost:3000/api/sources/upload-md',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:document.title,content:'# '+document.title+'\n\nSource: '+location.href+'\n\n'+document.body.innerText.slice(0,30000),projectId:proj.id})});const j=await res.json();alert(res.ok?'\u2713 Clipped to '+proj.name+' (#'+j.sourceId+')':'\u2717 '+(j.error||res.status));}catch(e){alert('Failed: '+e.message);}})();
 ```
 
 4. Save the bookmark. On any webpage, click it → pick a project (number or name) → success alert. The page lands as pending in `/sources`.
 
-**Note:** the bookmarklet uses `document.body.innerText` rather than full HTML-to-markdown conversion, so the body is plaintext. Good enough for ingestion (Claude reads it fine), but MarkDownload (Option A) produces nicer markdown for code blocks and structured pages.
+**Notes:**
+- The bookmarklet uses `document.body.innerText` rather than full HTML-to-markdown conversion, so the body is plaintext. Good enough for ingestion (Claude reads it fine), but MarkDownload (Option A) produces nicer markdown for code blocks and structured pages.
+- If you forgot to run with HTTPS and clicked the bookmarklet, you'll see "TLS error" or "secure connection failed" in the Web Inspector console. Restart the server with `npm run dev:https`.
 
 ### Option C — Obsidian Web Clipper
 
