@@ -11,6 +11,11 @@ import {
   getProjectBySlug,
   createProjectDirectories,
 } from "@/lib/projects";
+import { corsPreflight, withCors } from "@/lib/cors";
+
+export async function OPTIONS() {
+  return corsPreflight();
+}
 
 const EXCLUDED_PAGE_FILES = new Set(["index.md", "log.md"]);
 
@@ -48,7 +53,7 @@ export async function GET() {
     };
   });
 
-  return Response.json({ projects: enriched });
+  return withCors(Response.json({ projects: enriched }));
 }
 
 export async function POST(request: NextRequest) {

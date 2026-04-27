@@ -7,6 +7,11 @@ import path from "path";
 import { writeFile, mkdir } from "fs/promises";
 import fs from "fs";
 import { getProject, projectRoot } from "@/lib/projects";
+import { corsPreflight, withCors } from "@/lib/cors";
+
+export async function OPTIONS() {
+  return corsPreflight();
+}
 
 /**
  * Programmatic markdown upload.
@@ -122,9 +127,11 @@ export async function POST(request: NextRequest) {
   if (!ingestNow) {
     // Pending path — just captured, not yet ingested. User curates from
     // /sources (Ingest / Edit / Discard actions).
-    return Response.json(
-      { sourceId, status: "pending", filePath: `raw/${filename}` },
-      { status: 201 }
+    return withCors(
+      Response.json(
+        { sourceId, status: "pending", filePath: `raw/${filename}` },
+        { status: 201 }
+      )
     );
   }
 
@@ -149,8 +156,10 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  return Response.json(
-    { sourceId, jobId, status: "ingesting", filePath: `raw/${filename}` },
-    { status: 201 }
+  return withCors(
+    Response.json(
+      { sourceId, jobId, status: "ingesting", filePath: `raw/${filename}` },
+      { status: 201 }
+    )
   );
 }

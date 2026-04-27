@@ -12,6 +12,11 @@ import {
   type Project,
 } from "@/lib/projects";
 import { getAllMdFiles } from "@/lib/wiki-utils";
+import { corsPreflight, withCors } from "@/lib/cors";
+
+export async function OPTIONS() {
+  return corsPreflight();
+}
 
 /**
  * For an ingest target, list the slugs of entity + concept pages that already
@@ -92,9 +97,8 @@ export async function POST(request: NextRequest) {
   const sourceId = result[0].id;
 
   if (defer) {
-    return Response.json(
-      { sourceId, status: "pending" },
-      { status: 201 }
+    return withCors(
+      Response.json({ sourceId, status: "pending" }, { status: 201 })
     );
   }
 
@@ -151,5 +155,5 @@ No half-measures: every \`[[x]]\` must resolve after this ingest.${existingBlock
     },
   });
 
-  return Response.json({ sourceId, jobId }, { status: 201 });
+  return withCors(Response.json({ sourceId, jobId }, { status: 201 }));
 }

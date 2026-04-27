@@ -126,7 +126,23 @@ Two endpoints accept clips:
 4. Save options.
 5. On any webpage, click the MarkDownload icon → **Download → Send to URL**. The page lands as pending in your project. Open `/sources` to triage it.
 
-### Option B — Obsidian Web Clipper
+### Option B — Safari/Chrome bookmarklet (no install)
+
+The fastest setup if you're on Safari (or just don't want a browser extension). Lists your projects in a prompt, accepts either the project number or its name.
+
+1. In your browser's bookmark bar, create a new bookmark on any page (Safari: `⌘D` → save to **Favorites**; Chrome: `⌘D` → **Bookmarks Bar**).
+2. Edit the saved bookmark's URL (Safari: `Bookmarks → Edit Bookmarks` → right-click the new entry → **Edit Address**; Chrome: right-click → **Edit**).
+3. Replace the URL with the entire snippet below (one line, starts with `javascript:`):
+
+```javascript
+javascript:(async()=>{try{const r=await fetch('http://localhost:3000/api/projects');if(!r.ok)throw new Error('WikiLM not reachable at localhost:3000');const list=(await r.json()).projects||[];if(!list.length)throw new Error('No projects found');const menu=list.map((p,i)=>(i+1)+'. '+p.name).join('\n');const pick=prompt('Clip "'+document.title+'" to which project?\n\n'+menu,'1');if(!pick)return;const asNum=parseInt(pick,10);let proj=(Number.isFinite(asNum)&&asNum>=1&&asNum<=list.length)?list[asNum-1]:list.find(p=>p.name.toLowerCase()===pick.toLowerCase()||p.slug===pick);if(!proj){alert('No match for "'+pick+'"');return;}const res=await fetch('http://localhost:3000/api/sources/upload-md',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:document.title,content:'# '+document.title+'\n\nSource: '+location.href+'\n\n'+document.body.innerText.slice(0,30000),projectId:proj.id})});const j=await res.json();alert(res.ok?'\u2713 Clipped to '+proj.name+' (#'+j.sourceId+')':'\u2717 '+(j.error||res.status));}catch(e){alert('Failed: '+e.message);}})();
+```
+
+4. Save the bookmark. On any webpage, click it → pick a project (number or name) → success alert. The page lands as pending in `/sources`.
+
+**Note:** the bookmarklet uses `document.body.innerText` rather than full HTML-to-markdown conversion, so the body is plaintext. Good enough for ingestion (Claude reads it fine), but MarkDownload (Option A) produces nicer markdown for code blocks and structured pages.
+
+### Option C — Obsidian Web Clipper
 
 1. Install the Obsidian Web Clipper browser extension.
 2. Settings → **Custom output** → add a new output with type **Web request**.
