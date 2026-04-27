@@ -140,18 +140,19 @@ The simplest setup if you don't want a browser extension. A tiny bookmarklet ope
 
 1. In your browser's bookmark bar, create a new bookmark on any page (Safari: `⌘D` → save to **Favorites**; Chrome: `⌘D` → **Bookmarks Bar**).
 2. Edit the saved bookmark's URL (Safari: `Bookmarks → Edit Bookmarks` → right-click the new entry → **Edit Address**; Chrome: right-click → **Edit**).
-3. Replace the URL with the snippet below (one line):
+3. Replace the URL with the snippet below (one line — note this is short, won't be mangled by Safari):
 
 ```javascript
-javascript:(function(){var f=document.createElement('form');f.method='POST';f.action='https://localhost:3000/api/clip';f.target='_blank';var add=function(n,v){var i=document.createElement('input');i.name=n;i.value=v;f.appendChild(i);};add('url',location.href);add('title',document.title);add('html',document.documentElement.outerHTML.slice(0,500000));document.body.appendChild(f);f.submit();document.body.removeChild(f);})()
+javascript:(function(){var s=document.createElement('script');s.src='https://localhost:3000/clip.js?'+Date.now();document.body.appendChild(s);})()
 ```
 
-4. Save the bookmark. On any webpage, click it → a new tab opens at the WikiLM `/clip` page showing the captured source landed as pending. Pick a destination project from the dropdown (or skip to keep the default), click **Save**, done.
+4. Save the bookmark. The bookmarklet just loads `clip.js` from localhost — all the real work lives in `app/public/clip.js`. On any webpage, click the bookmark → a new tab opens at WikiLM `/clip` showing the captured source landed as pending. Pick a destination project from the dropdown (or skip to keep the default), click **Save**, done.
 
 **Notes:**
-- The bookmarklet sends the page HTML to the server as a form POST. The server runs Turndown to convert HTML → real markdown (preserves headings, lists, links, code blocks). **No web grounding needed** — the bookmarklet captures the page as you see it, including auth-walled / dynamic / SPA-rendered content.
+- The hosted `clip.js` builds a hidden form with the page HTML and POSTs it to `/api/clip`. The server runs Turndown to convert HTML → real markdown (preserves headings, lists, links, code blocks). **No web grounding needed** — the bookmarklet captures the page as you see it, including auth-walled / dynamic / SPA-rendered content.
 - HTML payload capped at 500KB to keep requests reasonable on long pages.
-- Form submission bypasses the CORS preflight + the Safari long-bookmarklet-mangling that broke earlier in-page approaches (see [STO-1960](https://linear.app/stonekey/issue/STO-1960) for the war story).
+- The script-injection pattern works around Safari's URL-field mangling that breaks long inline bookmarklets (Safari injects spaces mid-identifier — see [STO-1960](https://linear.app/stonekey/issue/STO-1960) for the war story).
+- Some sites enforce strict CSP `script-src` and will block the script injection. For those sites, use MarkDownload (Option A above) — browser extensions bypass page CSP.
 - If the bookmarklet does nothing visible, confirm dev server is on HTTPS (`npm run dev:https`, terminal shows `https://localhost:3000`).
 
 ### Option C — Obsidian Web Clipper
