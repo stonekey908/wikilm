@@ -27,6 +27,10 @@ design-handoff/
 # Per-session handoff notes for Claude Code continuity — local only.
 .claude/HANDOFF.md
 
+# Project-level Claude Code instructions — local only (contains session
+# handoff notes, internal phase commentary, ticket references).
+.claude/CLAUDE.md
+
 # ─────────────────────────────────────────────────────────────────────
 # User content — ignored by default so the shared repo is a clean install.
 # The empty .gitkeep scaffolding stays in source control so every clone

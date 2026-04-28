@@ -128,7 +128,7 @@ Two endpoints accept clips:
 
 ### Option B — Tiny bookmarklet → /clip page (recommended for Safari)
 
-The simplest setup if you don't want a browser extension. A tiny bookmarklet opens a localhost `/clip` page in a new tab; the page handles the project picker UI and submits server-side. The bookmarklet is short enough that Safari's URL field can't mangle it (long bookmarklets get whitespace injected mid-identifier in Safari — see [STO-1960](https://linear.app/stonekey/issue/STO-1960)).
+The simplest setup if you don't want a browser extension. A tiny bookmarklet opens a localhost `/clip` page in a new tab; the page handles the project picker UI and submits server-side. The bookmarklet is short enough that Safari's URL field can't mangle it (long bookmarklets get whitespace injected mid-identifier in Safari).
 
 **One-time setup: HTTPS dev server.** Modern browsers refuse to fetch HTTP localhost from an HTTPS page. To make the clipper work from real websites, run WikiLM on HTTPS:
 
@@ -151,7 +151,7 @@ javascript:(function(){var s=document.createElement('script');s.src='https://loc
 **Notes:**
 - The hosted `clip.js` builds a hidden form with the page HTML and POSTs it to `/api/clip`. The server runs Turndown to convert HTML → real markdown (preserves headings, lists, links, code blocks). **No web grounding needed** — the bookmarklet captures the page as you see it, including auth-walled / dynamic / SPA-rendered content.
 - HTML payload capped at 500KB to keep requests reasonable on long pages.
-- The script-injection pattern works around Safari's URL-field mangling that breaks long inline bookmarklets (Safari injects spaces mid-identifier — see [STO-1960](https://linear.app/stonekey/issue/STO-1960) for the war story).
+- The script-injection pattern works around Safari's URL-field mangling that breaks long inline bookmarklets (Safari injects spaces mid-identifier).
 - Some sites enforce strict CSP `script-src` and will block the script injection. For those sites, use MarkDownload (Option A above) — browser extensions bypass page CSP.
 - If the bookmarklet does nothing visible, confirm dev server is on HTTPS (`npm run dev:https`, terminal shows `https://localhost:3000`).
 
