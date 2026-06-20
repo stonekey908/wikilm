@@ -1,8 +1,10 @@
 import { getSetting } from "@/lib/connections";
 
 export const NOTION_TOKEN_SETTING = "notion_token"; // secret (redacted from /api/settings)
-export const NOTION_PARENT_SETTING = "notion_parent_page"; // parent page id
-export const NOTION_MAP_SETTING = "notion_page_map"; // JSON: { "<slug>": "<notionPageId>" }
+export const NOTION_PARENT_SETTING = "notion_parent_page"; // parent page id (where the hub is created)
+export const NOTION_HUB_SETTING = "notion_hub_page"; // auto-created "wikiLM" hub page id
+export const NOTION_PROJECT_PAGES_SETTING = "notion_project_pages"; // JSON { "<projectId>": "<pageId>" }
+export const NOTION_MAP_SETTING = "notion_page_map"; // JSON { "<projectId>:<slug>": "<notionPageId>" }
 export const NOTION_LAST_SYNC = "notion_last_sync";
 export const NOTION_DIRECTION_SETTING = "notion_direction"; // push | pull | two-way
 export const NOTION_VERSION = "2022-06-28";
@@ -11,6 +13,13 @@ export type NotionDirection = "push" | "pull" | "two-way";
 export function getNotionDirection(): NotionDirection {
   const v = getSetting(NOTION_DIRECTION_SETTING);
   return v === "pull" || v === "two-way" ? v : "push";
+}
+export function getNotionHub(): string | null {
+  const v = getSetting(NOTION_HUB_SETTING)?.trim();
+  return v ? v : null;
+}
+export function getNotionProjectPages(): Record<string, string> {
+  try { return JSON.parse(getSetting(NOTION_PROJECT_PAGES_SETTING) || "{}"); } catch { return {}; }
 }
 
 export function getNotionToken(): string | null {

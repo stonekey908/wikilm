@@ -109,7 +109,7 @@ export function ConnectionsView() {
     try {
       const r = await fetch("/api/connections/notion/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ projectId: 1 }) });
       const d = await r.json();
-      if (r.ok) { addToast({ type: "success", title: "Synced to Notion", description: `${d.created} created, ${d.skipped} up to date${d.failed ? `, ${d.failed} failed` : ""}.` }); fetch("/api/connections/notion").then((x) => x.json()).then(setNotion); }
+      if (r.ok) { addToast({ type: "success", title: "Synced to Notion", description: `${d.created} added, ${d.updated} updated, ${d.deleted} removed${d.pulled ? `, ${d.pulled} pulled` : ""}${d.failed ? `, ${d.failed} failed` : ""}.` }); fetch("/api/connections/notion").then((x) => x.json()).then(setNotion); }
       else addToast({ type: "error", title: "Sync failed", description: d.error });
     } catch { addToast({ type: "error", title: "Sync failed" }); }
     setSyncing(false);
@@ -233,7 +233,8 @@ export function ConnectionsView() {
                 onKeyDown={(e) => { if (e.key === "Enter" && notionToken.trim()) saveNotion({ token: notionToken.trim() }); }} /></div>
             <div className="intg-field"><label>Parent page ID</label>
               <input className="intg-input" defaultValue={notion.parent || ""} placeholder="32-char Notion page id"
-                onBlur={(e) => e.target.value.trim() !== (notion.parent || "") && saveNotion({ parent: e.target.value.trim() })} /></div>
+                onBlur={(e) => e.target.value.trim() !== (notion.parent || "") && saveNotion({ parent: e.target.value.trim() })} />
+              <span className="intg-note">A “wikiLM” hub + project page are created here on first sync</span></div>
             <div className="intg-field"><label>Direction</label>
               <select className="intg-input" value={notion.direction} onChange={(e) => saveNotion({ direction: e.target.value })}>
                 <option value="push">Push · wiki → Notion</option>

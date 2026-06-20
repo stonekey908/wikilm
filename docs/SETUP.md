@@ -85,20 +85,26 @@ wikiLM syncs a project to a **parent Notion page** using the Notion API.
 4. Connections → **Notion** → paste the **token** and **parent page id**, choose
    a **Direction**, then **Test** and **Sync now**.
 
-**What the sync does**
+**What the sync does** (trigger is the **Sync now** button — no background sync)
 
-- **Push (wiki → Notion):** each wiki page becomes a child page under the parent.
-  Markdown is converted to Notion blocks (headings, bullets, quotes, paragraphs).
-  A `slug → page-id` map is kept, so re-syncs **update** existing pages (title +
-  content refresh) instead of duplicating them.
-- **Pull (Notion → wiki):** Notion page content is converted back to Markdown and
-  written into the wiki, **preserving each page's frontmatter**.
-- **Two-way:** pulls pages **edited in Notion since the last sync** into the wiki,
-  then pushes the wiki back up — so edits made on Claude web/mobile (via Notion)
-  flow home and vice-versa. The last-sync time shows on the card.
+- **Dedicated area, auto-created:** on the first sync wikiLM creates a **`wikiLM`
+  hub page** under your parent, and a **`<project name>` page** under that. You
+  only ever share/paste the one parent page; wikiLM owns the structure beneath it.
+- **Push (wiki → Notion):** each wiki page becomes a child of the project page.
+  Markdown → Notion blocks (headings, bullets, quotes, paragraphs). A
+  `projectId:slug → page-id` map is kept, so re-syncs:
+  - **Add** new wiki pages → new Notion pages,
+  - **Update** changed pages (title + full content refresh, no duplicates),
+  - **Delete** — if a wiki page is gone, its Notion page is **archived**.
+- **Delete policy = wiki is source of truth:** deletions only flow wiki → Notion.
+  Deleting a page **in Notion does NOT remove it from the wiki** (it's restored on
+  the next push), so an accidental Notion delete can't destroy your wiki.
+- **Pull (Notion → wiki)** *(direction = pull / two-way)*: Notion edits are
+  converted back to Markdown and written into the wiki, **preserving frontmatter**.
+- **Two-way:** pulls pages edited in Notion since the last sync, then pushes.
 
-> Note: the parent page must be shared with your integration, or Notion returns
-> 401/404. Backlinks/wikilinks are kept as literal `[[text]]` in Notion for now.
+> The parent page must be shared with your integration (page `•••` → Connections),
+> or Notion returns 401/403. Wikilinks are kept as literal `[[text]]` in Notion.
 
 ## 6. MCP — drive wikiLM from Claude
 

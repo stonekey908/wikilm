@@ -4,8 +4,9 @@ import path from "node:path";
 import { getProject, wikiDir } from "@/lib/projects";
 import { setSetting, getSetting } from "@/lib/connections";
 import {
-  getNotionToken, getNotionParent, getNotionMap, getNotionDirection, notionHeaders,
-  markdownToBlocks, blocksToMarkdown, NOTION_MAP_SETTING, NOTION_LAST_SYNC,
+  getNotionToken, getNotionParent, getNotionMap, getNotionDirection, getNotionHub,
+  getNotionProjectPages, notionHeaders, markdownToBlocks, blocksToMarkdown,
+  NOTION_MAP_SETTING, NOTION_LAST_SYNC, NOTION_HUB_SETTING, NOTION_PROJECT_PAGES_SETTING,
 } from "@/lib/notion";
 
 const API = "https://api.notion.com/v1";
@@ -51,22 +52,34 @@ export async function POST(request: NextRequest) {
   const map = getNotionMap();
   const prevSyncIso = getSetting(NOTION_LAST_SYNC);
   const prevSync = prevSyncIso ? Date.parse(prevSyncIso) : 0;
+  const prefix = `${projectId}:`;
 
-  const counts = { created: 0, updated: 0, pulled: 0, skipped: 0, failed: 0 };
+  const counts = { created: 0, updated: 0, deleted: 0, pulled: 0, failed: 0 };
   const errors: string[] = [];
   const note = (e: string) => { if (errors.length < 4) errors.push(e); };
 
   // ── Notion API helpers ──
-  const getChildren = async (pageId: string): Promise<Array<{ type: string } & Record<string, unknown>>> => {
+  const createPage = async (parentId: string, title: string, children: unknown[] = []): Promise<string | null> => {
+    const r = await fetch(`${API}/pages`, {
+      method: "POST", headers,
+      body: JSON.stringify({ parent: { page_id: parentId }, properties: { title: { title: [{ text: { content: title } }] } }, children }),
+    });
+    if (!r.ok) { note(`create "${title}": ${r.status} ${(await r.text()).slice(0, 100)}`); return null; }
+    return ((await r.json()) as { id?: string }).id ?? null;
+  };
+  const getChildren = async (pageId: string): Promise<Array<{ type: string; id?: string } & Record<string, unknown>>> => {
     const r = await fetch(`${API}/blocks/${pageId}/children?page_size=100`, { headers });
     if (!r.ok) throw new Error(`children ${r.status}`);
-    return ((await r.json()) as { results?: Array<{ type: string } & Record<string, unknown>> }).results ?? [];
+    return ((await r.json()) as { results?: Array<{ type: string; id?: string } & Record<string, unknown>> }).results ?? [];
   };
-  const archiveChildren = async (pageId: string) => {
+  const archivePage = async (pageId: string) => {
+    await fetch(`${API}/pages/${pageId}`, { method: "PATCH", headers, body: JSON.stringify({ archived: true }) });
+  };
+  const replaceChildren = async (pageId: string, blocks: unknown[]) => {
     for (const c of await getChildren(pageId)) {
-      const id = (c as { id?: string }).id;
-      if (id) await fetch(`${API}/blocks/${id}`, { method: "PATCH", headers, body: JSON.stringify({ archived: true }) });
+      if (c.id) await fetch(`${API}/blocks/${c.id}`, { method: "PATCH", headers, body: JSON.stringify({ archived: true }) });
     }
+    await fetch(`${API}/blocks/${pageId}/children`, { method: "PATCH", headers, body: JSON.stringify({ children: blocks }) });
   };
   const lastEdited = async (pageId: string): Promise<number> => {
     const r = await fetch(`${API}/pages/${pageId}`, { headers });
@@ -74,9 +87,25 @@ export async function POST(request: NextRequest) {
     return Date.parse(((await r.json()) as { last_edited_time?: string }).last_edited_time ?? "") || 0;
   };
 
-  // ── Pull: Notion → wiki (for direction pull, or two-way pages edited since last sync) ──
+  // ── Ensure a dedicated "wikiLM" hub + per-project container page ──
+  let hub = getNotionHub();
+  if (!hub) { hub = await createPage(parent, "wikiLM"); if (hub) setSetting(NOTION_HUB_SETTING, hub); }
+  if (!hub) return Response.json({ error: "Could not create the wikiLM hub page (is the parent shared with the integration?)", errors }, { status: 502 });
+
+  const projectPages = getNotionProjectPages();
+  let container = projectPages[String(projectId)];
+  if (!container) {
+    const made = await createPage(hub, project.name);
+    if (made) { container = made; projectPages[String(projectId)] = made; setSetting(NOTION_PROJECT_PAGES_SETTING, JSON.stringify(projectPages)); }
+  }
+  if (!container) return Response.json({ error: "Could not create the project page in Notion.", errors }, { status: 502 });
+
+  // ── Pull (Notion → wiki). Wiki stays source of truth: missing/deleted Notion
+  //    pages never delete wiki pages — they're just skipped. ──
   if (direction === "pull" || direction === "two-way") {
-    for (const [slug, pageId] of Object.entries(map)) {
+    for (const [key, pageId] of Object.entries(map)) {
+      if (!key.startsWith(prefix)) continue;
+      const slug = key.slice(prefix.length);
       try {
         if (direction === "two-way" && (await lastEdited(pageId)) <= prevSync) continue;
         const md = blocksToMarkdown(await getChildren(pageId));
@@ -85,33 +114,37 @@ export async function POST(request: NextRequest) {
         const { fm } = splitFrontmatter(prev);
         const next = (fm ? fm + "\n" : "") + md;
         if (next !== prev) { fs.mkdirSync(path.dirname(dest), { recursive: true }); fs.writeFileSync(dest, next); counts.pulled++; }
-      } catch (e) { counts.failed++; note(`pull ${slug}: ${(e as Error).message}`); }
+      } catch { /* page gone in Notion → skip; wiki is source of truth */ }
     }
   }
 
-  // ── Push: wiki → Notion (create new pages, update existing) ──
+  // ── Push (wiki → Notion): create new, update existing, delete removed. ──
   if (direction === "push" || direction === "two-way") {
+    const seen = new Set<string>();
     for (const rel of files) {
       const slug = rel.replace(/\.md$/, "");
+      const key = prefix + slug;
+      seen.add(key);
       const content = fs.readFileSync(path.join(src, rel), "utf-8");
       const { body } = splitFrontmatter(content);
       const blocks = markdownToBlocks(body);
       const title = titleOf(content, slug);
       try {
-        if (map[slug]) {
-          await archiveChildren(map[slug]);
-          await fetch(`${API}/blocks/${map[slug]}/children`, { method: "PATCH", headers, body: JSON.stringify({ children: blocks }) });
-          await fetch(`${API}/pages/${map[slug]}`, { method: "PATCH", headers, body: JSON.stringify({ properties: { title: { title: [{ text: { content: title } }] } } }) });
+        if (map[key]) {
+          await replaceChildren(map[key], blocks);
+          await fetch(`${API}/pages/${map[key]}`, { method: "PATCH", headers, body: JSON.stringify({ properties: { title: { title: [{ text: { content: title } }] } } }) });
           counts.updated++;
         } else {
-          const r = await fetch(`${API}/pages`, {
-            method: "POST", headers,
-            body: JSON.stringify({ parent: { page_id: parent }, properties: { title: { title: [{ text: { content: title } }] } }, children: blocks }),
-          });
-          if (r.ok) { const j = (await r.json()) as { id?: string }; if (j.id) map[slug] = j.id; counts.created++; }
-          else { counts.failed++; note(`push ${slug}: ${r.status} ${(await r.text()).slice(0, 100)}`); }
+          const id = await createPage(container, title, blocks);
+          if (id) { map[key] = id; counts.created++; } else counts.failed++;
         }
       } catch (e) { counts.failed++; note(`push ${slug}: ${(e as Error).message}`); }
+    }
+    // Deletions: map entries for this project whose wiki file is gone → archive.
+    for (const key of Object.keys(map)) {
+      if (!key.startsWith(prefix) || seen.has(key)) continue;
+      try { await archivePage(map[key]); delete map[key]; counts.deleted++; }
+      catch (e) { counts.failed++; note(`delete ${key}: ${(e as Error).message}`); }
     }
   }
 
