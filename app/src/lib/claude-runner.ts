@@ -104,10 +104,18 @@ const ENV_MODELS: Record<string, string | undefined> = {
  * Exported so route handlers can log + persist the model in the same form
  * the subprocess spawns with.
  */
+export const ANTHROPIC_MODEL_SETTING = "anthropic_model";
+function getAnthropicModel(): string | null {
+  const row = db.select().from(settings).where(eq(settings.key, ANTHROPIC_MODEL_SETTING)).get();
+  return row?.value?.trim() || null;
+}
+
 export function getModel(type: string): string {
   const key = `model_${type}`;
   const row = db.select().from(settings).where(eq(settings.key, key)).get();
-  return row?.value ?? ENV_MODELS[type] ?? "sonnet";
+  // Precedence: explicit per-type setting > env override > the BYO Anthropic
+  // model default (from the Claude API connection) > sonnet.
+  return row?.value ?? ENV_MODELS[type] ?? getAnthropicModel() ?? "sonnet";
 }
 
 function getModelArgs(type: string): string[] {
