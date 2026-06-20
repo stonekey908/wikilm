@@ -4,7 +4,14 @@ export const NOTION_TOKEN_SETTING = "notion_token"; // secret (redacted from /ap
 export const NOTION_PARENT_SETTING = "notion_parent_page"; // parent page id
 export const NOTION_MAP_SETTING = "notion_page_map"; // JSON: { "<slug>": "<notionPageId>" }
 export const NOTION_LAST_SYNC = "notion_last_sync";
+export const NOTION_DIRECTION_SETTING = "notion_direction"; // push | pull | two-way
 export const NOTION_VERSION = "2022-06-28";
+
+export type NotionDirection = "push" | "pull" | "two-way";
+export function getNotionDirection(): NotionDirection {
+  const v = getSetting(NOTION_DIRECTION_SETTING);
+  return v === "pull" || v === "two-way" ? v : "push";
+}
 
 export function getNotionToken(): string | null {
   const v = getSetting(NOTION_TOKEN_SETTING)?.trim();
@@ -52,4 +59,32 @@ export function markdownToBlocks(body: string): unknown[] {
   }
   // Notion caps children at 100 per create call.
   return blocks.slice(0, 100);
+}
+
+// ── Notion → Markdown (pull) ──
+interface NotionRich { plain_text?: string; text?: { content: string } }
+interface NotionBlock { type: string; [key: string]: unknown }
+
+function plain(rich: NotionRich[] | undefined): string {
+  return (rich ?? []).map((r) => r.plain_text ?? r.text?.content ?? "").join("");
+}
+
+export function blocksToMarkdown(blocks: NotionBlock[]): string {
+  const lines: string[] = [];
+  for (const b of blocks) {
+    const data = b[b.type] as { rich_text?: NotionRich[] } | undefined;
+    const text = plain(data?.rich_text);
+    switch (b.type) {
+      case "heading_1": lines.push(`# ${text}`, ""); break;
+      case "heading_2": lines.push(`## ${text}`, ""); break;
+      case "heading_3": lines.push(`### ${text}`, ""); break;
+      case "bulleted_list_item":
+      case "numbered_list_item": lines.push(`- ${text}`); break;
+      case "quote": lines.push(`> ${text}`, ""); break;
+      case "code": lines.push("```", text, "```", ""); break;
+      case "divider": lines.push("---", ""); break;
+      default: if (text) lines.push(text, "");
+    }
+  }
+  return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim() + "\n";
 }

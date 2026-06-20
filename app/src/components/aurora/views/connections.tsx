@@ -64,10 +64,10 @@ export function ConnectionsView() {
   };
 
   // ── Notion sync (token + parent page + push) ──
-  const [notion, setNotion] = useState<{ configured: boolean; maskedToken: string | null; parent: string | null; lastSync: string | null }>({ configured: false, maskedToken: null, parent: null, lastSync: null });
+  const [notion, setNotion] = useState<{ configured: boolean; maskedToken: string | null; parent: string | null; direction: string; lastSync: string | null }>({ configured: false, maskedToken: null, parent: null, direction: "push", lastSync: null });
   const [notionToken, setNotionToken] = useState("");
   const [syncing, setSyncing] = useState(false);
-  const saveNotion = async (patch: { token?: string; parent?: string }) => {
+  const saveNotion = async (patch: { token?: string; parent?: string; direction?: string }) => {
     const r = await fetch("/api/connections/notion", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) });
     setNotion(await r.json()); if (patch.token) setNotionToken("");
     toast("Notion settings saved");
@@ -189,7 +189,13 @@ export function ConnectionsView() {
                 onKeyDown={(e) => { if (e.key === "Enter" && notionToken.trim()) saveNotion({ token: notionToken.trim() }); }} /></div>
             <div className="intg-field"><label>Parent page ID</label>
               <input className="intg-input" defaultValue={notion.parent || ""} placeholder="32-char Notion page id"
-                onBlur={(e) => e.target.value.trim() !== (notion.parent || "") && saveNotion({ parent: e.target.value.trim() })} />
+                onBlur={(e) => e.target.value.trim() !== (notion.parent || "") && saveNotion({ parent: e.target.value.trim() })} /></div>
+            <div className="intg-field"><label>Direction</label>
+              <select className="intg-input" value={notion.direction} onChange={(e) => saveNotion({ direction: e.target.value })}>
+                <option value="push">Push · wiki → Notion</option>
+                <option value="pull">Pull · Notion → wiki</option>
+                <option value="two-way">Two-way</option>
+              </select>
               <span className="intg-note">{notion.lastSync ? `Last sync ${new Date(notion.lastSync).toLocaleString()}` : "Share the parent page with your integration"}</span></div>
           </div>
         </div>
