@@ -43,9 +43,30 @@ export function ConnectionsView() {
     } catch { addToast({ type: "error", title: "Test failed" }); }
   };
 
+  // ── Obsidian export (vault path + export-now) ──
+  const [obsidian, setObsidian] = useState<{ configured: boolean; vaultPath: string | null; lastExport: string | null }>({ configured: false, vaultPath: null, lastExport: null });
+  const [vaultInput, setVaultInput] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const saveVault = async () => {
+    if (!vaultInput.trim()) return;
+    const r = await fetch("/api/connections/obsidian", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ vaultPath: vaultInput.trim() }) });
+    setObsidian(await r.json()); toast("Vault path saved");
+  };
+  const exportVault = async () => {
+    setExporting(true);
+    try {
+      const r = await fetch("/api/connections/obsidian/export", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ projectId: 1 }) });
+      const d = await r.json();
+      if (r.ok) { addToast({ type: "success", title: "Exported to vault", description: `${d.written} of ${d.exported} pages written.` }); fetch("/api/connections/obsidian").then((x) => x.json()).then(setObsidian); }
+      else addToast({ type: "error", title: "Export failed", description: d.error });
+    } catch { addToast({ type: "error", title: "Export failed" }); }
+    setExporting(false);
+  };
+
   useEffect(() => {
     fetch("/api/connections/mcp").then((r) => r.json()).then((d) => setMcp(!!d.enabled)).catch(() => {});
     fetch("/api/connections/tavily").then((r) => r.json()).then(setTavily).catch(() => {});
+    fetch("/api/connections/obsidian").then((r) => r.json()).then(setObsidian).catch(() => {});
   }, []);
 
   // ── Claude API (real, persisted via /api/connections/claude) ──
@@ -157,12 +178,16 @@ export function ConnectionsView() {
         <div className="intg">
           <div className="intg-top">
             <span className="intg-icon" style={{ background: "#7c5cff" }}><svg viewBox="0 0 16 16" fill="none" stroke="#fff" strokeWidth={1.4}><path d="M8 1.5l4.5 3v7L8 14.5 3.5 11.5v-7z" /><circle cx="8" cy="8" r="1.6" /></svg></span>
-            <div><div className="intg-name">Obsidian <span className="intg-status on">Vault linked</span></div>
+            <div><div className="intg-name">Obsidian <span className={cx("intg-status", obsidian.configured ? "on" : "no")}>{obsidian.configured ? "Vault linked" : "Not set"}</span></div>
               <div className="intg-desc">wikiLM exports pages as linked Markdown into an Obsidian vault — so Obsidian&apos;s graph view does the heavy lifting, no in-app graph needed.</div></div>
-            <div className="intg-actions"><button className="btn ghost" onClick={() => toast("Exported pages to vault")}>Export now</button></div>
+            <div className="intg-actions"><button className="btn ghost" disabled={!obsidian.configured || exporting} onClick={exportVault}>{exporting ? "Exporting…" : "Export now"}</button></div>
           </div>
           <div className="intg-config">
-            <div className="intg-field"><label>Vault path</label><input className="intg-input" defaultValue="~/Obsidian/AI Research" onBlur={() => toast("Vault path saved")} /></div>
+            <div className="intg-field"><label>Vault path</label>
+              <input className="intg-input" value={vaultInput} placeholder={obsidian.vaultPath || "/path/to/Obsidian/Vault"}
+                onChange={(e) => setVaultInput(e.target.value)} onBlur={saveVault}
+                onKeyDown={(e) => { if (e.key === "Enter") saveVault(); }} />
+              <span className="intg-note">{obsidian.lastExport ? `Last export ${new Date(obsidian.lastExport).toLocaleString()}` : "Pages export as linked Markdown with frontmatter"}</span></div>
           </div>
         </div>
       </div>
