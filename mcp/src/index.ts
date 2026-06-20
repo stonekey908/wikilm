@@ -45,6 +45,12 @@ import {
   listSourcesSchema,
   exportObsidian,
   exportObsidianSchema,
+  previewSource,
+  previewSourceSchema,
+  approveSource,
+  approveSourceSchema,
+  dispatchResearch,
+  dispatchResearchSchema,
 } from "./tools/wiki.js";
 
 type ToolResult = {
@@ -242,6 +248,41 @@ async function main() {
       annotations: { destructiveHint: false, openWorldHint: true },
     },
     wrap(exportObsidian)
+  );
+
+  server.registerTool(
+    "preview_source",
+    {
+      title: "Preview a source",
+      description:
+        "Return the stored raw content + metadata for a source by id (e.g. a pending candidate awaiting approval).",
+      inputSchema: previewSourceSchema.shape,
+    },
+    wrap(previewSource)
+  );
+
+  server.registerTool(
+    "approve_source",
+    {
+      title: "Approve a pending source",
+      description:
+        "Approve a pending source by id: flips it to ingesting and kicks off ingestion into the wiki. Returns the job info.",
+      inputSchema: approveSourceSchema.shape,
+      annotations: { destructiveHint: false, openWorldHint: true },
+    },
+    wrap(approveSource)
+  );
+
+  server.registerTool(
+    "dispatch_research",
+    {
+      title: "Run a research pass",
+      description:
+        "Search the web for sources about a topic and return the collected candidates (title, url, summary, relevance). Approve good ones with approve_source after they land in /sources.",
+      inputSchema: dispatchResearchSchema.shape,
+      annotations: { destructiveHint: false, openWorldHint: true },
+    },
+    wrap(dispatchResearch)
   );
 
   // Transport: stdio by default; set MCP_HTTP_PORT to expose a remote

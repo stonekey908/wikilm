@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   api,
   resolveProject,
+  streamResearch,
   type WikiPage,
   type WikiPageMeta,
   type JobRow,
@@ -302,4 +303,57 @@ export async function exportObsidian(
     `/api/connections/obsidian/export`,
     { projectId: project.id }
   );
+}
+
+/**
+ * preview_source — GET /api/sources/<id>/raw
+ * Returns the stored raw content + metadata for a source (e.g. a pending
+ * candidate awaiting approval).
+ */
+export const previewSourceSchema = z
+  .object({ id: z.number().int().positive() })
+  .strict();
+
+export async function previewSource(input: z.infer<typeof previewSourceSchema>) {
+  return api.get<Record<string, unknown>>(`/api/sources/${input.id}/raw`);
+}
+
+/**
+ * approve_source — POST /api/sources/<id> { action: "ingest" }
+ * Approve a pending source: flips it to ingesting and kicks off ingestion.
+ */
+export const approveSourceSchema = z
+  .object({ id: z.number().int().positive() })
+  .strict();
+
+export async function approveSource(input: z.infer<typeof approveSourceSchema>) {
+  return api.post<Record<string, unknown>>(`/api/sources/${input.id}`, { action: "ingest" });
+}
+
+/**
+ * dispatch_research — POST /api/sources/research (SSE)
+ * Run a web-research pass for a topic and return the collected candidates.
+ */
+export const dispatchResearchSchema = z
+  .object({
+    topic: z.string().min(1, "topic is required"),
+    maxResults: z.number().int().positive().max(20).optional(),
+    project: z.string().optional(),
+  })
+  .strict();
+
+export async function dispatchResearch(
+  input: z.infer<typeof dispatchResearchSchema>
+) {
+  const project = await resolveProject(input.project);
+  const results = await streamResearch({
+    topic: input.topic,
+    projectId: project.id,
+    maxResults: input.maxResults ?? 8,
+  });
+  return {
+    project: { id: project.id, slug: project.slug, name: project.name },
+    count: results.length,
+    results,
+  };
 }

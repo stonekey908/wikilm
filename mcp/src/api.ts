@@ -79,6 +79,47 @@ export const api = {
   post: <T>(path: string, body: unknown) => request<T>("POST", path, body),
 };
 
+/**
+ * Consume the /api/sources/research SSE stream and collect the RESULT lines.
+ * Used by the dispatch_research tool — the endpoint streams `RESULT:{…}` lines
+ * (and a final DONE), so we parse rather than JSON-decode the whole body.
+ */
+export async function streamResearch(body: {
+  topic: string;
+  projectId: number;
+  maxResults?: number;
+}): Promise<unknown[]> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (WRITE_TOKEN) headers["X-WikiLM-Write-Token"] = WRITE_TOKEN;
+  const res = await fetch(`${API_BASE_URL}/api/sources/research`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+  if (!res.ok || !res.body) {
+    throw new WikiLMApiError(`research failed (${res.status})`, res.status, "streamResearch");
+  }
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  const out: unknown[] = [];
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let nl: number;
+    while ((nl = buffer.indexOf("\n")) >= 0) {
+      const line = buffer.slice(0, nl).trim();
+      buffer = buffer.slice(nl + 1);
+      const brace = line.indexOf("{");
+      if (brace >= 0 && line.startsWith("RESULT")) {
+        try { out.push(JSON.parse(line.slice(brace))); } catch {}
+      }
+    }
+  }
+  return out;
+}
+
 // ---------- Types (minimal subset of the app's shapes) ----------
 
 export interface ProjectNode {
