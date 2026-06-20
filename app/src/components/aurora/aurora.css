@@ -655,6 +655,74 @@
   .aurora-root .fe-switch { top: auto; bottom: 14px; right: 12px; }
 }
 
+/* ── Enriched dashboard ledger (parity with the editorial home) ── */
+.aurora-root .dash-dateline { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; color: var(--text-3); font-size: 12.5px; margin: 2px 0 20px; }
+.aurora-root .dash-dateline .dd { display: inline-flex; align-items: center; gap: 6px; }
+.aurora-root .dash-dateline .dd b { color: var(--text-1); font-weight: 650; }
+.aurora-root .dash-dateline .sepdot { width: 3px; height: 3px; border-radius: 50%; background: var(--text-4); }
+
+.aurora-root .dash-ledger { display: grid; grid-template-columns: 1.05fr 1.25fr 1fr; gap: 0; margin-top: 22px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); overflow: hidden; }
+.aurora-root .lcol { padding: 18px 18px 22px; border-right: 1px solid var(--border); min-width: 0; }
+.aurora-root .lcol:last-child { border-right: none; }
+.aurora-root .lcol-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px; }
+.aurora-root .lcol-head .sct { color: var(--accent); font-size: 11px; font-weight: 700; }
+.aurora-root .lcol-head .t { font-size: 14px; font-weight: 650; color: var(--text-1); letter-spacing: -0.01em; }
+.aurora-root .lcol-head .ct { margin-left: auto; font-size: 11px; color: var(--text-3); background: var(--bg-2); padding: 1px 7px; border-radius: 999px; }
+
+.aurora-root .entry { display: flex; gap: 10px; padding: 8px 6px; border-radius: 9px; cursor: pointer; align-items: baseline; }
+.aurora-root .entry:hover { background: var(--bg-1); }
+.aurora-root .entry .rn { font-size: 10px; color: var(--text-4); width: 16px; flex: none; font-variant-numeric: tabular-nums; }
+.aurora-root .entry .et { font-size: 13.5px; color: var(--text-1); font-weight: 550; line-height: 1.3; }
+.aurora-root .entry .em { font-size: 10.5px; color: var(--text-3); margin-top: 2px; text-transform: capitalize; }
+.aurora-root .entry .eAgo { margin-left: auto; font-size: 10px; color: var(--text-4); flex: none; white-space: nowrap; }
+
+.aurora-root .mark { border-left: 2px solid var(--border-strong); padding: 8px 0 8px 11px; margin-bottom: 12px; }
+.aurora-root .mark.amber { border-color: var(--amber); }
+.aurora-root .mark.violet { border-color: var(--violet); }
+.aurora-root .mark.red { border-color: var(--red); }
+.aurora-root .mark-cat { font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-3); margin-bottom: 4px; }
+.aurora-root .mark.amber .mark-cat { color: var(--amber); }
+.aurora-root .mark.violet .mark-cat { color: var(--violet); }
+.aurora-root .mark.red .mark-cat { color: var(--red); }
+.aurora-root .mark-title { font-size: 13px; color: var(--text-1); font-weight: 550; line-height: 1.35; }
+.aurora-root .mark-desc { font-size: 11.5px; color: var(--text-3); line-height: 1.45; margin-top: 3px; }
+.aurora-root .mark-actions { display: flex; gap: 6px; margin-top: 7px; flex-wrap: wrap; }
+.aurora-root .mk-btn { font-size: 11px; padding: 3px 9px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); cursor: pointer; }
+.aurora-root .mk-btn:hover { background: var(--bg-2); color: var(--text-1); }
+.aurora-root .mk-btn.primary { background: var(--accent); color: var(--accent-fg); border-color: transparent; }
+.aurora-root .group-sub { font-size: 11px; color: var(--text-4); margin: -4px 0 10px; }
+
+.aurora-root .lint-row { display: flex; gap: 9px; padding: 7px 4px; border-radius: 8px; align-items: flex-start; }
+.aurora-root .lint-row:hover { background: var(--bg-1); }
+.aurora-root .sev { width: 7px; height: 7px; border-radius: 50%; margin-top: 5px; flex: none; background: var(--text-4); }
+.aurora-root .sev.warn { background: var(--red); }
+.aurora-root .sev.info { background: var(--amber); }
+.aurora-root .lint-row .lt { font-size: 12.5px; color: var(--text-1); line-height: 1.3; font-weight: 550; }
+.aurora-root .lint-row .lc { font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.03em; margin-top: 2px; }
+.aurora-root .lint-row .lx { margin-left: auto; display: flex; gap: 5px; flex: none; }
+.aurora-root .icon-btn { width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-3); display: grid; place-items: center; cursor: pointer; }
+.aurora-root .icon-btn:hover { background: var(--bg-2); color: var(--text-1); }
+
+.aurora-root .dispatch-job { display: flex; gap: 10px; padding: 9px 4px; align-items: flex-start; }
+.aurora-root .dj-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex: none; }
+.aurora-root .dj-dot.run { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-wash); }
+.aurora-root .dj-dot.done { background: var(--green); }
+.aurora-root .dj-dot.err { background: var(--red); }
+.aurora-root .dj-dot.queue { background: var(--text-4); }
+.aurora-root .dj-main { min-width: 0; flex: 1; }
+.aurora-root .dj-title { font-size: 12.5px; color: var(--text-1); font-weight: 550; line-height: 1.3; }
+.aurora-root .dj-meta { font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.02em; margin-top: 2px; }
+.aurora-root .dj-prog { height: 4px; border-radius: 3px; background: var(--bg-2); margin-top: 6px; overflow: hidden; }
+.aurora-root .dj-prog .fill { height: 100%; background: var(--accent); border-radius: 3px; }
+.aurora-root .commission { margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--border); }
+.aurora-root .commission-box { display: flex; gap: 7px; }
+.aurora-root .commission-box input { flex: 1; min-width: 0; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px; padding: 8px 11px; font-size: 12.5px; color: var(--text-1); font-family: inherit; }
+.aurora-root .commission-box input:focus { outline: none; border-color: var(--accent); }
+.aurora-root .commission-hint { font-size: 10.5px; color: var(--text-4); margin-top: 7px; }
+.aurora-root .lcol .none { font-size: 12px; color: var(--text-4); padding: 8px 4px; }
+
+@media (max-width: 1100px) { .aurora-root .dash-ledger { grid-template-columns: 1fr; } .aurora-root .lcol { border-right: none; border-bottom: 1px solid var(--border); } .aurora-root .lcol:last-child { border-bottom: none; } }
+
 /* keyframes (global) */
 @keyframes blip { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.7); } }
 @keyframes viewIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }

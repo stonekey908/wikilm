@@ -73,3 +73,38 @@ export interface ResearchResult {
   relevance?: number;
   tags?: string[];
 }
+
+export interface DashboardNudge {
+  id: number;
+  projectId: number;
+  projectSlug: string;
+  category: string;
+  severity: string;
+  title: string;
+  description: string;
+  targetPage: string | null;
+  suggestedAction: string | null;
+  dedupeKey: string;
+  createdAt: string;
+}
+
+export interface NudgesResponse {
+  promotion: DashboardNudge[];
+  theme: DashboardNudge[];
+  gap: DashboardNudge[];
+  suggestedQuestion: DashboardNudge[];
+  missingCrossRef: DashboardNudge[];
+  missingConcept: DashboardNudge[];
+  projectGroupTotals: { suggestedQuestion: number; missingCrossRef: number; missingConcept: number };
+}
+
+export interface LintFinding {
+  id: number;
+  category: string;
+  severity: string; // info | warn
+  title: string;
+  description: string;
+  targetPage: string | null;
+  suggestedAction: string | null;
+  status: string;
+}
