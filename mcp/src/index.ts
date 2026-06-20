@@ -41,6 +41,10 @@ import {
   generateOutputSchema,
   getJobStatus,
   getJobStatusSchema,
+  listSources,
+  listSourcesSchema,
+  exportObsidian,
+  exportObsidianSchema,
 } from "./tools/wiki.js";
 
 type ToolResult = {
@@ -217,9 +221,52 @@ async function main() {
     wrap(getJobStatus)
   );
 
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-  console.error("[wikilm-mcp] ready (stdio).");
+  server.registerTool(
+    "list_sources",
+    {
+      title: "List a project's sources",
+      description:
+        "Return the library of raw materials (title, type, status, url) for a project. Project defaults to the CWD-mapped project, falling back to root.",
+      inputSchema: listSourcesSchema.shape,
+    },
+    wrap(listSources)
+  );
+
+  server.registerTool(
+    "export_to_obsidian",
+    {
+      title: "Export wiki to Obsidian",
+      description:
+        "Sync trigger: mirror the project's wiki into the configured Obsidian vault (linked Markdown). Requires a vault path set in Connections. Returns { exported, written, vault }.",
+      inputSchema: exportObsidianSchema.shape,
+      annotations: { destructiveHint: false, openWorldHint: true },
+    },
+    wrap(exportObsidian)
+  );
+
+  // Transport: stdio by default; set MCP_HTTP_PORT to expose a remote
+  // Streamable HTTP endpoint so Claude web/mobile can reach a hosted instance.
+  const httpPort = process.env.MCP_HTTP_PORT ? Number(process.env.MCP_HTTP_PORT) : null;
+  if (httpPort && Number.isFinite(httpPort)) {
+    const { StreamableHTTPServerTransport } = await import(
+      "@modelcontextprotocol/sdk/server/streamableHttp.js"
+    );
+    const { createServer } = await import("node:http");
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    await server.connect(transport);
+    createServer((req, res) => {
+      transport.handleRequest(req, res).catch((e: unknown) => {
+        console.error("[wikilm-mcp] http error", e);
+        if (!res.headersSent) { res.statusCode = 500; res.end(); }
+      });
+    }).listen(httpPort, () => {
+      console.error(`[wikilm-mcp] ready (http :${httpPort}).`);
+    });
+  } else {
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    console.error("[wikilm-mcp] ready (stdio).");
+  }
 }
 
 main().catch((err) => {

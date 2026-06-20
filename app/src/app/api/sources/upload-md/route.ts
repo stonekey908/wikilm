@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { checkWriteToken } from "@/lib/write-guard";
 import { db } from "@/db";
 import { sources } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -67,6 +68,8 @@ function buildFrontmatter(title: string, tags: string[]): string {
 }
 
 export async function POST(request: NextRequest) {
+  const denied = checkWriteToken(request);
+  if (denied) return denied;
   const body = await request.json().catch(() => ({}));
   const { title } = body ?? {};
   const tags: string[] = Array.isArray(body?.tags)

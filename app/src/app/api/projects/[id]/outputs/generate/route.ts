@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { checkWriteToken } from "@/lib/write-guard";
 import fs from "fs";
 import path from "path";
 import { execFile } from "child_process";
@@ -36,6 +37,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const denied = checkWriteToken(request);
+  if (denied) return denied;
   const { id } = await params;
   const projectId = Number(id);
   if (!Number.isFinite(projectId)) {

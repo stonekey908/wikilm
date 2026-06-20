@@ -264,3 +264,42 @@ export async function getJobStatus(input: z.infer<typeof getJobStatusSchema>) {
     finishedAt: match.finishedAt,
   };
 }
+
+/**
+ * list_sources — GET /api/sources?projectId=<id>
+ * The library of raw materials (title, type, status, url) for a project.
+ */
+export const listSourcesSchema = z
+  .object({ project: z.string().optional() })
+  .strict();
+
+export async function listSources(input: z.infer<typeof listSourcesSchema>) {
+  const project = await resolveProject(input.project);
+  const { sources } = await api.get<{ sources: unknown[] }>(
+    `/api/sources?projectId=${project.id}`
+  );
+  return {
+    project: { id: project.id, slug: project.slug, name: project.name },
+    count: sources.length,
+    sources,
+  };
+}
+
+/**
+ * export_to_obsidian — POST /api/connections/obsidian/export
+ * Sync trigger: mirror the project's wiki into the configured Obsidian vault.
+ * Requires a vault path configured in Connections.
+ */
+export const exportObsidianSchema = z
+  .object({ project: z.string().optional() })
+  .strict();
+
+export async function exportObsidian(
+  input: z.infer<typeof exportObsidianSchema>
+) {
+  const project = await resolveProject(input.project);
+  return api.post<{ exported: number; written: number; vault: string }>(
+    `/api/connections/obsidian/export`,
+    { projectId: project.id }
+  );
+}

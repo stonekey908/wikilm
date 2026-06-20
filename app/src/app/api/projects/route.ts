@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { checkWriteToken } from "@/lib/write-guard";
 import { db } from "@/db";
 import { projects, sources } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
@@ -57,6 +58,8 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const denied = checkWriteToken(request);
+  if (denied) return denied;
   const body = await request.json();
   const { name, description, color, parentId } = body as {
     name?: string;
