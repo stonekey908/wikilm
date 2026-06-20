@@ -13,10 +13,13 @@ export interface JobRow {
   id: number;
   type: string;
   title: string;
-  status: string; // queued | running | done | error | cancelled
+  status: string; // queued | running | completed | failed | cancelled
   progress: string | null;
   model: string | null;
   createdAt: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  error?: string | null;
 }
 
 export interface DashboardResponse {
@@ -58,6 +61,8 @@ export interface SourceRow {
   url?: string | null;
   title: string;
   summary?: string | null;
+  author?: string | null;
+  pageCount?: number | null;
   tags?: string[] | string | null;
   status?: string | null;
   createdAt?: string;
