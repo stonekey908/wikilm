@@ -26,6 +26,31 @@ export function ConnectionsView() {
     toast(next ? "MCP connectivity enabled" : "MCP disabled");
   };
 
+  // ── External MCP servers (outbound client registry) ──
+  interface SrvDef { id: string; name: string; transport: "stdio" | "http"; command?: string; url?: string; enabled: boolean }
+  const [mcpServers, setMcpServers] = useState<SrvDef[]>([]);
+  const [srvStatus, setSrvStatus] = useState<Record<string, { ok: boolean; tools?: number } | undefined>>({});
+  const [srvName, setSrvName] = useState("");
+  const [srvCmd, setSrvCmd] = useState("");
+  const saveServers = async (list: SrvDef[]) => {
+    const r = await fetch("/api/connections/mcp/servers", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ servers: list }) });
+    setMcpServers(((await r.json()) as { servers?: SrvDef[] }).servers || []);
+  };
+  const addServer = async () => {
+    await saveServers([...mcpServers, { id: "", name: srvName.trim(), transport: "stdio", command: srvCmd.trim(), enabled: true }]);
+    setSrvName(""); setSrvCmd(""); toast("MCP server added");
+  };
+  const removeServer = async (id: string) => { await saveServers(mcpServers.filter((s) => s.id !== id)); };
+  const checkServer = async (s: SrvDef) => {
+    addToast({ type: "info", title: `Checking ${s.name}…` });
+    try {
+      const r = await fetch("/api/connections/mcp/servers/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: s.id }) });
+      const d = await r.json();
+      setSrvStatus((st) => ({ ...st, [s.id]: { ok: d.ok, tools: d.tools?.length } }));
+      addToast(d.ok ? { type: "success", title: `${s.name}: ${d.tools.length} tools` } : { type: "error", title: `${s.name} failed`, description: d.error });
+    } catch { addToast({ type: "error", title: "Check failed" }); }
+  };
+
   // ── Tavily (web search, gated on MCP) ──
   const [tavily, setTavily] = useState<{ configured: boolean; maskedKey: string | null; available: boolean }>({ configured: false, maskedKey: null, available: true });
   const [tavilyInput, setTavilyInput] = useState("");
@@ -92,6 +117,7 @@ export function ConnectionsView() {
 
   useEffect(() => {
     fetch("/api/connections/mcp").then((r) => r.json()).then((d) => setMcp(!!d.enabled)).catch(() => {});
+    fetch("/api/connections/mcp/servers").then((r) => r.json()).then((d) => setMcpServers(d.servers || [])).catch(() => {});
     fetch("/api/connections/tavily").then((r) => r.json()).then(setTavily).catch(() => {});
     fetch("/api/connections/obsidian").then((r) => r.json()).then(setObsidian).catch(() => {});
     fetch("/api/connections/notion").then((r) => r.json()).then(setNotion).catch(() => {});
@@ -167,7 +193,25 @@ export function ConnectionsView() {
             <div className="intg-actions"><div className={cx("toggle", mcp && "on")} onClick={toggleMcp} /></div>
           </div>
           <div className="intg-config">
-            <div className="intg-field"><label>Server</label><input className="intg-input" defaultValue="wikilm-mcp · node mcp/dist/index.js (stdio)" readOnly /></div>
+            <div className="intg-field"><label>Local server</label><input className="intg-input" defaultValue="wikilm-mcp · node mcp/dist/index.js (stdio)" readOnly /></div>
+            <div className="intg-field" style={{ gridColumn: "1 / -1" }}>
+              <label>External MCP servers (outbound)</label>
+              {mcpServers.length === 0 && <span className="intg-note">None registered. Add a command below to let wikiLM consume another MCP server.</span>}
+              {mcpServers.map((s) => (
+                <div key={s.id} className="mcp-srv-row">
+                  <span className="nm">{s.name}</span>
+                  <span className="cmd">{s.transport === "http" ? s.url : s.command}</span>
+                  {srvStatus[s.id] && <span className={cx("intg-status", srvStatus[s.id]!.ok ? "on" : "no")}>{srvStatus[s.id]!.ok ? `${srvStatus[s.id]!.tools} tools` : "error"}</span>}
+                  <button className="btn ghost" disabled={!mcp} onClick={() => checkServer(s)}>Check</button>
+                  <button className="btn ghost" onClick={() => removeServer(s.id)}>✕</button>
+                </div>
+              ))}
+              <div className="mcp-srv-add">
+                <input className="intg-input" placeholder="Name (e.g. Notion)" value={srvName} onChange={(e) => setSrvName(e.target.value)} />
+                <input className="intg-input" placeholder="Command, e.g. npx -y @notionhq/notion-mcp-server" value={srvCmd} onChange={(e) => setSrvCmd(e.target.value)} />
+                <button className="btn primary" disabled={!srvName.trim() || !srvCmd.trim()} onClick={addServer}>Add</button>
+              </div>
+            </div>
           </div>
         </div>
 

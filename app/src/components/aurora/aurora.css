@@ -886,6 +886,13 @@
 .aurora-root .dispatch-empty { padding: 26px 16px; font-size: 13px; color: var(--text-4); }
 @media (max-width: 900px) { .aurora-root .dispatch-head, .aurora-root .dispatch-row { grid-template-columns: 44px 1fr 90px 100px 44px; } .aurora-root .dispatch-head > :nth-child(4), .aurora-root .dispatch-row > :nth-child(4), .aurora-root .dispatch-head > :nth-child(6), .aurora-root .dispatch-row > .progress-line { display: none; } }
 
+/* External MCP servers registry */
+.aurora-root .mcp-srv-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px dashed var(--border); }
+.aurora-root .mcp-srv-row .nm { font-size: 12.5px; font-weight: 560; color: var(--text-1); }
+.aurora-root .mcp-srv-row .cmd { flex: 1; min-width: 0; font-size: 11px; color: var(--text-4); font-family: ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aurora-root .mcp-srv-add { display: flex; gap: 8px; margin-top: 9px; }
+.aurora-root .mcp-srv-add input { flex: 1; min-width: 0; }
+
 /* keyframes (global) */
 @keyframes blip { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.7); } }
 @keyframes viewIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
