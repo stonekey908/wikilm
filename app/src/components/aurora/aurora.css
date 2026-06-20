@@ -886,12 +886,50 @@
 .aurora-root .dispatch-empty { padding: 26px 16px; font-size: 13px; color: var(--text-4); }
 @media (max-width: 900px) { .aurora-root .dispatch-head, .aurora-root .dispatch-row { grid-template-columns: 44px 1fr 90px 100px 44px; } .aurora-root .dispatch-head > :nth-child(4), .aurora-root .dispatch-row > :nth-child(4), .aurora-root .dispatch-head > :nth-child(6), .aurora-root .dispatch-row > .progress-line { display: none; } }
 
-/* External MCP servers registry */
-.aurora-root .mcp-srv-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px dashed var(--border); }
+/* External MCP servers registry */.aurora-root .mcp-srv-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px dashed var(--border); }
 .aurora-root .mcp-srv-row .nm { font-size: 12.5px; font-weight: 560; color: var(--text-1); }
 .aurora-root .mcp-srv-row .cmd { flex: 1; min-width: 0; font-size: 11px; color: var(--text-4); font-family: ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .aurora-root .mcp-srv-add { display: flex; gap: 8px; margin-top: 9px; }
 .aurora-root .mcp-srv-add input { flex: 1; min-width: 0; }
+
+/* Claude-style chat: session rail + larger composer */
+.aurora-root .chat-layout { display: grid; grid-template-columns: 250px 1fr; height: 100%; }
+.aurora-root .chat-rail { border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; padding: 16px 12px; gap: 10px; }
+.aurora-root .chat-new { display: flex; align-items: center; gap: 8px; justify-content: center; padding: 9px; border-radius: 10px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text-1); font-size: 13px; font-weight: 560; cursor: pointer; }
+.aurora-root .chat-new:hover { background: var(--bg-1); border-color: var(--accent); }
+.aurora-root .chat-rail-h { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-4); padding: 2px 6px; }
+.aurora-root .chat-sessions { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; margin: 0 -4px; padding: 0 4px; }
+.aurora-root .chat-rail-empty { font-size: 12px; color: var(--text-4); padding: 8px 6px; }
+.aurora-root .chat-sess { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 6px; padding: 8px 9px; border-radius: 9px; cursor: pointer; }
+.aurora-root .chat-sess:hover { background: var(--bg-1); }
+.aurora-root .chat-sess.active { background: var(--accent-wash); }
+.aurora-root .chat-sess .ti { font-size: 12.5px; color: var(--text-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aurora-root .chat-sess.active .ti { color: var(--accent); font-weight: 560; }
+.aurora-root .chat-sess .ag { font-size: 10px; color: var(--text-4); }
+.aurora-root .chat-sess .del { opacity: 0; border: none; background: none; color: var(--text-4); cursor: pointer; display: grid; place-items: center; padding: 2px; }
+.aurora-root .chat-sess:hover .del { opacity: 1; }
+.aurora-root .chat-sess .del:hover { color: var(--red); }
+.aurora-root .chat-main { display: flex; flex-direction: column; min-width: 0; height: 100%; }
+.aurora-root .chat-scroll { flex: 1; overflow-y: auto; scroll-behavior: smooth; }
+.aurora-root .chat-inner { max-width: 768px; margin: 0 auto; padding: 30px 28px 24px; }
+.aurora-root .chat-hero { text-align: center; padding-top: 11vh; animation: rise 450ms var(--ease) both; }
+.aurora-root .chat-hero .ch-mark { width: 52px; height: 52px; border-radius: 16px; margin: 0 auto 18px; display: grid; place-items: center; color: #fff; background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #6ee7d8)); }
+.aurora-root .chat-hero h2 { font-size: 24px; font-weight: 680; letter-spacing: -0.03em; color: var(--text-1); }
+.aurora-root .chat-hero p { font-size: 14px; color: var(--text-3); margin-top: 6px; }
+.aurora-root .ch-suggest { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 22px; }
+.aurora-root .ch-suggest button { font-size: 13px; padding: 8px 14px; border-radius: 100px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer; transition: all 150ms var(--ease); }
+.aurora-root .ch-suggest button:hover { border-color: var(--accent); color: var(--text-1); transform: translateY(-1px); }
+.aurora-root .msg.user .txt { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 11px 15px; }
+.aurora-root .chat-dock { border-top: 1px solid var(--border); background: var(--bg-0); padding: 14px 28px 16px; }
+.aurora-root .chat-composer2 { max-width: 768px; margin: 0 auto; display: flex; align-items: flex-end; gap: 10px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 20px; padding: 9px 9px 9px 16px; box-shadow: var(--shadow-composer); transition: border-color 160ms, box-shadow 160ms; }
+.aurora-root .chat-composer2:focus-within { border-color: var(--accent); box-shadow: var(--shadow-composer), 0 0 0 4px var(--ring); }
+.aurora-root .chat-composer2 textarea { flex: 1; border: none; outline: none; background: none; resize: none; font-family: inherit; font-size: 15px; line-height: 1.5; color: var(--text-1); max-height: 200px; padding: 7px 0; }
+.aurora-root .chat-composer2 textarea::placeholder { color: var(--text-4); }
+.aurora-root .cc-send { width: 36px; height: 36px; border-radius: 12px; border: none; background: var(--accent); color: var(--accent-fg); display: grid; place-items: center; cursor: pointer; flex-shrink: 0; transition: transform 120ms, background 160ms; }
+.aurora-root .cc-send:hover { transform: scale(1.06); }
+.aurora-root .cc-send.stop { background: var(--text-1); }
+.aurora-root .chat-foot { max-width: 768px; margin: 9px auto 0; text-align: center; font-size: 11px; color: var(--text-4); }
+@media (max-width: 820px) { .aurora-root .chat-layout { grid-template-columns: 1fr; } .aurora-root .chat-rail { display: none; } }
 
 /* keyframes (global) */
 @keyframes blip { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.7); } }
