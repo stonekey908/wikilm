@@ -114,6 +114,20 @@ function getModelArgs(type: string): string[] {
   return ["--model", getModel(type)];
 }
 
+// Bring-your-own Anthropic API key. When set in settings, it is injected into
+// the spawned Claude CLI's environment so calls bill against the user's API
+// key (pay-per-use) instead of a Claude subscription. Unset → unchanged.
+export const ANTHROPIC_KEY_SETTING = "anthropic_api_key";
+export function getAnthropicApiKey(): string | null {
+  const row = db.select().from(settings).where(eq(settings.key, ANTHROPIC_KEY_SETTING)).get();
+  const v = row?.value?.trim();
+  return v ? v : null;
+}
+function spawnEnv(): NodeJS.ProcessEnv {
+  const key = getAnthropicApiKey();
+  return key ? { ...process.env, ANTHROPIC_API_KEY: key } : { ...process.env };
+}
+
 // Track running processes by job ID
 const runningProcesses = new Map<number, ChildProcess>();
 
@@ -236,7 +250,7 @@ export function streamClaude({ prompt, projectCwd, type }: StreamOptions): Reada
       const proc = spawn(cmd, args, {
         cwd: projectCwd,
         stdio: ["ignore", "pipe", "pipe"],
-        env: { ...process.env },
+        env: spawnEnv(),
       });
 
       let buffer = "";
@@ -307,7 +321,7 @@ function spawnJob(jobId: number, options: JobOptions): void {
   ], {
     cwd: options.projectCwd,
     stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env },
+    env: spawnEnv(),
   });
 
   runningProcesses.set(jobId, proc);

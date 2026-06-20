@@ -1,13 +1,52 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/components/toast-provider";
 import { cx } from "../lib";
+
+const CLAUDE_MODELS = [
+  ["claude-opus-4-8", "Claude Opus 4.8"],
+  ["claude-sonnet-4-6", "Claude Sonnet 4.6"],
+  ["claude-haiku-4-5", "Claude Haiku 4.5"],
+  ["claude-fable-5", "Claude Fable 5"],
+];
+
+interface ClaudeStatus { configured: boolean; maskedKey: string | null; model: string }
 
 export function ConnectionsView() {
   const { addToast } = useToast();
   const [mcp, setMcp] = useState(true);
   const toast = (title: string, description?: string) => addToast({ type: "success", title, description });
+
+  // ── Claude API (real, persisted via /api/connections/claude) ──
+  const [claude, setClaude] = useState<ClaudeStatus>({ configured: false, maskedKey: null, model: "claude-opus-4-8" });
+  const [keyInput, setKeyInput] = useState("");
+  const [testing, setTesting] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/connections/claude").then((r) => r.json()).then(setClaude).catch(() => {});
+  }, []);
+
+  const saveKey = async () => {
+    if (!keyInput.trim()) return;
+    const r = await fetch("/api/connections/claude", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ apiKey: keyInput.trim() }) });
+    setClaude(await r.json()); setKeyInput("");
+    toast("API key saved", "Claude runs now bill against your key.");
+  };
+  const saveModel = async (model: string) => {
+    const r = await fetch("/api/connections/claude", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model }) });
+    setClaude(await r.json());
+  };
+  const testKey = async () => {
+    setTesting(true);
+    try {
+      const r = await fetch("/api/connections/claude/test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(keyInput.trim() ? { apiKey: keyInput.trim() } : {}) });
+      const d = await r.json();
+      if (d.ok) addToast({ type: "success", title: "Key valid", description: "Authenticated with the Anthropic API." });
+      else addToast({ type: "error", title: "Test failed", description: d.error || "Unknown error." });
+    } catch { addToast({ type: "error", title: "Test failed", description: "Could not run the test." }); }
+    setTesting(false);
+  };
 
   return (
     <section className="view active">
@@ -21,13 +60,21 @@ export function ConnectionsView() {
         <div className="intg">
           <div className="intg-top">
             <span className="intg-icon" style={{ background: "#d97757" }}><svg viewBox="0 0 16 16" fill="none" stroke="#fff" strokeWidth={1.7}><path d="M8 1.5l5.5 9.5h-11z" /></svg></span>
-            <div><div className="intg-name">Claude API <span className="intg-status on">Connected</span></div>
+            <div><div className="intg-name">Claude API <span className={cx("intg-status", claude.configured ? "on" : "no")}>{claude.configured ? "Connected" : "Not set"}</span></div>
               <div className="intg-desc">Use your own Anthropic API key and model instead of a Claude subscription. Powers answers, chat, and synthesis.</div></div>
-            <div className="intg-actions"><button className="btn ghost" onClick={() => toast("Tested — key valid")}>Test</button></div>
+            <div className="intg-actions"><button className="btn ghost" disabled={testing} onClick={testKey}>{testing ? "Testing…" : "Test"}</button></div>
           </div>
           <div className="intg-config">
-            <div className="intg-field"><label>API key</label><input className="intg-input" type="password" defaultValue="sk-ant-api03-•••••••••••••••" onBlur={() => toast("API key saved")} /></div>
-            <div className="intg-field"><label>Model</label><div className="select" onClick={() => toast("Model menu")}>Claude Opus 4.8 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.8}><path d="M5 6.5l3 3 3-3" /></svg></div>
+            <div className="intg-field"><label>API key</label>
+              <input className="intg-input" type="password" value={keyInput}
+                placeholder={claude.maskedKey || "sk-ant-api03-…"}
+                onChange={(e) => setKeyInput(e.target.value)} onBlur={saveKey}
+                onKeyDown={(e) => { if (e.key === "Enter") saveKey(); }} />
+            </div>
+            <div className="intg-field"><label>Model</label>
+              <select className="intg-input" value={claude.model} onChange={(e) => saveModel(e.target.value)}>
+                {CLAUDE_MODELS.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+              </select>
               <span className="intg-note">Falls back to a Claude subscription if no key is set</span></div>
           </div>
         </div>
