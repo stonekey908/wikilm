@@ -8,6 +8,7 @@ export type Density = "cozy" | "comfy" | "airy";
 export type Size = "sm" | "md" | "lg";
 export type FontFace = "fraunces" | "playfair" | "crimson" | "garamond";
 export type SidebarState = "open" | "collapsed";
+export type Layout = "editorial" | "aurora";
 
 export type TweakState = {
   theme: Theme;
@@ -17,6 +18,7 @@ export type TweakState = {
   font: FontFace;
   sidebar: SidebarState;
   grain: boolean;
+  layout: Layout;
 };
 
 const DEFAULTS: TweakState = {
@@ -27,6 +29,7 @@ const DEFAULTS: TweakState = {
   font: "fraunces",
   sidebar: "open",
   grain: true,
+  layout: "editorial",
 };
 
 const STORAGE_KEY = "wikilm-ed:tweaks";
@@ -58,8 +61,10 @@ function applyToBody(state: TweakState) {
   b.dataset.font = state.font;
   b.dataset.side = state.sidebar;
   b.dataset.grain = state.grain ? "true" : "false";
+  b.dataset.layout = state.layout;
   // Mirror onto documentElement in case CSS targets either
   const h = document.documentElement;
+  h.dataset.layout = state.layout;
   h.dataset.theme = state.theme;
   h.dataset.accent = state.accent;
   h.dataset.density = state.density;

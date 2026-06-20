@@ -10,8 +10,9 @@ import {
 import { ProjectProvider } from "@/components/project-switcher";
 import { ToastProvider } from "@/components/toast-provider";
 import { TweaksProvider } from "@/components/editorial/tweaks-provider";
-import { EditorialShell } from "@/components/editorial/editorial-shell";
+import { ShellRouter } from "@/components/shell-router";
 import "./globals.css";
+import "@/components/aurora/aurora.css";
 
 const fraunces = Fraunces({
   variable: "--font-fraunces",
@@ -92,7 +93,7 @@ export default function RootLayout({
         <TweaksProvider>
           <ProjectProvider>
             <ToastProvider>
-              <EditorialShell>{children}</EditorialShell>
+              <ShellRouter>{children}</ShellRouter>
             </ToastProvider>
           </ProjectProvider>
         </TweaksProvider>

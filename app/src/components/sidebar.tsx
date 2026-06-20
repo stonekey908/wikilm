@@ -9,7 +9,6 @@ import {
   Download,
   MessageSquare,
   Clock,
-  Share2,
   Beaker,
   Settings,
   Sun,
@@ -34,7 +33,6 @@ const navItems: NavItem[] = [
   { label: "Sources", href: "/sources", icon: Download, badgeKey: "sourceCount" },
   { label: "Chat", href: "/chat", icon: MessageSquare },
   { label: "Jobs", href: "/jobs", icon: Clock, badgeKey: "runningJobs" },
-  { label: "Graph", href: "/graph", icon: Share2 },
   { label: "Lint", href: "/lint", icon: Beaker },
 ];
 

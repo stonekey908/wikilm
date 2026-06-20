@@ -104,14 +104,36 @@ const ENV_MODELS: Record<string, string | undefined> = {
  * Exported so route handlers can log + persist the model in the same form
  * the subprocess spawns with.
  */
+export const ANTHROPIC_MODEL_SETTING = "anthropic_model";
+function getAnthropicModel(): string | null {
+  const row = db.select().from(settings).where(eq(settings.key, ANTHROPIC_MODEL_SETTING)).get();
+  return row?.value?.trim() || null;
+}
+
 export function getModel(type: string): string {
   const key = `model_${type}`;
   const row = db.select().from(settings).where(eq(settings.key, key)).get();
-  return row?.value ?? ENV_MODELS[type] ?? "sonnet";
+  // Precedence: explicit per-type setting > env override > the BYO Anthropic
+  // model default (from the Claude API connection) > sonnet.
+  return row?.value ?? ENV_MODELS[type] ?? getAnthropicModel() ?? "sonnet";
 }
 
 function getModelArgs(type: string): string[] {
   return ["--model", getModel(type)];
+}
+
+// Bring-your-own Anthropic API key. When set in settings, it is injected into
+// the spawned Claude CLI's environment so calls bill against the user's API
+// key (pay-per-use) instead of a Claude subscription. Unset → unchanged.
+export const ANTHROPIC_KEY_SETTING = "anthropic_api_key";
+export function getAnthropicApiKey(): string | null {
+  const row = db.select().from(settings).where(eq(settings.key, ANTHROPIC_KEY_SETTING)).get();
+  const v = row?.value?.trim();
+  return v ? v : null;
+}
+function spawnEnv(): NodeJS.ProcessEnv {
+  const key = getAnthropicApiKey();
+  return key ? { ...process.env, ANTHROPIC_API_KEY: key } : { ...process.env };
 }
 
 // Track running processes by job ID
@@ -236,7 +258,7 @@ export function streamClaude({ prompt, projectCwd, type }: StreamOptions): Reada
       const proc = spawn(cmd, args, {
         cwd: projectCwd,
         stdio: ["ignore", "pipe", "pipe"],
-        env: { ...process.env },
+        env: spawnEnv(),
       });
 
       let buffer = "";
@@ -307,7 +329,7 @@ function spawnJob(jobId: number, options: JobOptions): void {
   ], {
     cwd: options.projectCwd,
     stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env },
+    env: spawnEnv(),
   });
 
   runningProcesses.set(jobId, proc);

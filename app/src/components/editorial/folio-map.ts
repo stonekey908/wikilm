@@ -5,7 +5,6 @@ export type EditorialView =
   | "chat"
   | "lint"
   | "jobs"
-  | "graph"
   | "compose"
   | "settings";
 
@@ -24,9 +23,8 @@ export const FOLIO: Record<EditorialView, FolioEntry> = {
   chat: { view: "chat", num: "04", name: "THE SALON", label: "Chat", path: "/chat" },
   lint: { view: "lint", num: "05", name: "LINT · THE EDIT", label: "Lint", path: "/lint" },
   jobs: { view: "jobs", num: "06", name: "THE DISPATCH", label: "Dispatch", path: "/jobs" },
-  graph: { view: "graph", num: "07", name: "THE MAP", label: "Map", path: "/graph" },
-  compose: { view: "compose", num: "08", name: "DICTATION", label: "Dictation", path: "/compose" },
-  settings: { view: "settings", num: "09", name: "THE PRESS", label: "Settings", path: "/settings" },
+  compose: { view: "compose", num: "07", name: "DICTATION", label: "Dictation", path: "/compose" },
+  settings: { view: "settings", num: "08", name: "THE PRESS", label: "Settings", path: "/settings" },
 };
 
 export const VIEW_ORDER: EditorialView[] = [
@@ -36,7 +34,6 @@ export const VIEW_ORDER: EditorialView[] = [
   "chat",
   "lint",
   "jobs",
-  "graph",
   "compose",
   "settings",
 ];
@@ -48,7 +45,6 @@ export function viewFromPath(pathname: string): EditorialView {
   if (pathname.startsWith("/chat")) return "chat";
   if (pathname.startsWith("/lint")) return "lint";
   if (pathname.startsWith("/jobs")) return "jobs";
-  if (pathname.startsWith("/graph")) return "graph";
   if (pathname.startsWith("/compose")) return "compose";
   if (pathname.startsWith("/settings")) return "settings";
   return "dashboard";

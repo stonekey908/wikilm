@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SecondBrain — Mockup</title>
+<title>wikiLM — Mockup</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@350..700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -833,9 +833,37 @@
   .toast-x:hover { color: var(--text-2); }
 
   .hidden { display: none; }
+
+  /* ─── Frontend switcher (shared with the Aurora mockup) ─── */
+  .fe-switch {
+    position: fixed; top: 14px; right: 16px; z-index: 200;
+    display: flex; align-items: center; gap: 3px; padding: 3px;
+    background: var(--surface-card); border: 1px solid var(--border); border-radius: 100px;
+    box-shadow: var(--shadow-md);
+  }
+  .fe-seg {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 13px; border-radius: 100px;
+    font-size: 12px; font-weight: 600; color: var(--text-3); cursor: pointer; border: none;
+    background: transparent; font-family: inherit; transition: all 180ms ease; white-space: nowrap;
+  }
+  .fe-seg svg { width: 13px; height: 13px; }
+  .fe-seg:hover { color: var(--text-1); }
+  .fe-seg.active { background: var(--primary); color: var(--primary-fg); box-shadow: var(--shadow-sm); }
 </style>
 </head>
 <body>
+
+<!-- Frontend switcher -->
+<div class="fe-switch">
+  <button class="fe-seg active" title="Classic Nova frontend (current)">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
+    Classic
+  </button>
+  <button class="fe-seg" onclick="switchFrontend('aurora')" title="Switch to the Aurora frontend">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 11a6 6 0 0112 0"/><path d="M5 11a3 3 0 016 0"/><line x1="2" y1="11" x2="14" y2="11"/></svg>
+    Aurora
+  </button>
+</div>
 
 <div class="app">
   <!-- ═══ SIDEBAR ═══ -->
@@ -844,7 +872,7 @@
       <div class="logo-mark">
         <svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.8"><circle cx="8" cy="8" r="3.5"/><path d="M8 1v3M8 12v3M1 8h3M12 8h3"/></svg>
       </div>
-      <span class="logo-text">SecondBrain</span>
+      <span class="logo-text">wikiLM</span>
     </div>
 
     <!-- Project Switcher -->
@@ -908,8 +936,8 @@
         <span class="nav-badge running">1</span>
       </a>
       <a class="nav-item">
-        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="4" cy="4" r="2"/><circle cx="12" cy="4" r="2"/><circle cx="4" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><line x1="6" y1="4" x2="10" y2="4"/><line x1="4" y1="6" x2="4" y2="10"/><line x1="6" y1="5.5" x2="10" y2="10.5"/></svg>
-        Graph
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6.5 9.5l-2 2a2.5 2.5 0 01-3.5-3.5l2-2"/><path d="M9.5 6.5l2-2a2.5 2.5 0 013.5 3.5l-2 2"/><line x1="6" y1="10" x2="10" y2="6"/></svg>
+        Connections
       </a>
 
       <div class="nav-divider"></div>
@@ -968,7 +996,7 @@
           <div class="lib-grid">
             <div class="lib-card">
               <div class="lib-type"><span class="lib-type-dot pdf"></span>PDF</div>
-              <div class="lib-title">Karpathy — LLM Wiki Second Brain</div>
+              <div class="lib-title">Karpathy — Building an LLM Wiki</div>
               <div class="lib-meta">Medium &middot; Apr 2026</div>
               <div class="lib-status ingested"><span class="lib-status-dot"></span> Ingested &middot; 14 pages</div>
             </div>
@@ -1147,6 +1175,11 @@ document.addEventListener('click', function(e) {
     document.getElementById('projectDropdown').classList.remove('open');
   }
 });
+
+function switchFrontend(which) {
+  localStorage.setItem('sb:frontend', which);
+  if (which === 'aurora') window.location.href = 'mockup-perplexity.html';
+}
 </script>
 
 </body>

@@ -7,7 +7,6 @@ import {
   FileText,
   Sparkles,
   Layers,
-  Share2,
   MessageSquare,
   Beaker,
   Clock,
@@ -92,7 +91,7 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
               <li>
                 <strong>Query or explore</strong> — use <span className="text-[var(--text-1)]">Chat</span>{" "}
                 to ask questions, or browse the <span className="text-[var(--text-1)]">Wiki</span>{" "}
-                and <span className="text-[var(--text-1)]">Graph</span> directly.
+                directly.
               </li>
               <li>
                 <strong>Generate outputs</strong> — from any wiki page, click{" "}
@@ -139,13 +138,6 @@ export function HelpModal({ open, onClose }: HelpModalProps) {
                   <strong>Jobs</strong> — every Claude subprocess (ingest,
                   synthesis, lint, research, output) with status + model. Click
                   the footer to slide up a live panel.
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <Share2 className="w-4 h-4 mt-0.5 opacity-60 shrink-0" />
-                <span>
-                  <strong>Graph</strong> — visual map of pages and wikilinks.
-                  Toggle subtree mode to see a single page&apos;s neighborhood.
                 </span>
               </li>
               <li className="flex items-start gap-2">
