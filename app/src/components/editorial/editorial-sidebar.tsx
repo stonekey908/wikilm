@@ -47,19 +47,6 @@ const NAV_ICONS: Record<EditorialView, React.ReactNode> = {
       <path d="M8 4v4l2.5 2.5" />
     </svg>
   ),
-  graph: (
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <circle cx="8" cy="8" r="2" />
-      <circle cx="3" cy="3" r="1.5" />
-      <circle cx="13" cy="3" r="1.5" />
-      <circle cx="3" cy="13" r="1.5" />
-      <circle cx="13" cy="13" r="1.5" />
-      <line x1="6.5" y1="6.5" x2="4" y2="4" />
-      <line x1="9.5" y1="6.5" x2="12" y2="4" />
-      <line x1="6.5" y1="9.5" x2="4" y2="12" />
-      <line x1="9.5" y1="9.5" x2="12" y2="12" />
-    </svg>
-  ),
   compose: (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
       <path d="M3 12l1-4 7-7 3 3-7 7-4 1z" />
@@ -124,7 +111,6 @@ export function EditorialSidebar() {
               <span className="si-icon">{NAV_ICONS[v]}</span>
               <span className="si-text">
                 {f.label}
-                {v === "graph" && <span className="si-beta">Beta</span>}
               </span>
               <span className="si-count"></span>
             </button>

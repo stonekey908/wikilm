@@ -12,9 +12,8 @@ const QUICK_ITEMS: Array<[string, string]> = [
   ["Salon", "Chat over the wiki — ask it how to do anything. Save a thread as a note. ⌘4"],
   ["The Edit", "Lint — orphan, dangling-wikilink, contradiction findings. Fix queues a repair. ⌘5"],
   ["Dispatch", "Every running job — ingest, research, lint, output. Live progress + cancel. ⌘6"],
-  ["Map", "Force-directed graph of the wiki. ⌘7"],
-  ["Dictation", "Generate report / summary / cheat sheet / deck / infographic. ⌘8"],
-  ["Press", "Model routing per job type, provider availability, UI tokens. ⌘9"],
+  ["Dictation", "Generate report / summary / cheat sheet / deck / infographic. ⌘7"],
+  ["Press", "Model routing per job type, provider availability, UI tokens. ⌘8"],
 ];
 
 const SHORTCUTS: Array<[string, string]> = [
