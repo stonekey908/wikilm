@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SecondBrain — Aurora Frontend</title>
+<title>wikiLM — Aurora Frontend</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@350..700&display=swap" rel="stylesheet">
 <style>
   /* ════════════════════════════════════════════════════════════
-     SecondBrain · "Aurora" — a clean, search-first frontend (Perplexity-inspired)
+     wikiLM · "Aurora" — a clean, search-first frontend (Perplexity-inspired)
      Clean, paper-warm, true-turquoise accent. No italics anywhere.
      Smooth cubic-bezier motion. Fully navigable: Discover, Sources,
      Wiki, Chat, Jobs, Graph, Settings.
@@ -598,6 +598,30 @@
   .mini-link { font-size: 12px; color: var(--accent); cursor: pointer; background: none; border: none; font-family: inherit; }
   .mini-link:hover { text-decoration: underline; }
 
+  /* ════════ Connections / integrations ════════ */
+  .intg { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 18px 20px; margin-bottom: 12px;
+    transition: all 200ms var(--ease); opacity: 0; transform: translateY(10px); animation: rise 500ms var(--ease) forwards; }
+  .intg:hover { border-color: var(--border-strong); box-shadow: var(--shadow-sm); }
+  .intg.off { opacity: 0.6; }
+  .intg-top { display: flex; align-items: center; gap: 13px; }
+  .intg-icon { width: 40px; height: 40px; border-radius: 11px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #fff; }
+  .intg-icon svg { width: 20px; height: 20px; }
+  .intg-name { font-size: 15px; font-weight: 620; color: var(--text-1); display: flex; align-items: center; gap: 9px; }
+  .intg-desc { font-size: 12.5px; color: var(--text-3); margin-top: 2px; line-height: 1.45; max-width: 64ch; }
+  .intg-status { font-size: 10.5px; font-weight: 680; padding: 2px 9px; border-radius: 100px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .intg-status.on { background: var(--green-wash); color: var(--green); }
+  .intg-status.avail { background: var(--accent-wash-2); color: var(--accent); }
+  .intg-status.no { background: var(--bg-2); color: var(--text-3); }
+  .intg-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .intg-config { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; }
+  .intg-field { display: flex; align-items: center; gap: 10px; }
+  .intg-field label { font-size: 12.5px; color: var(--text-2); font-weight: 520; width: 110px; flex-shrink: 0; }
+  .intg-input { flex: 1; background: var(--bg-0); border: 1px solid var(--border-input, var(--border)); border-radius: 9px; padding: 8px 11px;
+    font-family: ui-monospace, monospace; font-size: 12.5px; color: var(--text-1); outline: none; transition: all 150ms var(--ease); }
+  .intg-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
+  .intg-note { font-size: 11.5px; color: var(--text-4); display: flex; align-items: center; gap: 6px; }
+  .intg-note svg { width: 13px; height: 13px; }
+
   /* ════════ Command palette (⌘K) ════════ */
   .overlay { position: fixed; inset: 0; z-index: 300; background: rgba(10,10,12,0.42); backdrop-filter: blur(3px);
     display: flex; opacity: 0; pointer-events: none; transition: opacity 220ms var(--ease); }
@@ -768,7 +792,7 @@
       <div class="logo-mark">
         <svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.7"><circle cx="8" cy="8" r="3.3"/><path d="M8 1.2v2.2M8 12.6v2.2M1.2 8h2.2M12.6 8h2.2"/></svg>
       </div>
-      <span class="logo-text">SecondBrain</span>
+      <span class="logo-text">wikiLM</span>
       <button class="collapse-btn" onclick="toggleSidebar()" title="Collapse sidebar">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="3" width="12" height="10" rx="2"/><line x1="6" y1="3" x2="6" y2="13"/></svg>
       </button>
@@ -814,9 +838,9 @@
       <a class="nav-item" data-view="jobs" onclick="showView('jobs')">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.2"/><polyline points="8,4.5 8,8 10.5,9.8"/></svg>
         <span class="lbl">Jobs</span><span class="badge run">1</span></a>
-      <a class="nav-item" data-view="graph" onclick="showView('graph')">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="4" cy="4" r="2"/><circle cx="12" cy="4" r="2"/><circle cx="8" cy="12" r="2"/><line x1="5.5" y1="5" x2="7" y2="10.5"/><line x1="10.5" y1="5" x2="9" y2="10.5"/></svg>
-        <span class="lbl">Graph</span></a>
+      <a class="nav-item" data-view="connections" onclick="showView('connections')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6.5 9.5l-2 2a2.5 2.5 0 01-3.5-3.5l2-2"/><path d="M9.5 6.5l2-2a2.5 2.5 0 013.5 3.5l-2 2"/><line x1="6" y1="10" x2="10" y2="6"/></svg>
+        <span class="lbl">Connections</span></a>
     </nav>
 
     <div class="side-foot">
@@ -864,7 +888,7 @@
       <section class="view active" id="view-discover">
         <div class="home" id="home">
           <span class="hero-badge"><span class="pip"></span> 1 source ingesting · 24 indexed</span>
-          <h1 class="hero-title">Ask your <span class="grad">second brain</span></h1>
+          <h1 class="hero-title">Ask <span class="grad">wikiLM</span></h1>
           <p class="hero-sub">Search across your sources, wiki, and the open web — then file the best findings straight into your knowledge base.</p>
           <div class="composer-wrap">
             <div class="composer" id="composer">
@@ -990,7 +1014,7 @@
           <div class="chat-msgs" id="chatMsgs"></div>
           <div class="chat-composer">
             <div class="chat-box">
-              <input id="chatInput" placeholder="Message your second brain…" onkeydown="if(event.key==='Enter')sendChat()">
+              <input id="chatInput" placeholder="Message wikiLM…" onkeydown="if(event.key==='Enter')sendChat()">
               <button class="model-chip">Claude Opus 4.8 <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 6.5l3 3 3-3"/></svg></button>
               <button class="send" onclick="sendChat()"><svg width="17" height="17" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="13" x2="8" y2="3"/><path d="M4 7l4-4 4 4"/></svg></button>
             </div>
@@ -1007,25 +1031,78 @@
       </section>
 
       <!-- ════ GRAPH ════ -->
-      <section class="view" id="view-graph">
-        <div class="graph-wrap">
-          <div class="page-head row">
-            <div><h1 class="page-title">Knowledge graph</h1><p class="page-sub">87 pages · 142 links · hover a node to trace its connections</p></div>
-            <span class="spacer"></span>
-            <button class="btn ghost" onclick="showToast('Re-laying out graph…')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13 3v3h-3M3 13v-3h3"/><path d="M13 6A5.5 5.5 0 003 7M3 10a5.5 5.5 0 0010 -1"/></svg> Re-layout</button>
-          </div>
-          <div class="graph-stage" id="graphStage">
-            <div class="graph-ctrls">
-              <button class="gctrl" onclick="graphZoom(1.25)" title="Zoom in"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="8" y1="4" x2="8" y2="12"/><line x1="4" y1="8" x2="12" y2="8"/></svg></button>
-              <button class="gctrl" onclick="graphZoom(0.8)" title="Zoom out"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="4" y1="8" x2="12" y2="8"/></svg></button>
-              <button class="gctrl" onclick="graphReset()" title="Reset view"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M2 8a6 6 0 116 6"/><path d="M2 12V8h4"/></svg></button>
+      <section class="view" id="view-connections">
+        <div class="page">
+          <div class="page-head"><h1 class="page-title">Connections</h1><p class="page-sub">Bring wikiLM into your tools — drive it from Claude over MCP, sync to Notion, and let Obsidian draw the graph.</p></div>
+
+          <!-- Claude API -->
+          <div class="intg" style="animation-delay:0ms">
+            <div class="intg-top">
+              <span class="intg-icon" style="background:#d97757"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.7"><path d="M8 1.5l5.5 9.5h-11z"/><line x1="8" y1="6" x2="8" y2="9"/></svg></span>
+              <div><div class="intg-name">Claude API <span class="intg-status on">Connected</span></div>
+                <div class="intg-desc">Use your own Anthropic API key and model instead of a Claude subscription. Powers answers, chat, and synthesis.</div></div>
+              <div class="intg-actions"><button class="btn ghost" onclick="showToast('Tested — key valid')">Test</button></div>
+            </div>
+            <div class="intg-config">
+              <div class="intg-field"><label>API key</label><input class="intg-input" type="password" value="sk-ant-api03-•••••••••••••••••••••••" onchange="showToast('API key saved')"></div>
+              <div class="intg-field"><label>Model</label><div class="select" onclick="showToast('Model menu (mock)')">Claude Opus 4.8 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 6.5l3 3 3-3"/></svg></div>
+                <span class="intg-note"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6.5"/><line x1="8" y1="7" x2="8" y2="11"/><circle cx="8" cy="4.6" r="0.6" fill="currentColor"/></svg> Falls back to Claude Pro if no key is set</span></div>
             </div>
           </div>
-          <div class="graph-legend">
-            <div class="glegend"><span class="gl" style="background:var(--accent)"></span> Concept</div>
-            <div class="glegend"><span class="gl" style="background:#2f6fed"></span> Paper</div>
-            <div class="glegend"><span class="gl" style="background:#7c5cff"></span> Method</div>
-            <div class="glegend"><span class="gl" style="background:var(--amber)"></span> Note</div>
+
+          <!-- MCP connectivity -->
+          <div class="intg" style="animation-delay:60ms">
+            <div class="intg-top">
+              <span class="intg-icon" style="background:var(--accent)"><svg viewBox="0 0 16 16" fill="none" stroke="var(--accent-fg)" stroke-width="1.6"><path d="M6.5 9.5l-2 2a2.5 2.5 0 01-3.5-3.5l2-2"/><path d="M9.5 6.5l2-2a2.5 2.5 0 013.5 3.5l-2 2"/><line x1="6" y1="10" x2="10" y2="6"/></svg></span>
+              <div><div class="intg-name">MCP connectivity <span class="intg-status on">Enabled</span></div>
+                <div class="intg-desc">Control wikiLM from Claude Code, Desktop, or the web/mobile app over the Model Context Protocol — and let wikiLM reach other MCP servers (Notion, Tavily) in turn.</div></div>
+              <div class="intg-actions"><div class="toggle on" id="mcpToggle" onclick="toggleMcp()"></div></div>
+            </div>
+            <div class="intg-config">
+              <div class="intg-field"><label>Server</label><input class="intg-input" value="wikilm-mcp · node mcp/dist/index.js (stdio)" readonly></div>
+              <div class="intg-note"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="3,8 7,12 13,4"/></svg> Exposes list/search/read wiki, projects, and save-note tools to Claude</div>
+            </div>
+          </div>
+
+          <!-- Notion -->
+          <div class="intg" style="animation-delay:120ms">
+            <div class="intg-top">
+              <span class="intg-icon" style="background:#111"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.4"><rect x="3" y="2.5" width="10" height="11" rx="1"/><path d="M5.5 5.5v5M5.5 5.5l3 5M8.5 5.5v5"/></svg></span>
+              <div><div class="intg-name">Notion <span class="intg-status on">Synced</span></div>
+                <div class="intg-desc">Two-way sync your wiki to a Notion workspace, so you can read and edit it from Claude on web and mobile. Last synced 4 minutes ago.</div></div>
+              <div class="intg-actions"><button class="btn ghost" onclick="showToast('Syncing 87 pages to Notion…')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13 3v3h-3M3 13v-3h3"/><path d="M13 6A5.5 5.5 0 003 7M3 10a5.5 5.5 0 0010 -1"/></svg> Sync now</button></div>
+            </div>
+            <div class="intg-config">
+              <div class="intg-field"><label>Workspace</label><input class="intg-input" value="AI Research · /wikiLM (database)" readonly></div>
+              <div class="intg-field"><label>Direction</label><div class="select" onclick="showToast('Sync direction (mock)')">Two-way <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 6.5l3 3 3-3"/></svg></div></div>
+            </div>
+          </div>
+
+          <!-- Tavily (gated on MCP) -->
+          <div class="intg" id="tavilyCard" style="animation-delay:180ms">
+            <div class="intg-top">
+              <span class="intg-icon" style="background:#2f6fed"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.7"><circle cx="7" cy="7" r="4.5"/><line x1="10.5" y1="10.5" x2="14" y2="14"/></svg></span>
+              <div><div class="intg-name">Tavily <span class="intg-status avail" id="tavilyStatus">Available</span></div>
+                <div class="intg-desc">High-quality web search for research runs. Available whenever MCP connectivity is enabled.</div></div>
+              <div class="intg-actions"><button class="btn primary" id="tavilyBtn" onclick="showToast('Tavily connected')">Connect</button></div>
+            </div>
+            <div class="intg-config">
+              <div class="intg-field"><label>API key</label><input class="intg-input" type="password" placeholder="tvly-••••••••••••••••"></div>
+            </div>
+          </div>
+
+          <!-- Obsidian (replaces the graph) -->
+          <div class="intg" style="animation-delay:240ms">
+            <div class="intg-top">
+              <span class="intg-icon" style="background:#7c5cff"><svg viewBox="0 0 16 16" fill="none" stroke="#fff" stroke-width="1.4"><path d="M8 1.5l4.5 3v7L8 14.5 3.5 11.5v-7z"/><circle cx="8" cy="8" r="1.6"/></svg></span>
+              <div><div class="intg-name">Obsidian <span class="intg-status on">Vault linked</span></div>
+                <div class="intg-desc">wikiLM exports pages as linked Markdown into an Obsidian vault — so Obsidian's graph view does the heavy lifting, no in-app graph needed.</div></div>
+              <div class="intg-actions"><button class="btn ghost" onclick="showToast('Exported 87 pages to vault')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 2v8M4.5 6.5L8 10l3.5-3.5"/><path d="M2.5 11v2.5h11V11"/></svg> Export now</button></div>
+            </div>
+            <div class="intg-config">
+              <div class="intg-field"><label>Vault path</label><input class="intg-input" value="~/Obsidian/AI Research" onchange="showToast('Vault path saved')"></div>
+              <div class="intg-note"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8h10M8 3v10"/></svg> Pages link with [[wikilinks]]; open the vault in Obsidian to explore the graph</div>
+            </div>
           </div>
         </div>
       </section>
@@ -1135,7 +1212,7 @@
   ];
 
   const LIBRARY = [
-    { type:'PDF', color:'var(--red)', title:'Karpathy — LLM Wiki Second Brain', meta:'Medium · Apr 2026', status:'ingested', stat:'Ingested · 14 pages', cls:'pdf' },
+    { type:'PDF', color:'var(--red)', title:'Karpathy — Building an LLM Wiki', meta:'Medium · Apr 2026', status:'ingested', stat:'Ingested · 14 pages', cls:'pdf' },
     { type:'Web', color:'var(--accent)', title:'Attention Is All You Need', meta:'arXiv · 2017', status:'ingested', stat:'Ingested · 22 pages', cls:'web' },
     { type:'Web', color:'var(--accent)', title:'The Bitter Lesson — Rich Sutton', meta:'sutton.ca · 2019', status:'ingested', stat:'Ingested · 8 pages', cls:'web' },
     { type:'Note', color:'var(--amber)', title:'Meeting notes — AI strategy sync', meta:'Personal · Apr 12', status:'pending', stat:'Pending ingestion', cls:'note' },
@@ -1295,6 +1372,15 @@
     const tg = document.getElementById('setSideToggle'); if (tg) tg.classList.toggle('on', !c);
   }
   function toggleDrawer(){ const o = document.body.dataset.drawer === 'open'; document.body.dataset.drawer = o ? '' : 'open'; }
+  function toggleMcp(){
+    const t = document.getElementById('mcpToggle'); const on = t.classList.toggle('on');
+    // Tavily is only available when MCP connectivity is on
+    const card = document.getElementById('tavilyCard'), st = document.getElementById('tavilyStatus'), btn = document.getElementById('tavilyBtn');
+    card.classList.toggle('off', !on);
+    st.textContent = on ? 'Available' : 'Needs MCP'; st.className = 'intg-status ' + (on ? 'avail' : 'no');
+    btn.disabled = !on; btn.style.opacity = on ? '1' : '0.5'; btn.style.pointerEvents = on ? 'auto' : 'none';
+    showToast(on ? 'MCP connectivity enabled' : 'MCP connectivity disabled');
+  }
   function togglePill(el){ el.classList.toggle('on'); }
   function toggleProj(e){ e.stopPropagation(); document.getElementById('projMenu').classList.toggle('open'); }
   document.addEventListener('click', e => { if (!e.target.closest('.proj')) document.getElementById('projMenu').classList.remove('open'); });
@@ -1302,8 +1388,9 @@
   /* ───────── View routing ───────── */
   const built = {};
   function showView(name){
-    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     const view = document.getElementById('view-' + name);
+    if (!view) return; // unknown view — ignore (e.g. removed Graph)
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     view.classList.add('active');
     // Restart the entry animation so the transition plays on *every* navigation,
     // not just the first time the view is shown.
@@ -1316,7 +1403,6 @@
     if (name === 'wiki' && !built.wiki){ renderWikiList(); selectWiki(WIKI[0].slug); built.wiki = true; }
     if (name === 'chat' && !built.chat){ renderChat(); built.chat = true; }
     if (name === 'jobs'){ renderJobs(); }
-    if (name === 'graph' && !built.graph){ renderGraph(); built.graph = true; }
     if (name === 'settings'){ syncSettings(); }
   }
   function syncSettings(){
@@ -1525,7 +1611,7 @@
       <div class="cite-panel-body"><div>${rows}</div></div></div>`;
   }
   function msgHTML(m){
-    const who = m.who === 'user' ? 'You' : 'SecondBrain';
+    const who = m.who === 'user' ? 'You' : 'wikiLM';
     const av = m.who === 'user' ? 'NE' : '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="8" cy="8" r="3.3"/><path d="M8 1.2v2.2M8 12.6v2.2M1.2 8h2.2M12.6 8h2.2"/></svg>';
     const cites = m.who === 'bot' ? citePanelHTML(m.cites) : '';
     const actions = m.who === 'bot' ? `<div class="msg-actions"><button class="tool" onclick="showToast('Saved as note')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 2h10v13l-5-3.5L3 15z"/></svg> Save as note</button><button class="tool" onclick="showToast('Copied')"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="8" height="8" rx="1.5"/><path d="M6 3V2.5A1.5 1.5 0 017.5 1H13a1.5 1.5 0 011.5 1.5V8a1.5 1.5 0 01-1.5 1.5h-.5"/></svg> Copy</button></div>` : '';
@@ -1543,7 +1629,7 @@
     const box = document.getElementById('chatMsgs');
     const u = document.createElement('div'); u.className = 'msg user'; u.innerHTML = msgHTML({ who:'user', text:`<p>${q}</p>` }); box.appendChild(u);
     const b = document.createElement('div'); b.className = 'msg bot';
-    b.innerHTML = `<div class="av"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="8" cy="8" r="3.3"/><path d="M8 1.2v2.2M8 12.6v2.2M1.2 8h2.2M12.6 8h2.2"/></svg></div><div class="body"><div class="who">SecondBrain</div><div class="txt"><div class="typing"><span></span><span></span><span></span></div></div></div>`;
+    b.innerHTML = `<div class="av"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="8" cy="8" r="3.3"/><path d="M8 1.2v2.2M8 12.6v2.2M1.2 8h2.2M12.6 8h2.2"/></svg></div><div class="body"><div class="who">wikiLM</div><div class="txt"><div class="typing"><span></span><span></span><span></span></div></div></div>`;
     box.appendChild(b);
     document.getElementById('scroll').scrollTop = document.getElementById('scroll').scrollHeight;
     setTimeout(() => {
@@ -1705,7 +1791,7 @@
     { group:'Go to', icon:'wiki', label:'Wiki', run:()=>showView('wiki') },
     { group:'Go to', icon:'chat', label:'Chat', run:()=>showView('chat') },
     { group:'Go to', icon:'jobs', label:'Jobs', run:()=>showView('jobs') },
-    { group:'Go to', icon:'graph', label:'Graph', run:()=>showView('graph') },
+    { group:'Go to', icon:'conn', label:'Connections', run:()=>showView('connections') },
     { group:'Go to', icon:'gear', label:'Settings', run:()=>showView('settings') },
     { group:'Actions', icon:'plus', label:'New thread', sub:'⌘⇧O', run:()=>newThread() },
     { group:'Actions', icon:'theme', label:'Toggle light / dark', sub:'⌘J', run:()=>toggleTheme() },
@@ -1717,7 +1803,8 @@
     src:'<path d="M8 1.5v7M4.5 5L8 8.5 11.5 5"/><path d="M2 9.5v3.5h12V9.5"/>', wiki:'<path d="M3 2h7l3 3v9H3z"/>', chat:'<path d="M14 10a1.5 1.5 0 01-1.5 1.5h-7L2 14.5V3.5A1.5 1.5 0 013.5 2h9A1.5 1.5 0 0114 3.5z"/>',
     jobs:'<circle cx="8" cy="8" r="6.2"/><polyline points="8,4.5 8,8 10.5,9.8"/>', graph:'<circle cx="4" cy="4" r="2"/><circle cx="12" cy="4" r="2"/><circle cx="8" cy="12" r="2"/>',
     gear:'<circle cx="8" cy="8" r="2.3"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2"/>', plus:'<line x1="8" y1="3" x2="8" y2="13"/><line x1="3" y1="8" x2="13" y2="8"/>',
-    theme:'<circle cx="8" cy="8" r="3.3"/><line x1="8" y1="1" x2="8" y2="3"/><line x1="8" y1="13" x2="8" y2="15"/>', key:'<rect x="2" y="5" width="12" height="7" rx="1.5"/>'
+    theme:'<circle cx="8" cy="8" r="3.3"/><line x1="8" y1="1" x2="8" y2="3"/><line x1="8" y1="13" x2="8" y2="15"/>', key:'<rect x="2" y="5" width="12" height="7" rx="1.5"/>',
+    conn:'<path d="M6.5 9.5l-2 2a2.5 2.5 0 01-3.5-3.5l2-2"/><path d="M9.5 6.5l2-2a2.5 2.5 0 013.5 3.5l-2 2"/><line x1="6" y1="10" x2="10" y2="6"/>'
   };
   let palSel = 0, palItems = [];
   function openPalette(){ openOverlay('paletteOverlay'); const i = document.getElementById('paletteInput'); i.value=''; renderPalette(''); setTimeout(()=>i.focus(),60); }
@@ -1757,7 +1844,7 @@
     if (e.key === '/'){ e.preventDefault(); showView('discover'); newThread(); return; }
     if (e.key === '?'){ openShortcuts(); return; }
     if (e.key.toLowerCase() === 'g'){ gPending = true; setTimeout(()=>gPending=false, 800); return; }
-    if (gPending){ const map = { h:'home', d:'discover', s:'sources', w:'wiki', c:'chat', j:'jobs', r:'graph' }; const v = map[e.key.toLowerCase()]; if (v){ showView(v); } gPending = false; }
+    if (gPending){ const map = { h:'home', d:'discover', s:'sources', w:'wiki', c:'chat', j:'jobs', o:'connections' }; const v = map[e.key.toLowerCase()]; if (v){ showView(v); } gPending = false; }
   });
 
   /* ───────── Toast ───────── */
