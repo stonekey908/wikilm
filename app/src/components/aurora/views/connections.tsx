@@ -63,10 +63,38 @@ export function ConnectionsView() {
     setExporting(false);
   };
 
+  // ── Notion sync (token + parent page + push) ──
+  const [notion, setNotion] = useState<{ configured: boolean; maskedToken: string | null; parent: string | null; lastSync: string | null }>({ configured: false, maskedToken: null, parent: null, lastSync: null });
+  const [notionToken, setNotionToken] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  const saveNotion = async (patch: { token?: string; parent?: string }) => {
+    const r = await fetch("/api/connections/notion", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) });
+    setNotion(await r.json()); if (patch.token) setNotionToken("");
+    toast("Notion settings saved");
+  };
+  const testNotion = async () => {
+    try {
+      const r = await fetch("/api/connections/notion/test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(notionToken.trim() ? { token: notionToken.trim() } : {}) });
+      const d = await r.json();
+      addToast(d.ok ? { type: "success", title: "Notion token valid" } : { type: "error", title: "Test failed", description: d.error });
+    } catch { addToast({ type: "error", title: "Test failed" }); }
+  };
+  const syncNotion = async () => {
+    setSyncing(true);
+    try {
+      const r = await fetch("/api/connections/notion/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ projectId: 1 }) });
+      const d = await r.json();
+      if (r.ok) { addToast({ type: "success", title: "Synced to Notion", description: `${d.created} created, ${d.skipped} up to date${d.failed ? `, ${d.failed} failed` : ""}.` }); fetch("/api/connections/notion").then((x) => x.json()).then(setNotion); }
+      else addToast({ type: "error", title: "Sync failed", description: d.error });
+    } catch { addToast({ type: "error", title: "Sync failed" }); }
+    setSyncing(false);
+  };
+
   useEffect(() => {
     fetch("/api/connections/mcp").then((r) => r.json()).then((d) => setMcp(!!d.enabled)).catch(() => {});
     fetch("/api/connections/tavily").then((r) => r.json()).then(setTavily).catch(() => {});
     fetch("/api/connections/obsidian").then((r) => r.json()).then(setObsidian).catch(() => {});
+    fetch("/api/connections/notion").then((r) => r.json()).then(setNotion).catch(() => {});
   }, []);
 
   // ── Claude API (real, persisted via /api/connections/claude) ──
@@ -147,12 +175,22 @@ export function ConnectionsView() {
         <div className="intg">
           <div className="intg-top">
             <span className="intg-icon" style={{ background: "#111" }}><svg viewBox="0 0 16 16" fill="none" stroke="#fff" strokeWidth={1.4}><rect x="3" y="2.5" width="10" height="11" rx="1" /><path d="M5.5 5.5v5M5.5 5.5l3 5M8.5 5.5v5" /></svg></span>
-            <div><div className="intg-name">Notion <span className="intg-status on">Synced</span></div>
-              <div className="intg-desc">Two-way sync your wiki to a Notion workspace, so you can read and edit it from Claude on web and mobile.</div></div>
-            <div className="intg-actions"><button className="btn ghost" onClick={() => toast("Syncing to Notion…")}>Sync now</button></div>
+            <div><div className="intg-name">Notion <span className={cx("intg-status", notion.configured ? "on" : "no")}>{notion.configured ? (notion.lastSync ? "Synced" : "Connected") : "Not set"}</span></div>
+              <div className="intg-desc">Sync your wiki to a Notion workspace, so you can read and edit it from Claude on web and mobile.</div></div>
+            <div className="intg-actions">
+              <button className="btn ghost" onClick={testNotion}>Test</button>
+              <button className="btn primary" disabled={!notion.configured || !notion.parent || syncing} onClick={syncNotion}>{syncing ? "Syncing…" : "Sync now"}</button>
+            </div>
           </div>
           <div className="intg-config">
-            <div className="intg-field"><label>Workspace</label><input className="intg-input" defaultValue="AI Research · /wikiLM (database)" readOnly /></div>
+            <div className="intg-field"><label>Integration token</label>
+              <input className="intg-input" type="password" value={notionToken} placeholder={notion.maskedToken || "secret_…"}
+                onChange={(e) => setNotionToken(e.target.value)} onBlur={() => notionToken.trim() && saveNotion({ token: notionToken.trim() })}
+                onKeyDown={(e) => { if (e.key === "Enter" && notionToken.trim()) saveNotion({ token: notionToken.trim() }); }} /></div>
+            <div className="intg-field"><label>Parent page ID</label>
+              <input className="intg-input" defaultValue={notion.parent || ""} placeholder="32-char Notion page id"
+                onBlur={(e) => e.target.value.trim() !== (notion.parent || "") && saveNotion({ parent: e.target.value.trim() })} />
+              <span className="intg-note">{notion.lastSync ? `Last sync ${new Date(notion.lastSync).toLocaleString()}` : "Share the parent page with your integration"}</span></div>
           </div>
         </div>
 
